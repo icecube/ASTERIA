@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 
+
 class Interaction(ABC):
 
     def __init__(self):
@@ -20,12 +21,13 @@ class Interaction(ABC):
         super().__init__()
 
     @abstractmethod
-    def crossSection(self, Enu):
+    def cross_section(self, Enu):
         pass
 
     @abstractmethod
-    def meanLeptonEnergy(self, Enu):
+    def mean_lepton_energy(self, Enu):
         pass
+
 
 class InvBeta(Interaction):
 
@@ -36,15 +38,15 @@ class InvBeta(Interaction):
         self.Eth = self.Mn + self.Me - self.Mp
         self.delta = (self.Mn**2 - self.Mp**2 -self.Me**2) / (2*self.Mp)
 
-    def crossSection(self, Enu):
+    def cross_section(self, Enu):
         """Inverse beta decay cross section parameterization from Strumia and
         Vissani, Phys. Lett. B 564:42, 2003.
 
         Args:
-            Enu: neutrino energy with proper units. Can be an array.
+            :param Enu: neutrino energy with proper units. Can be an array.
 
         Returns:
-            Inverse beta cross section.
+            :return: Inverse beta cross section.
         """
         # Convert all units to MeV
         Enu = Enu.to('MeV').value
@@ -68,11 +70,12 @@ class InvBeta(Interaction):
             return 1e-43*u.cm**2 * pe * Ee * \
                    Enu**(-0.07056+0.02018*np.log(Enu)-0.001953*np.log(Enu)**3)
 
-    def meanLeptonEnergy(self, Enu):
+    def mean_lepton_energy(self, Enu):
         # Mean lepton energy from Abbasi et al., A&A 535:A109, 2011, p.6.
         # Could also use Strumia and Vissani eq. 16
         Elep = (Enu - self.delta)*(1. - Enu/(Enu + self.Mp))
         return Elep * u.MeV
+
 
 class InvBetaTabular(Interaction):
 
@@ -99,15 +102,15 @@ class InvBetaTabular(Interaction):
 
         self.XvsE = Tabular1D(self.E, self.x)
 
-    def crossSection(self, Enu):
+    def cross_section(self, Enu):
         """Tabular inverse beta decay cross section from Strumia and Vissani,
         Phys. Lett. B 564:42, 2003.
 
         Args:
-            Enu: neutrino energy with proper units. Can be an array.
+            :param Enu: neutrino energy with proper units. Can be an array.
 
         Returns:
-            Inverse beta cross section.
+            :return: Inverse beta cross section.
         """
         # Convert all units to MeV
         Enu = Enu.to('MeV').value
@@ -122,7 +125,7 @@ class InvBetaTabular(Interaction):
                 return self.XvsE(Enu) * 1e-41 * u.cm**2
             return 0.
 
-    def meanLeptonEnergy(self, Enu):
+    def mean_lepton_energy(self, Enu):
         pass
 
 fig, ax = plt.subplots(1,1, figsize=(9,6))
@@ -130,7 +133,7 @@ fig, ax = plt.subplots(1,1, figsize=(9,6))
 Enu = np.linspace(0., 200., 101) * u.MeV
 
 for ibd in [InvBeta(), InvBetaTabular()]:
-    xs = ibd.crossSection(Enu)
+    xs = ibd.cross_section(Enu)
     ax.plot(Enu, xs/1e-41)
 
 #ibd_parameterized = InvBeta()
