@@ -42,11 +42,8 @@ class InvBeta(Interaction):
         """Inverse beta decay cross section parameterization from Strumia and
         Vissani, Phys. Lett. B 564:42, 2003.
 
-        Args:
-            :param Enu: neutrino energy with proper units. Can be an array.
-
-        Returns:
-            :return: Inverse beta cross section.
+        :param Enu: neutrino energy with proper units. Can be an array.
+        :return: Inverse beta cross section.
         """
         # Convert all units to MeV
         Enu = Enu.to('MeV').value
@@ -106,11 +103,8 @@ class InvBetaTabular(Interaction):
         """Tabular inverse beta decay cross section from Strumia and Vissani,
         Phys. Lett. B 564:42, 2003.
 
-        Args:
-            :param Enu: neutrino energy with proper units. Can be an array.
-
-        Returns:
-            :return: Inverse beta cross section.
+        :param Enu: neutrino energy with proper units. Can be an array.
+        :return: Inverse beta cross section.
         """
         # Convert all units to MeV
         Enu = Enu.to('MeV').value

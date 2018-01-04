@@ -44,8 +44,7 @@ class NuFlux:
     def __init__(self, fitsfile):
         """Read in CCSN model data from a FITS file.
 
-        Args:
-            fitsfile (string): name of CCSN model file.
+        :param fitsfile: name of CCSN model file.
         """
 
         table = Table.read(fitsfile)
@@ -72,13 +71,10 @@ class NuFlux:
     def energy_spectrum_pdf(self, flavor, t, E):
         """Compute the PDF of the neutrino energy distribution at time t.
 
-        Args:
-            flavor (Flavor): neutrino flavor enum type.
-            t (astropy.units.quantity.Quantity): time w.r.t. core bounce.
-            E (numpy.array): sorted array of neutrino energies to used to compute the neutrino energy PDF.
-
-        Returns:
-            pdf (np.array): table of PDF values computed at E.
+         :param flavor: neutrino flavor enum type.
+         :param t: time w.r.t. core bounce.
+         :param E: sorted array of neutrino energies to used to compute the neutrino energy PDF.
+         :return pdf: table of PDF values computed at E.
         """
         # Given t, get current average energy and pinch parameter.
         # Use simple 1D linear interpolation
@@ -93,13 +89,10 @@ class NuFlux:
     def energy_spectrum_cdf(self, flavor, t, E):
         """Compute the CDF of the neutrino energy distribution at time t.
 
-        Args:
-            flavor (Flavor): neutrino flavor enum type.
-            t (astropy.units.quantity.Quantity): time w.r.t. core bounce.
-            E (numpy.array): sorted array of neutrino energies to used to compute the neutrino energy CDF.
-
-        Returns:
-            cdf (np.array): table of CDF values computed at E.
+         :param flavor: neutrino flavor enum type.
+         :param t: time w.r.t. core bounce.
+         :param E: sorted array of neutrino energies to used to compute the neutrino energy CDF.
+         :return cdf: table of CDF values computed at E.
         """
         # Given t, get current average energy and pinch parameter.
         # Use simple 1D linear interpolation
@@ -114,14 +107,11 @@ class NuFlux:
         particular neutrino flavor. The energies are generated via inverse
         transform sampling of the CDF of the neutrino energy distribution.
 
-        Args:
-            flavor (Flavor): neutrino flavor enum type.
-            t (astropy.units.quantity.Quantity): time w.r.t. core bounce.
-            E (numpy.array): sorted array of neutrino energies to used to compute the neutrino energy CDF.
-            n (int): number of energies to sample from the CDF.
-
-        Returns:
-            energies (np.array): list of n energies sampled from the CDF.
+        :param flavor: neutrino flavor enum type.
+        :param t: time w.r.t. core bounce.
+        :param E: sorted array of neutrino energies to used to compute the neutrino energy CDF.
+        :param n: number of energies to sample from the CDF.
+        :return energies: list of n energies sampled from the CDF.
         """
         cdf = self.energy_spectrum_cdf(flavor, t, E)
         energies = np.zeros(n, dtype=float)
