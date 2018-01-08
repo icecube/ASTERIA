@@ -17,7 +17,7 @@ for ibd, style, lab in zip([InvBetaPar(), InvBetaTab()],
                            ['Parametric (Eq. 25)', 'Table 1']):
     xs = ibd.cross_section(Flavor.nu_e_bar, enu)
     lep = ibd.mean_lepton_energy(Flavor.nu_e_bar, enu)
-    axes[0][0].plot(enu, xs/1e-41, style, label=lab)
+    axes[0][0].plot(enu, xs, style, label=lab)
     axes[0][1].plot(enu, lep, style, label=lab)
 
     # Plot residuals
@@ -31,7 +31,8 @@ for ibd, style, lab in zip([InvBetaPar(), InvBetaTab()],
     xs_old = xs
     lep_old = lep
 
-axes[0,0].set(ylabel=r'$\sigma(\bar{\nu}_e p)$ [10$^{-41}$ cm$^2$]')
+axes[0,0].set(ylabel=r'$\sigma(\bar{\nu}_e p\rightarrow e^{+}n)$ [cm$^2$]',
+              yscale='log')
 axes[1,0].set(xlabel=r'$E_\nu$ [MeV]',
               ylabel=r'$\Delta\sigma/\sigma$ [%]',
               ylim=[-1.2,1.2])

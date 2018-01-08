@@ -45,6 +45,7 @@ class InvBetaPar(Interaction):
     def cross_section(self, flavor, e_nu):
         """Inverse beta decay cross section, Strumia and Vissani eq. 25.
 
+        :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Inverse beta cross section.
         """
@@ -79,6 +80,10 @@ class InvBetaPar(Interaction):
     def mean_lepton_energy(self, flavor, e_nu):
         """Mean lepton energy from Abbasi et al., A&A 535:A109, 2011, p.6.
         Could also use Strumia and Vissani eq. 16.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :return: mean energy of the emitted lepton.
         """
         # Only works for electron antineutrinos
         if flavor != Flavor.nu_e_bar:
@@ -142,6 +147,7 @@ class InvBetaTab(Interaction):
         """Tabulated inverse beta decay cross section from
         Strumia and Vissani, Table 1.
 
+        :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Inverse beta cross section.
         """
@@ -175,6 +181,7 @@ class InvBetaTab(Interaction):
         """Tabulated mean lepton energy after the interaction from
         Strumia and Vissani, Table 1.
 
+        :param flavor: neutrino flavor
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Mean lepton energy after the interaction.
         """
@@ -218,6 +225,10 @@ class ElectronScatter(Interaction):
 
     def cross_section(self, flavor, e_nu):
         """Cross section from Marciano and Parsa, J. Phys. G 29:2969, 2003.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :return: neutrino cross section.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
@@ -287,6 +298,10 @@ class Oxygen16NC(Interaction):
 
     def cross_section(self, flavor, e_nu):
         """Calculate cross section.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :return: neutrino cross section.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
@@ -302,6 +317,10 @@ class Oxygen16NC(Interaction):
 
     def mean_lepton_energy(self, flavor, e_nu):
         """Calculate mean lepton energy.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :return: mean energy of emitted lepton.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
