@@ -248,31 +248,68 @@ class ElectronScatter(Interaction):
         pass
 
 
-    class Oxygen16CC(Interaction):
-        """O16 charged current interaction, using estimates from Kolbe et al.,
-        PRD 66:013007, 2002.
+class Oxygen16CC(Interaction):
+    """O16 charged current interaction, using estimates from Kolbe et al.,
+    PRD 66:013007, 2002.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def cross_section(self, flavor, e_nu):
+        pass
+
+    def mean_lepton_energy(self, flavor, e_nu):
+        pass
+
+
+class Oxygen16NC(Interaction):
+    """O16 neutral current interaction, using estimates from Kolbe et al.,
+    PRD 66:013007, 2002.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+        # Energy threshold for interaction [MeV]
+        self.Eth = 12.
+
+        # Relative contribution from photon production to NC cross section
+        self.relative_photon_prob = 0.249 + 0.067
+        self.mean_photon_energy = 4.7
+
+        # Relative contribution from neutron production to NC cross section
+        self.relative_neutron_prob = 0.187 + 0.067 + 0.085 + 0.007
+        self.mean_neutron_energy = 0.95
+
+        self._lepton_energy = self.relative_neutron_prob*self.mean_neutron_energy + \
+                              self.relative_photon_prob*self.mean_photon_energy
+
+    def cross_section(self, flavor, e_nu):
+        """Calculate cross section.
         """
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
 
-        def __init__(self):
-            super().__init__()
+        if isinstance(Enu, (list, tuple, np.ndarray)):
+            xs = np.where(Enu <= self.Eth, 0., 6.7e-40 * (Enu**0.208 - 8.**0.25)**6)
+            # xs[cut] = 6.7e-40 * (Enu[cut]**0.208 - 8.**0.25)**6
+        else:
+            if Enu < self.Eth:
+                return 0 * u.cm**2
+            xs = 6.7e-40 * (Enu**0.208 - 8.**0.25)**6
+        return xs * u.cm**2
 
-        def cross_section(self, flavor, e_nu):
-            pass
-
-        def mean_lepton_energy(self, flavor, e_nu):
-            pass
-
-
-    class Oxygen16NC(Interaction):
-        """O16 neutral current interaction, using estimates from Kolbe et al.,
-        PRD 66:013007, 2002.
+    def mean_lepton_energy(self, flavor, e_nu):
+        """Calculate mean lepton energy.
         """
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
 
-        def __init__(self):
-            super().__init__()
-
-        def cross_section(self, flavor, e_nu):
-            pass
-
-        def mean_lepton_energy(self, flavor, e_nu):
-            pass
+        if isinstance(Enu, (list, tuple, np.ndarray)):
+            lep = np.where(Enu <= self.Eth, 0., self._lepton_energy)
+        else:
+            if Enu < self.Eth:
+                lep = 0.
+            lep = self._lepton_energy
+        return lep * u.MeV
