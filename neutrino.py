@@ -18,12 +18,43 @@ class Ordering(Enum):
 
 
 class Flavor(Enum):
+    """Encapsulate neutrino flavors as a python enum.
+    """
+
     nu_e = 1
     nu_mu = 2
     nu_tau = 3
     nu_e_bar = -1
     nu_mu_bar = -2
     nu_tau_bar = -3
+
+    @property
+    def is_electron(self):
+        return self in (Flavor.nu_e, Flavor.nu_e_bar)
+
+    @property
+    def is_muon(self):
+        return self in (Flavor.nu_mu, Flavor.nu_mu_bar)
+
+    @property
+    def is_tau(self):
+        return self in (Flavor.tau_mu, Flavor.tau_mu_bar)
+
+    @property
+    def is_x(self):
+        return self in (Flavor.nu_mu, Flavor.nu_tau)
+
+    @property
+    def is_xbar(self):
+        return self in (Flavor.nu_mu_bar, Flavor.nu_tau_bar)
+
+    @property
+    def is_neutrino(self):
+        return self in (Flavor.nu_e, Flavor.nu_mu, Flavor.nu_tau)
+
+    @property
+    def is_antineutrino(self):
+        return self in (Flavor.nu_e_bar, Flavor.nu_mu_bar, Flavor.nu_tau_bar)
 
 
 neutrinos = (Flavor.nu_e, Flavor.nu_mu, Flavor.nu_tau)

@@ -1,3 +1,5 @@
+from neutrino import Flavor
+
 from abc import ABC, abstractmethod
 
 import astropy.units as u
@@ -20,11 +22,11 @@ class Interaction(ABC):
         super().__init__()
 
     @abstractmethod
-    def cross_section(self, e_nu):
+    def cross_section(self, flavor, e_nu):
         pass
 
     @abstractmethod
-    def mean_lepton_energy(self, e_nu):
+    def mean_lepton_energy(self, flavor, e_nu):
         pass
 
 
@@ -39,12 +41,18 @@ class InvBetaPar(Interaction):
         self.Eth = self.Mn + self.Me - self.Mp
         self.delta = (self.Mn ** 2 - self.Mp ** 2 - self.Me ** 2) / (2 * self.Mp)
 
-    def cross_section(self, e_nu):
+    def cross_section(self, flavor, e_nu):
         """Inverse beta decay cross section, Strumia and Vissani eq. 25.
 
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Inverse beta cross section.
         """
+        # Only works for electron antineutrinos
+        if flavor != Flavor.nu_e_bar:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros(len(e_nu), dtype=float) * u.cm**2
+            return 0. * u.cm**2
+
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
 
@@ -67,9 +75,16 @@ class InvBetaPar(Interaction):
             return 1e-43 * u.cm ** 2 * pe * Ee * \
                 Enu ** (-0.07056 + 0.02018 * np.log(Enu) - 0.001953 * np.log(Enu) ** 3)
 
-    def mean_lepton_energy(self, e_nu):
-        # Mean lepton energy from Abbasi et al., A&A 535:A109, 2011, p.6.
-        # Could also use Strumia and Vissani eq. 16.
+    def mean_lepton_energy(self, flavor, e_nu):
+        """Mean lepton energy from Abbasi et al., A&A 535:A109, 2011, p.6.
+        Could also use Strumia and Vissani eq. 16.
+        """
+        # Only works for electron antineutrinos
+        if flavor != Flavor.nu_e_bar:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros(len(e_nu), dtype=float) * u.MeV
+            return 0. * u.MeV
+
         Enu = e_nu.to('MeV').value
 
         # Handle possibility of list/array input
@@ -122,13 +137,19 @@ class InvBetaTab(Interaction):
         self.lepVsE = interpolate.interp1d(self.E, self.lep)
 #        self.loglepVslogE = interpolate.interp1d(np.log10(self.E), np.log10(self.lep))
 
-    def cross_section(self, e_nu):
+    def cross_section(self, flavor, e_nu):
         """Tabulated inverse beta decay cross section from
         Strumia and Vissani, Table 1.
 
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Inverse beta cross section.
         """
+        # Only works for electron antineutrinos
+        if flavor != Flavor.nu_e_bar:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros(len(e_nu), dtype=float) * u.cm**2
+            return 0. * u.cm**2
+
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
 #        logEnu = np.log10(e_nu.to('MeV').value)
@@ -149,13 +170,18 @@ class InvBetaTab(Interaction):
 #                return 10**(self.logxVslogE(logEnu) - 41) * u.cm ** 2
             return 0. * u.cm**2
 
-    def mean_lepton_energy(self, e_nu):
+    def mean_lepton_energy(self, flavor, e_nu):
         """Tabulated mean lepton energy after the interaction from
         Strumia and Vissani, Table 1.
 
         :param e_nu: neutrino energy with proper units. Can be an array.
         :return: Mean lepton energy after the interaction.
         """
+        # Only works for electron antineutrinos
+        if flavor != Flavor.nu_e_bar:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros(len(e_nu), dtype=float) * u.MeV
+            return 0. * u.MeV
 
         # Perform calculation in MeV
         Enu = e_nu.to('MeV').value
@@ -192,8 +218,8 @@ enu = np.linspace(0., 200., 101) * u.MeV
 for ibd, style, lab in zip([InvBetaPar(), InvBetaTab()],
                            ['-', '.'],
                            ['Parametric (Eq. 25)', 'Table 1']):
-    xs = ibd.cross_section(enu)
-    lep = ibd.mean_lepton_energy(enu)
+    xs = ibd.cross_section(Flavor.nu_e_bar, enu)
+    lep = ibd.mean_lepton_energy(Flavor.nu_e_bar, enu)
     axes[0][0].plot(enu, xs/1e-41, style, label=lab)
     axes[0][1].plot(enu, lep, style, label=lab)
 
