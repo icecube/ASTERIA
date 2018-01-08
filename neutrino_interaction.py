@@ -2,22 +2,22 @@
 decay and neutrino electron scattering. """
 
 import numpy
-from astropy import units
+from astropy import units as u
 
 import neutrino
 
 # Constants
 # mass constants
-MASS_P = 938.272081358*units.MeV
-MASS_N = 939.5654133*units.MeV
-MASS_E = 0.510998946131*units.MeV
+MASS_P = 938.272081358*u.MeV
+MASS_N = 939.5654133*u.MeV
+MASS_E = 0.510998946131*u.MeV
 DELTA_NP = MASS_N-MASS_P # neutron-proton mass difference; unit MeV
 
 # cherenkov threshold energy
-CHERENKOV_ERG_THRESHOLD = 0.783*units.MeV
+CHERENKOV_ERG_THRESHOLD = 0.783*u.MeV
 
 # coupling constants
-FERMI_COUPLING = 1.16637876e-11/units.MeV**2
+FERMI_COUPLING = 1.16637876e-11/u.MeV**2
 
 # cabbibo angle
 CABBIBO_COS2 = 0.94984516
@@ -28,15 +28,15 @@ WEIGNBERG_COS2 = 0.768705
 WEIGNBERG_SIN2 = 0.231295
 
 # conversion factor
-HBAR_C = 197.326978812e-13*units.MeV *units.cm
+HBAR_C = 197.326978812e-13*u.MeV *u.cm
 
 def compton_electron_prob(erg_e, erg_photon):
     """ Unnormalized energy distribution of electron in compton-scattering given photon
     energy and electron energy in MeV.
     Inputs:
-    + erg_e: astropy.units.Quantity
+    + erg_e: astropy.u.Quantity
         Electron energy in MeV.
-    + erg_photon: astropy.units.Quantity
+    + erg_photon: astropy.u.Quantity
         Photon  energy in MeV.
     Outputs:
     + prob: float
@@ -60,10 +60,10 @@ def compton_electron_prob(erg_e, erg_photon):
 def compton_electron_mean_erg(erg_photon):
     """ Compute the mean energy in MeV of electrons given photon energy in MeV
     Inputs:
-    + erg_photon: astropy.units.Quantity
+    + erg_photon: astropy.u.Quantity
         Photon  energy in MeV.
     Outputs:
-    + mean_aerg: astropy.units.Quantity
+    + mean_aerg: astropy.u.Quantity
         Mean energy of electron in MeV.
     """
     try:
@@ -75,7 +75,7 @@ def compton_electron_mean_erg(erg_photon):
     min_erg = CHERENKOV_ERG_THRESHOLD-MASS_E
     max_erg = 2.*erg_photon**2/(MASS_E+2*erg_photon)
     if min_erg >= max_erg:
-        return 0*units.MeV
+        return 0*u.MeV
 
     # define energy distribution
     nstep = 100000
@@ -100,7 +100,7 @@ class InverseBetaDecay(object):
         """ Constructor to define class variables and constants """
         # energy threshold for inverse beta-decay
         # minimum energy 1.806 MeV, below minimum energy cross section is 0
-        self._min_erg = 1.806*units.MeV
+        self._min_erg = 1.806*u.MeV
 
     def cross_section(self, erg_nu):
         """ Calculate the cross section in cm2 of inverse beta decay
@@ -108,10 +108,10 @@ class InverseBetaDecay(object):
         This approximation agrees well with the full result for neutrino energy
         less than 300 MeV.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm2.
         """
         # convert neutrino energy unit into MeV
@@ -125,7 +125,7 @@ class InverseBetaDecay(object):
         if not hasattr(erg_nu.value, "__len__"):
             # if energy is less than threshold, cross section is 0 cm2
             if erg_nu <= self._min_erg:
-                return 0*units.cm**2
+                return 0*u.cm**2
             isarray = False
 
         # define parameters and cross section
@@ -134,7 +134,7 @@ class InverseBetaDecay(object):
         if isarray:
             p_pos = numpy.sqrt(erg_pos**2-MASS_E**2,
                                out=numpy.zeros_like(erg_nu),
-                               where=erg_pos > MASS_E)*units.MeV
+                               where=erg_pos > MASS_E)*u.MeV
         else:
             p_pos = erg_pos**2-MASS_E**2
 
@@ -147,32 +147,32 @@ class InverseBetaDecay(object):
         # if energy less than threshold, cross section is 0 cm2
         if isarray:
             cross_section[erg_nu <= self._min_erg] = 0
-        return cross_section*units.cm**2
+        return cross_section*u.cm**2
 
     def mean_leptonic_energy(self, erg_nu):
         """ Calculate the mean leptonic energy in MeV of inverse beta decay
         given neutrino energy in MeV.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         Outputs:
-        - mean_erg_lep: astropy.units.Quantity
+        - mean_erg_lep: astropy.u.Quantity
             Return the mean leptonic energy in MeV.
         """
         # minimum energy threshold
         min_erg = self._min_erg+CHERENKOV_ERG_THRESHOLD
 
         # compton-cherenkov energy
-        neutron_mean_erg_e = 0.95*units.MeV
+        neutron_mean_erg_e = 0.95*u.MeV
 
         # calculate mean leptonic energy in MeV
         delta = MASS_N**2-MASS_P**2-MASS_E**2
         mean_erg_lep = (erg_nu-delta)*(1.-erg_nu/(erg_nu+MASS_P))
         mean_erg_lep += neutron_mean_erg_e-CHERENKOV_ERG_THRESHOLD
         if hasattr(erg_nu, '__len__'):
-            mean_erg_lep[erg_nu <= min_erg] = 0.*units.MeV
+            mean_erg_lep[erg_nu <= min_erg] = 0.*u.MeV
         elif erg_nu <= min_erg:
-            mean_erg_lep = 0.*units.MeV
+            mean_erg_lep = 0.*u.MeV
 
         return mean_erg_lep
 
@@ -192,7 +192,7 @@ class NeutrinoElectronScatter(object):
         assuming that transfer momentum is much less than mediator's mass (W, Z).
         Only neutrino electron and anti-neutrino electorn interacts.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         - flavor_nu: int or neutrino.Flavor
             Neutrino flavor. Can be an integer or an instance of neutrino.Flavor.
@@ -200,7 +200,7 @@ class NeutrinoElectronScatter(object):
                 +1: nu_e     +2: nu_mu     +3: nu_tau
                 -1: nu_e_bar -2: nu_mu_bar -3: nu_tau_bar
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm2.
         """
         # convert neutrino energy unit into MeV
@@ -239,7 +239,7 @@ class NeutrinoElectronScatter(object):
             - y_max**2*(epsilon_p*epsilon_m*MASS_E/erg_nu+2*epsilon_p**2)/2
             + y_max*(epsilon_p**2+epsilon_m**2))
 
-        return cross_section*units.cm**2
+        return cross_section*u.cm**2
 
     def mean_leptonic_energy(self):
         pass
@@ -250,9 +250,9 @@ class NeutrinoOxygen16CC(object):
     def __init__(self):
         """ Constructor set variable """
         # Minimum energy threshold of neutrino and anti-neutrino
-        self._min_nu_erg = 15.4*units.MeV
-        self._min_nubar_erg = 11.4*units.MeV
-        self._nubar_threshold = 42.3293*units.MeV
+        self._min_nu_erg = 15.4*u.MeV
+        self._min_nubar_erg = 11.4*u.MeV
+        self._nubar_threshold = 42.3293*u.MeV
 
     def _cross_section_par(self, erg_nu, *pars):
         """ General parameterized form of neutrino O16 CC interaction """
@@ -263,7 +263,7 @@ class NeutrinoOxygen16CC(object):
         interaction using parameterized equations given neutrino energy in MeV
         and flavor. Only neutrino electron and anti-neutrino electorn interacts.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         - flavor_nu: int or neutrino.Flavor
             Neutrino flavor. Can be an integer or an instance of neutrino.Flavor.
@@ -271,7 +271,7 @@ class NeutrinoOxygen16CC(object):
                 +1: nu_e     +2: nu_mu     +3: nu_tau
                 -1: nu_e_bar -2: nu_mu_bar -3: nu_tau_bar
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm^2."""
         # convert neutrino energy unit into MeV
         try:
@@ -319,15 +319,15 @@ class NeutrinoOxygen16CC(object):
             # only nue and nue interacts
             cross_section = erg_nu.value-erg_nu.value
 
-        # return cross section in units of cm2
-        return cross_section*units.cm**2
+        # return cross section in u of cm2
+        return cross_section*u.cm**2
 
     def mean_leptonic_energy(self, erg_nu, flavor_nu):
         """ Calculate the mean leptonic energy in MeV of charged current
         neutrino O16 interaction given neutrino energy in MeV and flavor.
         Only neutrino electron and anti-neutrin electorn interacts.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         - flavor_nu: int or neutrino.Flavor
             Neutrino flavor. Can be an integer or an instance of neutrino.Flavor.
@@ -335,7 +335,7 @@ class NeutrinoOxygen16CC(object):
                 +1: nu_e     +2: nu_mu     +3: nu_tau
                 -1: nu_e_bar -2: nu_mu_bar -3: nu_tau_bar
         Outputs:
-        - mean_erg_nu: astropy.units.Quantity
+        - mean_erg_nu: astropy.u.Quantity
             Return the mean leptonic energy in MeV."""
         # convert neutrino energy unit into MeV
         try:
@@ -355,12 +355,12 @@ class NeutrinoOxygen16CC(object):
             else:
                 min_erg = self._min_nubar_erg+CHERENKOV_ERG_THRESHOLD
             mean_erg_lep = erg_nu-min_erg
-            mean_erg_lep = numpy.minimum(mean_erg_lep, 0.*units.MeV)
+            mean_erg_lep = numpy.minimum(mean_erg_lep, 0.*u.MeV)
         else:
             # only nue and nuebar interacts
             mean_erg_lep = erg_nu-erg_nu
 
-        # return mean leptonic energy in units of MeV
+        # return mean leptonic energy in u of MeV
         return mean_erg_lep
 
     @property
@@ -385,16 +385,16 @@ class NeutrinoOxygen16NC(object):
     def __init__(self):
         """ Constructor set variable """
         # Minimum energy threshold of neutrino
-        self._min_erg = 12.*units.MeV
+        self._min_erg = 12.*u.MeV
 
     def cross_section(self, erg_nu):
         """ Calculate the cross section in cm2 of neutral current neutrino O16
         interaction using parameterized equations given neutrino erg in MeV.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm^2.
         """
         # convert neutrino energy unit into MeV
@@ -411,17 +411,17 @@ class NeutrinoOxygen16NC(object):
             cross_section = 0
 
         # return cross section in unit of cm^2
-        return cross_section*units.cm**2
+        return cross_section*u.cm**2
 
 
     def mean_leptonic_energy(self, erg_nu):
         """ Calculate the mean leptonic energy in MeV of charged current
         neutrino O16 interaction given neutrino energy in MeV.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         Outputs:
-        - mean_erg_lep: astropy.units.Quantity
+        - mean_erg_lep: astropy.u.Quantity
             Return the mean leptonic energy in MeV. Return 0 if energy is less
             than energy threshold."""
         # convert neutrino energy unit into MeV
@@ -449,7 +449,7 @@ class NeutrinoOxygen16NC(object):
             mean_erg_lep = 0.
 
         # return energy in MeV
-        return mean_erg_lep*units.MeV
+        return mean_erg_lep*u.MeV
 
     @property
     def min_erg(self):
@@ -463,13 +463,13 @@ class NeutrinoOxygen18(object):
     def __init__(self):
         """ Constructor sets up variables """
         self._O18_per_O = 0.002 # fraction of 018 isotope
-        self._min_erg = 1.66*units.MeV  # min energy for interaction
+        self._min_erg = 1.66*u.MeV  # min energy for interaction
 
     def cross_section(self, erg_nu, flavor_nu):
         """ Calculate the cross section in cm2 of neutrino-018 interaction
         given neutrino energy in MeV and neutrino flavor.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         - flavor_nu: int or neutrino.Flavor
             Neutrino flavor. Can be an integer or an instance of neutrino.Flavor.
@@ -477,7 +477,7 @@ class NeutrinoOxygen18(object):
                 +1: nu_e     +2: nu_mu     +3: nu_tau
                 -1: nu_e_bar -2: nu_mu_bar -3: nu_tau_bar
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm^2.
         """
         # convert neutrino energy unit into MeV
@@ -490,7 +490,7 @@ class NeutrinoOxygen18(object):
         if isinstance(flavor_nu, neutrino.Flavor):
             flavor_nu = flavor_nu.value
         if flavor_nu != 1:
-            return (erg_nu-erg_nu).value*units.cm**2
+            return (erg_nu-erg_nu).value*u.cm**2
 
         # calculate cross section for nue-018
         cross_section = 1.7e-50*erg_nu**2+1.6e-49*erg_nu-0.9e-49
@@ -500,14 +500,14 @@ class NeutrinoOxygen18(object):
         elif erg_nu <= self._min_erg:
             cross_section = 0.
 
-        # return cross section in units of cm2
-        return cross_section*units.cm**2
+        # return cross section in u of cm2
+        return cross_section*u.cm**2
 
     def mean_leptonic_energy(self, erg_nu, flavor_nu):
         """ Calculate the mean leptonic energy in MeV of nu-018 interaction
         given neutrino energy in MeV and neutrino flavor.
         Inputs:
-        - erg_nu: astropy.units.Quantity
+        - erg_nu: astropy.u.Quantity
             Neutrino energy in MeV.
         - flavor_nu: int or neutrino.Flavor
             Neutrino flavor. Can be an integer or an instance of neutrino.Flavor.
@@ -515,7 +515,7 @@ class NeutrinoOxygen18(object):
                 +1: nu_e     +2: nu_mu     +3: nu_tau
                 -1: nu_e_bar -2: nu_mu_bar -3: nu_tau_bar
         Outputs:
-        - cross_section: astropy.units.Quantity
+        - cross_section: astropy.u.Quantity
             Return the full cross secton in cm^2."""
         # convert neutrino energy unit into MeV
         try:
@@ -527,12 +527,12 @@ class NeutrinoOxygen18(object):
         if isinstance(flavor_nu, neutrino.Flavor):
             flavor_nu = flavor_nu.value
         if flavor_nu != 1:
-            return (erg_nu-erg_nu).value*units.cm**2
+            return (erg_nu-erg_nu).value*u.cm**2
 
         # calculate mean leptonic energy in MeV
         min_erg = self._min_erg+CHERENKOV_ERG_THRESHOLD
         mean_erg_lep = erg_nu-min_erg
-        mean_erg_lep = numpy.minimum(mean_erg_lep, 0.*units.MeV)
+        mean_erg_lep = numpy.minimum(mean_erg_lep, 0.*u.MeV)
 
         return mean_erg_lep
 
