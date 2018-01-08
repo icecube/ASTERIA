@@ -2,8 +2,7 @@ from abc import ABC, abstractmethod
 
 import astropy.units as u
 import astropy.constants as c
-from astropy.modeling.tabular import Tabular1D
-# from astropy.io import ascii
+from scipy import interpolate
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -94,6 +93,7 @@ class InvBetaTab(Interaction):
 
         # Calculate IBD threshold
         self.Eth = self.Mn + self.Me - self.Mp
+#        self.logEth = np.log10(self.Mn + self.Me - self.Mp)
 
         # Tabulated energy values [MeV], Strumia and Vissani Table 1
         self.E = [1.806, 2.01, 2.25, 2.51, 2.8, 3.12, 3.48, 3.89, 4.33, 4.84,
@@ -103,7 +103,7 @@ class InvBetaTab(Interaction):
                   129.0, 144.0, 160.0, 179.0, 200.0]
 
         # Tabulated cross sections [1e-41 cm2], Strumia and Vissani Table 1
-        self.x = [0., 0.00351, 0.00735, 0.0127, 0.0202, 0.0304, 0.044, 0.0619,
+        self.x = [1e-20, 0.00351, 0.00735, 0.0127, 0.0202, 0.0304, 0.044, 0.0619,
                   0.0854, 0.116, 0.155, 0.205, 0.269, 0.349, 0.451, 0.511,
                   0.654, 0.832, 1.05, 1.33, 1.67, 2.09, 2.61, 3.24,
                   4.01, 4.95, 6.08, 7.44, 9.08, 11.0, 12.1, 14.7,
@@ -111,14 +111,16 @@ class InvBetaTab(Interaction):
                   54.6, 62.7, 71.5, 81.0, 91.3, 102.0]
 
         # Tabulated mean lepton energy [MeV], Strumia and Vissani Table 1
-        self.lep = [0, 0.719, 0.952, 1.21, 1.50, 1.82, 2.18, 2.58, 3.03, 3.52,
+        self.lep = [1e-20, 0.719, 0.952, 1.21, 1.50, 1.82, 2.18, 2.58, 3.03, 3.52,
                     4.08, 4.69, 5.38, 6.15, 7.00, 7.46, 8.47, 9.58, 10.8, 12.2,
                     13.7, 15.5, 17.4, 19.5, 21.8, 24.4, 27.3, 30.5, 34.1, 38.0,
                     40.2, 44.8, 49.9, 55.6, 61.8, 68.8, 76.5, 85.0, 94.5, 105.,
                     117., 130., 144., 161., 179.]
 
-        self.XvsE = Tabular1D(self.E, self.x)
-        self.lepVsE = Tabular1D(self.E, self.lep)
+        self.XvsE = interpolate.interp1d(self.E, self.x)
+#        self.logxVslogE = interpolate.interp1d(np.log10(self.E), np.log10(self.x))
+        self.lepVsE = interpolate.interp1d(self.E, self.lep)
+#        self.loglepVslogE = interpolate.interp1d(np.log10(self.E), np.log10(self.lep))
 
     def cross_section(self, e_nu):
         """Tabulated inverse beta decay cross section from
@@ -129,7 +131,12 @@ class InvBetaTab(Interaction):
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
+#        logEnu = np.log10(e_nu.to('MeV').value)
 
+#        if isinstance(logEnu, (list, tuple, np.ndarray)):
+#            cut = logEnu > self.logEth
+#            xs = np.zeros(len(logEnu), dtype=float)
+#            xs[cut] = 10**(self.logxVslogE(logEnu[cut]) - 41)
         if isinstance(Enu, (list, tuple, np.ndarray)):
             cut = Enu > self.Eth
             xs = np.zeros(len(Enu), dtype=float)
@@ -138,6 +145,8 @@ class InvBetaTab(Interaction):
         else:
             if Enu > self.Eth:
                 return self.XvsE(Enu) * 1e-41 * u.cm ** 2
+#            if logEnu > self.logEth:
+#                return 10**(self.logxVslogE(logEnu) - 41) * u.cm ** 2
             return 0. * u.cm**2
 
     def mean_lepton_energy(self, e_nu):
@@ -160,7 +169,17 @@ class InvBetaTab(Interaction):
             if Enu > self.Eth:
                 return self.lepVsE(Enu) * u.MeV
             return 0. * u.MeV
-
+#        logEnu = np.log10(e_nu.to('MeV').value)
+#
+#        if isinstance(logEnu, (list, tuple, np.ndarray)):
+#            loglep = np.zeros(len(logEnu), dtype=float)
+#            cut = logEnu > self.logEth
+#            loglep[cut] = self.loglepVslogE(logEnu[cut])
+#            return 10**loglep * u.MeV
+#        else:
+#            if logEnu > self.logEth:
+#                return 10**(self.loglepVslogE(logEnu)) * u.MeV
+#            return 0. * u.MeV
 
 
 fig, axes = plt.subplots(2, 2, figsize=(10, 5), sharex=True,
@@ -191,9 +210,11 @@ for ibd, style, lab in zip([InvBetaPar(), InvBetaTab()],
 
 axes[0,0].set(ylabel=r'$\sigma(\bar{\nu}_e p)$ [10$^{-41}$ cm$^2$]')
 axes[1,0].set(xlabel=r'$E_\nu$ [MeV]',
-              ylabel=r'$\Delta\sigma/\sigma$ [%]')
+              ylabel=r'$\Delta\sigma/\sigma$ [%]',
+              ylim=[-1.2,1.2])
 axes[0,1].set(ylabel=r'$\langle E_e\rangle$ [MeV]')
-axes[1,1].set(ylabel=r'$\Delta\langle E\rangle/\langle E\rangle$ [%]')
+axes[1,1].set(ylabel=r'$\Delta\langle E\rangle/\langle E\rangle$ [%]',
+              ylim=[-5,10])
 
 leg = axes[0,0].legend()
 fig.suptitle(r'Inv. $\beta$ Models from Strumia and Vissani, PLB 564, 2003')
