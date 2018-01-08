@@ -20,6 +20,9 @@ class Interaction(ABC):
         # Weak mixing angle... for large momentum transfer?
         self.sinw2 = 0.23122
 
+        # Cherenkov threshold energy [MeV]
+        self.Eckov = 0.783
+
         super().__init__()
 
     @abstractmethod
@@ -47,7 +50,7 @@ class InvBetaPar(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
-        :return: Inverse beta cross section.
+        :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
         if flavor != Flavor.nu_e_bar:
@@ -83,7 +86,7 @@ class InvBetaPar(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
-        :return: mean energy of the emitted lepton.
+        :returns: mean energy of the emitted lepton.
         """
         # Only works for electron antineutrinos
         if flavor != Flavor.nu_e_bar:
@@ -149,7 +152,7 @@ class InvBetaTab(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
-        :return: Inverse beta cross section.
+        :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
         if flavor != Flavor.nu_e_bar:
@@ -183,7 +186,7 @@ class InvBetaTab(Interaction):
 
         :param flavor: neutrino flavor
         :param e_nu: neutrino energy with proper units. Can be an array.
-        :return: Mean lepton energy after the interaction.
+        :returns: Mean lepton energy after the interaction.
         """
         # Only works for electron antineutrinos
         if flavor != Flavor.nu_e_bar:
@@ -228,7 +231,7 @@ class ElectronScatter(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
-        :return: neutrino cross section.
+        :returns: neutrino cross section.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
@@ -267,11 +270,92 @@ class Oxygen16CC(Interaction):
     def __init__(self):
         super().__init__()
 
+        # Interaction threshold energies, in MeV
+        self.Eth_nu = 15.4
+        self.Eth_nubar = 11.4
+
+    def _xsfunc(self, E, pars):
+        """Parametric fit function for the CC O16 interaction.
+        See Appendix B.3 of Tomàs et al., PRD 68:093013, 2003.
+
+        :param E: neutrino energy [MeV].
+        :param pars: four fit parameters.
+        :returns: cross section [cm^2].
+        """
+        a, b, c, d = pars
+        return a * (E**b - c**b)**d
+
     def cross_section(self, flavor, e_nu):
-        pass
+        """Compute the CC cross section for oxygen-16.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :returns: cross section.
+        """
+        if not flavor.is_electron:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros_like(e_nu) * u.cm**2
+            return 0. * u.cm**2
+
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        if flavor == Flavor.nu_e:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                xs = np.where(Enu <= self.Eth_nu, 0.,
+                              self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.)))
+            else:
+                if Enu <= self.Eth_nu:
+                    xs = 0.
+                else:
+                    xs = self._xsfunc(Enu, (4.73e-44, 0.25, 0.25, 15.))
+            return xs * u.cm**2
+        elif flavor == Flavor.nu_e_bar:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                xs = np.where(Enu <= 42.3293,
+                              self._xsfunc(Enu, (2.11357e-40, 0.224172, 8.36303, 6.80079)),
+                              self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914)))
+            else:
+                if Enu <= self.Eth_nu:
+                    xs = 0.
+                else:
+                    if Enu <= 42.3293:
+                        xs = self._xsfunc(Enu, (2.11357e-40, 0.224172, 8.36303, 6.80079))
+                    else:
+                        xs = self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914))
+            return xs * u.cm**2
+        else:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros_like(e_nu) * u.cm**2
+            return 0. * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
-        pass
+        """Compute mean energy of lepton emitted in CC interaction.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :returns: lepton energy.
+        """
+        if not flavor.is_electron:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros_like(e_nu) * u.MeV
+            return 0. * u.MeV
+
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        # Compute correct minimum energy
+        if flavor == Flavor.nu_e:
+            e_thr = self.Eth_nu + self.Eckov
+        else:
+            e_thr = self.Eth_nubar + self.Eckov
+
+        if isinstance(e_nu, (list, tuple, np.ndarray)):
+            lep = np.where(Enu < e_thr, 0., Enu - e_thr)
+        else:
+            lep = 0. if Enu < e_thr else Enu - e_thr
+
+        return lep * u.MeV
 
 
 class Oxygen16NC(Interaction):
@@ -301,7 +385,7 @@ class Oxygen16NC(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
-        :return: neutrino cross section.
+        :returns: neutrino cross section.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
@@ -320,7 +404,7 @@ class Oxygen16NC(Interaction):
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
-        :return: mean energy of emitted lepton.
+        :returns: mean energy of emitted lepton.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
@@ -328,7 +412,5 @@ class Oxygen16NC(Interaction):
         if isinstance(Enu, (list, tuple, np.ndarray)):
             lep = np.where(Enu <= self.Eth, 0., self._lepton_energy)
         else:
-            if Enu < self.Eth:
-                lep = 0.
-            lep = self._lepton_energy
+            lep = 0. if Enu < self.Eth else self._lepton_energy
         return lep * u.MeV
