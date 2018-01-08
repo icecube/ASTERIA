@@ -210,14 +210,39 @@ class InvBetaTab(Interaction):
 
 
 class ElectronScatter(Interaction):
-    """Cross sections for elastic nu-electron scattering.
+    """Cross sections for elastic neutrino-electron scattering.
     """
 
     def __init__(self):
         super().__init__()
 
     def cross_section(self, flavor, e_nu):
-        pass
+        """Cross section from Marciano and Parsa, J. Phys. G 29:2969, 2003.
+        """
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        # Define flavor-dependent parameters
+        epsilons = [-self.sinw2, 0.]
+        if flavor.is_electron:
+            epsilons[1] = -0.5 - self.sinw2
+        else:
+            epsilons[1] =  0.5 - self.sinw2
+
+        if flavor.is_neutrino:
+            epsilon_p, epsilon_m = epsilons
+        else:
+            epsilon_m, epsilon_p = epsilons
+
+        norm = 1.5e-44
+        ymax = 1./(1 + self.Me/(2*Enu))
+        xs = norm*Enu * (
+            ymax**3 * epsilon_p**2/3.
+            - ymax**2 * 0.5*(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)
+            + ymax * (epsilon_p**2 + epsilon_m**2)
+        )
+
+        return xs * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
         pass

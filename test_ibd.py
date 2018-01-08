@@ -4,7 +4,6 @@ from neutrino import Flavor
 import astropy.units as u
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 
 fig, axes = plt.subplots(2, 2, figsize=(10, 5), sharex=True,
                          gridspec_kw={'height_ratios':[3,1], 'hspace':0})
