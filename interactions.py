@@ -246,3 +246,33 @@ class ElectronScatter(Interaction):
 
     def mean_lepton_energy(self, flavor, e_nu):
         pass
+
+
+    class Oxygen16CC(Interaction):
+        """O16 charged current interaction, using estimates from Kolbe et al.,
+        PRD 66:013007, 2002.
+        """
+
+        def __init__(self):
+            super().__init__()
+
+        def cross_section(self, flavor, e_nu):
+            pass
+
+        def mean_lepton_energy(self, flavor, e_nu):
+            pass
+
+
+    class Oxygen16NC(Interaction):
+        """O16 neutral current interaction, using estimates from Kolbe et al.,
+        PRD 66:013007, 2002.
+        """
+
+        def __init__(self):
+            super().__init__()
+
+        def cross_section(self, flavor, e_nu):
+            pass
+
+        def mean_lepton_energy(self, flavor, e_nu):
+            pass
