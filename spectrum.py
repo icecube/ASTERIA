@@ -54,7 +54,7 @@ class NuFlux:
         self.EvsT, self.LvsT, self.AvsT = {}, {}, {}
 
         for flavor in Flavor:
-            fl = flavor.name.upper()
+  `          fl = flavor.name.upper()
 
             self.E[flavor] = table['E_{:s}'.format(fl)].to('MeV')
             self.L[flavor] = table['L_{:s}'.format(fl)].to('erg/s')
@@ -115,17 +115,33 @@ class NuFlux:
         """
         cdf = self.energy_spectrum_cdf(flavor, t, E)
         energies = np.zeros(n, dtype=float)
-        for i in range(n):
+
+        # Generate a random number between 0 and 1 and compare to the CDF
+        # of the neutrino energy distribution at time t
+        u = np.random.uniform(n)
+        j = np.searchsorted(cdf, u)
+
+        # Linearly interpolate in the CDF to produce a random energy
+        energies[j <= 0] = E[0].to('MeV').value
+        energies[j >= len(E)-1] = E[-1].to('MeV').value
+
+        cut = (0 < j) & (j < len(E)-1)
+        j = j[cut]
+        en = E[j] + (E[j + 1] - E[j]) / (cdf[j + 1] - cdf[j]) * (u[cut] - cdf[j])
+        energies[cut] = en
+
+        # for i in range(n):
             # Generate a random number between 0 and 1 and compare to the CDF
             # of the neutrino energy distribution at time t.
-            u = np.random.uniform()
-            j = np.searchsorted(cdf, u)
-            if j <= 0:
-                energies[i] = E[0].to('MeV').value
-            elif j >= len(E):
-                energies[i] = E[-1].to('MeV').value
+            # u = np.random.uniform()
+            # j = np.searchsorted(cdf, u)
+            # if j <= 0:
+                # energies[i] = E[0].to('MeV').value
+            # elif j >= len(E)-1:
+                # energies[i] = E[-1].to('MeV').value
+            # else:
+                # Linearly interpolate in the CDF to produce a random energy
+                # en = E[j] + (E[j + 1] - E[j]) / (cdf[j + 1] - cdf[j]) * (u - cdf[j])
+                # energies[i] = en.to('MeV').value
 
-            # Linearly interpolate in the CDF to produce a random energy
-            en = E[j] + (E[j + 1] - E[j]) / (cdf[j + 1] - cdf[j]) * (u - cdf[j])
-            energies[i] = en.to('MeV').value
         return energies
