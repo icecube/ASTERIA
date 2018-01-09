@@ -1,12 +1,13 @@
-from neutrino import Flavor
+""" Module for neutrino interaction"""
 
 from abc import ABC, abstractmethod
 
+import numpy as np
 import astropy.units as u
 import astropy.constants as c
 from scipy import interpolate
 
-import numpy as np
+from neutrino import Flavor
 
 
 class Interaction(ABC):
@@ -32,6 +33,60 @@ class Interaction(ABC):
     @abstractmethod
     def mean_lepton_energy(self, flavor, e_nu):
         pass
+
+    def compton_cherenkov_energy_dist(self, e_electron, e_photon):
+        """Compute compton-cherenkov electron energy unnormalized distribution
+
+        :param e_electron: electron energy.
+        :param e_photon: photon energy.
+        :returns: energy pdf.
+        """
+
+        # Convert all units to MeV
+        Ephoton = e_photon.to("MeV")
+        Ee = e_electron.to("MeV")
+
+
+        # Calculate unnormalized energy distribution
+        Efrac = Ephoton/self.Me
+
+        pdf = Ephoton**3/(Ephoton-Ee)**2
+        pdf += Ephoton*(2*Efrac+1)
+        pdf += Efrac**2*(Ephoton-Ee)
+        pdf -= Ephoton**2*(2+2*Efrac-Efrac**2)/(Ephoton-Ee)
+        pdf *= 1./Ephoton**5*self.Me**3
+
+        return pdf.value
+
+    def compton_electron_mean_energy(self, e_photon):
+        """ Compute compton-cherenkov mean electron energy
+
+            :param e_photon: photon energy.
+            :returns: mean electron energy.
+        """
+        # Convert all units into MeV
+        Ephoton = e_photon.to('MeV')
+
+        Eth = self.Eckov-self.Me # cherenkov kinetic energy threshold
+        Emax = 2.*Ephoton**2/(MASS_E+2*erg_photon)
+        if Eth >= Emax:
+            return 0*u.MeV
+
+        # Define compton-cherenkov electron energy distribution
+        nstep = 100000
+        Ee = np.linspace(0., Emax, nstep+1)
+        step_size = Emax/nstep
+        Epdf = self.compton_cherenkov_energy_dist(Ee, Ephoton)
+
+        # Calculate electron mean energy in MeV
+
+        # fraction of electron above energy threshold
+        cut = Ee > Eth
+        efrac = np.trapz(Epdf[cut], dx=step_size)
+        efrac /= np.trapz(Epdf, dx=step_size)
+
+        Ee_mean = (np.average(Ee[cut], weights=Epdf[cut])-Eth)*Efrac
+        return Ee_mean
 
 
 class InvBetaPar(Interaction):
@@ -64,7 +119,7 @@ class InvBetaPar(Interaction):
         # Calculate mean positron energy and momentum using the crappy estimate
         # from Strumia and Vissani eq. 25.
         Ee = Enu - (self.Mn - self.Mp)
-        pe = np.sqrt(Ee ** 2 - self.Me ** 2)
+        pe = np.    sqrt(Ee ** 2 - self.Me ** 2)
 
         # Handle possibility of list/array input
         if isinstance(Enu, (list, tuple, np.ndarray)):
@@ -185,7 +240,7 @@ class InvBetaTab(Interaction):
         Strumia and Vissani, Table 1.
 
         :param flavor: neutrino flavor
-        :param e_nu: neutrino energy with proper units. Can be an array.
+-        :param e_nu: neutrino energy with proper units. Can be an array.
         :returns: Mean lepton energy after the interaction.
         """
         # Only works for electron antineutrinos
@@ -276,7 +331,7 @@ class Oxygen16CC(Interaction):
 
     def _xsfunc(self, E, pars):
         """Parametric fit function for the CC O16 interaction.
-        See Appendix B.3 of Tomàs et al., PRD 68:093013, 2003.
+        See Appendix B.3 of Tomas et al., PRD 68:093013, 2003.
 
         :param E: neutrino energy [MeV].
         :param pars: four fit parameters.

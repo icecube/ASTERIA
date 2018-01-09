@@ -42,22 +42,20 @@ def compton_electron_prob(erg_e, erg_photon):
     + prob: float
         Probability of an electron of a given energy
     """
-    try:
-        erg_e = erg_e.to('MeV').value
-        erg_photon = erg_photon.to('MeV').value
-    except AttributeError:
-        print('Energy must have unit of energy.')
+    erg_e.to("MeV")
+    erg_photon.to("MeV")
 
     # energy of photon as a fraction of electron mass
-    erg_frac = erg_photon/MASS_E.value
+    erg_frac = erg_photon/MASS_E
     # probability
     prob = erg_photon**3/(erg_photon-erg_e)**2
     prob += erg_photon*(2*erg_frac+1)
     prob += erg_frac**2*(erg_photon-erg_e)
-    prob += -(2+2*erg_frac-erg_frac**2)/(erg_frac**3*(erg_photon-erg_e))
-    return prob
+    prob -= erg_photon**2*(2+2*erg_frac-erg_frac**2)/(erg_photon-erg_e)
+    prob *= 1./erg_photon**5*MASS_E**3
+    return prob.value
 
-def compton_electron_mean_erg(erg_photon):
+def compton_electron_mean_energy(erg_photon):
     """ Compute the mean energy in MeV of electrons given photon energy in MeV
     Inputs:
     + erg_photon: astropy.u.Quantity
@@ -84,11 +82,13 @@ def compton_electron_mean_erg(erg_photon):
 
     # calculate fraction of energy above the threshold energy
     erg_pdf = compton_electron_prob(erg_range, erg_photon)
-    erg_frac = numpy.trapz(erg_pdf[erg_range > min_erg], dx=erg_step)
+
+    cut = erg_range > min_erg
+    erg_frac = numpy.trapz(erg_pdf[cut], dx=erg_step)
     erg_frac /= numpy.trapz(erg_pdf, dx=erg_step)
 
     # calculate mean energy in MeV
-    mean_erg = (numpy.average(erg_range, weights=erg_pdf)-min_erg)*erg_frac
+    mean_erg = (numpy.average(erg_range[cut], weights=erg_pdf[cut])-min_erg)*erg_frac
     return mean_erg
 
 
