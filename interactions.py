@@ -209,9 +209,7 @@ class InvBetaTab(Interaction):
                     117., 130., 144., 161., 179.]
 
         self.XvsE = interpolate.interp1d(self.E, self.x)
-#        self.logxVslogE = interpolate.interp1d(np.log10(self.E), np.log10(self.x))
         self.lepVsE = interpolate.interp1d(self.E, self.lep)
-#        self.loglepVslogE = interpolate.interp1d(np.log10(self.E), np.log10(self.lep))
 
     def cross_section(self, flavor, e_nu):
         """Tabulated inverse beta decay cross section from
@@ -229,12 +227,8 @@ class InvBetaTab(Interaction):
 
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
-#        logEnu = np.log10(e_nu.to('MeV').value)
 
-#        if isinstance(logEnu, (list, tuple, np.ndarray)):
-#            cut = logEnu > self.logEth
-#            xs = np.zeros(len(logEnu), dtype=float)
-#            xs[cut] = 10**(self.logxVslogE(logEnu[cut]) - 41)
+        # Handle possibility of list input
         if isinstance(Enu, (list, tuple, np.ndarray)):
             cut = Enu > self.Eth
             xs = np.zeros(len(Enu), dtype=float)
@@ -243,8 +237,6 @@ class InvBetaTab(Interaction):
         else:
             if Enu > self.Eth:
                 return self.XvsE(Enu) * 1e-41 * u.cm ** 2
-#            if logEnu > self.logEth:
-#                return 10**(self.logxVslogE(logEnu) - 41) * u.cm ** 2
             return 0. * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
@@ -273,17 +265,6 @@ class InvBetaTab(Interaction):
             if Enu > self.Eth:
                 return self.lepVsE(Enu) * u.MeV
             return 0. * u.MeV
-#        logEnu = np.log10(e_nu.to('MeV').value)
-#
-#        if isinstance(logEnu, (list, tuple, np.ndarray)):
-#            loglep = np.zeros(len(logEnu), dtype=float)
-#            cut = logEnu > self.logEth
-#            loglep[cut] = self.loglepVslogE(logEnu[cut])
-#            return 10**loglep * u.MeV
-#        else:
-#            if logEnu > self.logEth:
-#                return 10**(self.loglepVslogE(logEnu)) * u.MeV
-#            return 0. * u.MeV
 
 
 class ElectronScatter(Interaction):
