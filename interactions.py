@@ -350,19 +350,27 @@ class Oxygen16CC(Interaction):
 
         if flavor == Flavor.nu_e:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
-                xs = np.where(Enu <= self.Eth_nu, 0.,
-                              self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.)))
+                cut = Enu >= self.Eth_nu
+                xs = np.zeros_like(Enu)
+                xs[cut] = self._xsfunc(Enu[cut], (4.73e-40, 0.25, 15., 6.))
+                # xs = np.where(Enu <= self.Eth_nu, 0.,
+                #               self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.)))
             else:
-                if Enu <= self.Eth_nu:
+                if Enu < self.Eth_nu:
                     xs = 0.
                 else:
-                    xs = self._xsfunc(Enu, (4.73e-44, 0.25, 0.25, 15.))
+                    xs = self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.))
             return xs * u.cm**2
         elif flavor == Flavor.nu_e_bar:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
-                xs = np.where(Enu <= 42.3293,
-                              self._xsfunc(Enu, (2.11357e-40, 0.224172, 8.36303, 6.80079)),
-                              self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914)))
+                cut1 = np.logical_and(Enu >= self.Eth_nubar, Enu < 42.3293)
+                cut2 = Enu >= 42.3293
+                xs = np.zeros_like(Enu)
+                xs[cut1] = self._xsfunc(Enu[cut1], (2.11357e-40, 0.224172, 8.36303, 6.80079))
+                xs[cut2] = self._xsfunc(Enu[cut2], (2.11357e-40, 0.260689, 16.7893, 4.23914))
+                # xs = np.where(Enu <= 42.3293,
+                #               self._xsfunc(Enu, (2.11357e-40, 0.224172, 8.36303, 6.80079)),
+                #               self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914)))
             else:
                 if Enu <= self.Eth_nu:
                     xs = 0.
@@ -525,4 +533,21 @@ class Oxygen18(Interaction):
         :param e_nu: neutrino energy.
         :returns: mean energy.
         """
-        pass
+        # Only electron neutrinos interact with O18!
+        if flavor != Flavor.nu_e:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros_like(e_nu) * u.MeV
+            return 0. * u.MeV
+
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        e_min = self.e_th + self.e_ckov
+        if isinstance(e_nu, (list, tuple, np.ndarray)):
+            lep = np.where(Enu < e_min, 0., Enu - e_min)
+        else:
+            lep = 0.
+            if Enu >= e_min:
+                lep = Enu - e_min
+
+        return lep * u.MeV

@@ -34,6 +34,8 @@ lep = cc.mean_lepton_energy(Flavor.nu_e, enu)
 ax1.plot(enu, lep)
 lep = cc.mean_lepton_energy(Flavor.nu_e_bar, enu)
 ax1.plot(enu, lep)
+lep = o18.mean_lepton_energy(Flavor.nu_e, enu)
+ax1.plot(enu, lep)
 ax1.set(xlabel=r'$E_\nu$ [MeV]',
         ylabel=r'$\langle E_e\rangle$ [MeV]')
 
