@@ -21,12 +21,12 @@ class Flavor(Enum):
     """Encapsulate neutrino flavors as a python enum.
     """
 
-    nu_e = 1
-    nu_mu = 2
-    nu_tau = 3
-    nu_e_bar = -1
-    nu_mu_bar = -2
-    nu_tau_bar = -3
+    nu_e = r'$\nu_e$'
+    nu_mu = r'$\nu_\mu$'
+    nu_tau = r'$\nu_\tau$'
+    nu_e_bar = r'$\overline{\nu}_e$'
+    nu_mu_bar = r'$\overline{\nu}_\mu$'
+    nu_tau_bar = r'$\overline{\nu}_\tau$'
 
     @property
     def is_electron(self):
@@ -55,6 +55,9 @@ class Flavor(Enum):
     @property
     def is_antineutrino(self):
         return self in (Flavor.nu_e_bar, Flavor.nu_mu_bar, Flavor.nu_tau_bar)
+
+    def __str__(self):
+        return self.value
 
 
 neutrinos = (Flavor.nu_e, Flavor.nu_mu, Flavor.nu_tau)
