@@ -1,4 +1,4 @@
-from interactions import Oxygen16NC, Oxygen16CC
+from interactions import Oxygen16NC, Oxygen16CC, Oxygen18
 from neutrino import Flavor
 
 import numpy as np
@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 enu = np.linspace(0.1, 200., 401) * u.MeV
 nc = Oxygen16NC()
 cc = Oxygen16CC()
+o18 = Oxygen18()
 
 fig, ax = plt.subplots(1,2, figsize=(10,4), sharex=True)
 ax0, ax1 = ax
@@ -18,6 +19,8 @@ xs = cc.cross_section(Flavor.nu_e, enu)
 ax0.plot(enu, xs, label=r'$^{16}$O CC: $\nu_e+^{16}$O$\rightarrow e^- + X$')
 xs = cc.cross_section(Flavor.nu_e_bar, enu)
 ax0.plot(enu, xs, label=r'$^{16}$O CC: $\overline{\nu}_e+^{16}$O$\rightarrow e^+ + X$')
+xs = o18.cross_section(Flavor.nu_e, enu)
+ax0.plot(enu, xs, label=r'$^{18}$O CC: $\nu_e+^{18}$O$\rightarrow e^- + X$')
 
 ax0.set(xlabel=r'$E_\nu$ [MeV]',
         ylabel=r'$\sigma(\nu_X + ^{16}\mathrm{O})$ [$10^{-42}$ cm$^2$]',

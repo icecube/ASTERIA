@@ -474,3 +474,55 @@ class Oxygen16NC(Interaction):
         else:
             lep = 0. if Enu < self.Eth else self._lepton_energy
         return lep * u.MeV
+
+
+class Oxygen18(Interaction):
+    """
+    O18 CC interaction, using estimates from Haxton and Robertson,
+    PRC 59:515, 1999.
+    """
+    def __init__(self):
+        super().__init__()
+
+        # Energy threshold: 1.66 MeV
+        self.e_th = 1.66
+
+        # Abundance of the oxygen-18 isotope: 0.2%
+        self.o18frac = 0.002
+
+    def cross_section(self, flavor, e_nu):
+        """Oxygen-18 interaction cross section.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :returns: cross section.
+        """
+        # Only electron neutrinos interact with O18!
+        if flavor != Flavor.nu_e:
+            if isinstance(e_nu, (list, tuple, np.ndarray)):
+                return np.zeros_like(e_nu) * u.cm**2
+            return 0. * u.cm**2
+
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        # Handle list input
+        if isinstance(Enu, (list, tuple, np.ndarray)):
+            xs = np.where(Enu < self.e_th, 0.,
+                          1.7e-50*Enu**2 + 1.6e-49*Enu - 0.9e-49)
+        else:
+            if Enu < self.e_th:
+                xs = 0.
+            else:
+                xs = 1.7e-50*Enu**2 + 1.6e-49*Enu - 0.9e-49
+
+        return (xs/self.o18frac) * u.cm**2
+
+    def mean_lepton_energy(self, flavor, e_nu):
+        """Mean lepton energy produced by O18 interaction.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :returns: mean energy.
+        """
+        pass
