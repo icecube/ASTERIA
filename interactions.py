@@ -1,4 +1,6 @@
-""" Module for neutrino interaction"""
+# -*- coding: utf-8 -*-
+""" Module for neutrino interaction cross sections.
+"""
 
 from abc import ABC, abstractmethod
 
@@ -22,7 +24,13 @@ class Interaction(ABC):
         self.sinw2 = 0.23122
 
         # Cherenkov threshold energy [MeV]
-        self.Eckov = 0.783
+        self.e_ckov = 0.783
+
+        # Energy of Compton electrons produced by 2.225 MeV gammas from
+        # neutron capture. Evaluates to 0.95 MeV. Should be rechecked, as
+        # there may be multiple Compton scattering.
+        # self.e_compton = self.compton_electron_mean_energy(2.225)
+        self.e_compton_n = 0.95
 
         super().__init__()
 
@@ -43,50 +51,51 @@ class Interaction(ABC):
         """
 
         # Convert all units to MeV
-        Ephoton = e_photon.to("MeV")
-        Ee = e_electron.to("MeV")
+        e_ph = e_photon.to("MeV").value
+        e_el = e_electron.to("MeV").value
 
 
         # Calculate unnormalized energy distribution
-        Efrac = Ephoton/self.Me
+        e_fr = e_ph/self.Me
 
-        pdf = Ephoton**3/(Ephoton-Ee)**2
-        pdf += Ephoton*(2*Efrac+1)
-        pdf += Efrac**2*(Ephoton-Ee)
-        pdf -= Ephoton**2*(2+2*Efrac-Efrac**2)/(Ephoton-Ee)
-        pdf *= 1./Ephoton**5*self.Me**3
+        pdf = e_ph**3 / (e_ph - e_el)**2
+        pdf += e_ph * (2*e_fr + 1)
+        pdf += e_fr**2 * (e_ph - e_el)
+        pdf -= e_ph**2 * (2 + 2*e_fr-e_fr**2) / (e_ph - e_el)
+        pdf *= 1./e_ph**5 * self.Me**3
 
         return pdf.value
 
     def compton_electron_mean_energy(self, e_photon):
-        """ Compute compton-cherenkov mean electron energy
+        """ Compute Compton-Cherenkov mean electron energy
 
-            :param e_photon: photon energy.
-            :returns: mean electron energy.
+        :param e_photon: photon energy.
+        :returns: mean electron energy.
         """
         # Convert all units into MeV
-        Ephoton = e_photon.to('MeV')
+        e_ph = e_photon.to('MeV')
 
-        Eth = self.Eckov-self.Me # cherenkov kinetic energy threshold
-        Emax = 2.*Ephoton**2/(MASS_E+2*erg_photon)
-        if Eth >= Emax:
-            return 0*u.MeV
+        # Cherenkov kinetic energy threshold
+        e_th = self.e_ckov - self.Me
+        e_max = 2. * e_ph**2 / (self.Me + 2*e_ph)
+        if e_th >= e_max:
+            return 0. * u.MeV
 
-        # Define compton-cherenkov electron energy distribution
+        # Define Compton-Cherenkov electron energy distribution
         nstep = 100000
-        Ee = np.linspace(0., Emax, nstep+1)
-        step_size = Emax/nstep
-        Epdf = self.compton_cherenkov_energy_dist(Ee, Ephoton)
-
-        # Calculate electron mean energy in MeV
+        e_el = np.linspace(0., e_max, nstep+1)
+        step_size = e_max/nstep
+        e_pdf = self.compton_cherenkov_energy_dist(e_el, e_ph)
 
         # fraction of electron above energy threshold
-        cut = Ee > Eth
-        efrac = np.trapz(Epdf[cut], dx=step_size)
-        efrac /= np.trapz(Epdf, dx=step_size)
+        cut = e_el > e_th
+        e_frac = np.trapz(e_pdf[cut], dx=step_size)
+        e_frac /= np.trapz(e_pdf, dx=step_size)
 
-        Ee_mean = (np.average(Ee[cut], weights=Epdf[cut])-Eth)*Efrac
-        return Ee_mean
+        e_mean = (np.average(e_el[cut], weights=e_pdf[cut]) - e_th) * e_frac
+
+        # Calculate electron mean energy in MeV
+        return e_mean * u.MeV
 
 
 class InvBetaPar(Interaction):
@@ -153,13 +162,16 @@ class InvBetaPar(Interaction):
 
         # Handle possibility of list/array input
         if isinstance(Enu, (list, tuple, np.ndarray)):
-            lep = np.zeros(len(Enu), dtype=float)
-            cut = Enu > self.Eth
-            lep[cut] = (Enu[cut] - self.delta) * (1. - Enu[cut] / (Enu[cut] + self.Mp))
+            # Note: subtraction of energy lost to Cherenkov production and
+            # Compton scattering is present in the USSR code, but it appears
+            # to make the agreement with the Strumia and Vissani calculation
+            # (the InvBetaTab class) worse.
+            lep = np.where(Enu < self.Eth + self.e_ckov, 0.,
+                           (Enu - self.delta) * (1. - Enu / (Enu + self.Mp)))# - self.e_ckov - self.e_compton_n)
             return lep * u.MeV
         else:
             if Enu > self.Eth:
-                return (Enu - self.delta) * (1. - Enu / (Enu + self.Mp))
+                return (Enu - self.delta) * (1. - Enu / (Enu + self.Mp))# - self.e_ckov - self.e_compton_n
             return 0. * u.MeV
 
 
@@ -240,7 +252,7 @@ class InvBetaTab(Interaction):
         Strumia and Vissani, Table 1.
 
         :param flavor: neutrino flavor
--        :param e_nu: neutrino energy with proper units. Can be an array.
+        :param e_nu: neutrino energy with proper units. Can be an array.
         :returns: Mean lepton energy after the interaction.
         """
         # Only works for electron antineutrinos
@@ -401,9 +413,9 @@ class Oxygen16CC(Interaction):
 
         # Compute correct minimum energy
         if flavor == Flavor.nu_e:
-            e_thr = self.Eth_nu + self.Eckov
+            e_thr = self.Eth_nu + self.e_ckov
         else:
-            e_thr = self.Eth_nubar + self.Eckov
+            e_thr = self.Eth_nubar + self.e_ckov
 
         if isinstance(e_nu, (list, tuple, np.ndarray)):
             lep = np.where(Enu < e_thr, 0., Enu - e_thr)
@@ -421,19 +433,31 @@ class Oxygen16NC(Interaction):
     def __init__(self):
         super().__init__()
 
-        # Energy threshold for interaction [MeV]
+        # Energy threshold for interaction, all flavors [MeV]
         self.Eth = 12.
 
         # Relative contribution from photon production to NC cross section
+        #  - 15^N + p + gamma: 24.9%
+        #  - 15^O + n + gamma:  6.7%
+
+        # The mean gamma-ray energy is 7.5 MeV, and the related Compton
+        # electron will be 4.7 MeV.
         self.relative_photon_prob = 0.249 + 0.067
-        self.mean_photon_energy = 4.7
+        self.e_compton_g = 4.7
+        # self.e_compton_g = self.compton_electron_mean_energy(7.5)
 
         # Relative contribution from neutron production to NC cross section
-        self.relative_neutron_prob = 0.187 + 0.067 + 0.085 + 0.007
-        self.mean_neutron_energy = 0.95
+        #  - 15^O(g.s.) + n:   18.7%
+        #  - 15^O + n + gamma:  6.7%
+        #  - 14^N + p + n:      8.5%
+        #  - 11^B + n + 4^He:   0.7%
 
-        self._lepton_energy = self.relative_neutron_prob*self.mean_neutron_energy + \
-                              self.relative_photon_prob*self.mean_photon_energy
+        # The mean energy is 2.225 Mev and the related Compton electron
+        # will be 0.95 MeV (calculated in base class).
+        self.relative_neutron_prob = 0.187 + 0.067 + 0.085 + 0.007
+
+        self._lepton_energy = self.relative_neutron_prob * self.e_compton_n + \
+                              self.relative_photon_prob * self.e_compton_g
 
     def cross_section(self, flavor, e_nu):
         """Calculate cross section.

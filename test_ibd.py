@@ -38,10 +38,10 @@ axes[1,0].set(xlabel=r'$E_\nu$ [MeV]',
               ylim=[-1.2,1.2])
 axes[0,1].set(ylabel=r'$\langle E_e\rangle$ [MeV]')
 axes[1,1].set(ylabel=r'$\Delta\langle E\rangle/\langle E\rangle$ [%]',
-              ylim=[-5,10])
+              ylim=[-5,15])
 
 leg = axes[0,0].legend()
-fig.suptitle(r'Inv. $\beta$ Mode1ls from Strumia and Vissani, PLB 564, 2003')
+fig.suptitle(r'Inv. $\beta$ Models from Strumia and Vissani, PLB 564, 2003')
 fig.subplots_adjust(left=0.075, right=0.95)
 
 plt.show()
