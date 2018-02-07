@@ -98,8 +98,9 @@ class Detector(object):
         return np.random.poisson(signals)
 
 
+"""
 def main():
-    """ Test main """
+    Test main
     doms_table_fname = "../Icecube_geometry.20110102.complete.txt"
     effvol_table_fname = "../effvol/effectivevolume_benedikt_AHA_normalDoms.txt"
     icecube = Detector(doms_table_fname, effvol_table_fname)
@@ -129,4 +130,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main()"""
