@@ -49,7 +49,12 @@ sequence of keys:
     1.0
 """
 
+import os
+import re
 import yaml
+
+import astropy.units
+import astropy.utils.data
 
 class Node(object):
     """A single node of a configuration data structure.
@@ -143,15 +148,15 @@ class Configuration(Node):
         Updates the wavelength and abs_base_path attributes based on
         the current settings of the wavelength_grid and base_path nodes.
         """
-        # Initialize our wavelength grid.
-        grid = self.wavelength_grid
-        nwave = 1 + int(math.floor(
-            (grid.max - grid.min) / grid.step))
-        if nwave <= 0:
-            raise ValueError('Invalid wavelength grid.')
-        wave_unit = astropy.units.Unit(grid.unit)
-        wave = (grid.min + grid.step * np.arange(nwave)) * wave_unit
-        self._assign('wavelength', wave)
+#        # Initialize our wavelength grid.
+#        grid = self.wavelength_grid
+#        nwave = 1 + int(math.floor(
+#            (grid.max - grid.min) / grid.step))
+#        if nwave <= 0:
+#            raise ValueError('Invalid wavelength grid.')
+#        wave_unit = astropy.units.Unit(grid.unit)
+#        wave = (grid.min + grid.step * np.arange(nwave)) * wave_unit
+#        self._assign('wavelength', wave)
 
         # Use environment variables to interpolate {NAME} in the base path.
         base_path = self.base_path
