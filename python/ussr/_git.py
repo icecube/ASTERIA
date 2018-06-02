@@ -51,7 +51,6 @@ def get_version():
     except IOError:
         return ver
     version_file = join(version_dir, '_version.py')
-    print(version_file)
     if not isfile(version_file):
         update_version()
     with open(version_file, "r") as f:
