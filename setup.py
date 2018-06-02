@@ -4,13 +4,13 @@ from __future__ import absolute_import, division, print_function
 #
 # Standard imports
 #
-import glob
+from glob import glob
 import os
 import re
 import sys
 #
 from distutils.command.sdist import sdist as DistutilsSdist
-from setuptools import setup, find_packages
+from setuptools import setup
 #
 from python.ussr._git import get_version, SetVersion
 #
@@ -39,15 +39,15 @@ setup_keywords['provides'] = [setup_keywords['name']]
 setup_keywords['requires'] = ['Python (>2.7.0)']
 setup_keywords['zip_safe'] = False
 setup_keywords['use_2to3'] = False
-setup_keywords['packages'] = find_packages('python')
-setup_keywords['package_dir'] = {'':'python'}
+setup_keywords['packages'] = ['ussr']
+setup_keywords['package_dir'] = {'ussr': 'python/ussr'}
 setup_keywords['cmdclass'] = {'version': SetVersion, 'sdist': DistutilsSdist}
 setup_keywords['test_suite']='{name}.test.test_suite'.format(**setup_keywords)
 #
 # Internal data directories.
 #
-setup_keywords['package_data'] = {'ussr': ['data/config/*',
-                                           'data/spectra/*']}
+setup_keywords['data_files'] = [('ussr/data/config', glob('data/config/*')),
+                                ('ussr/data/spectra', glob('data/spectra/*'))]
 #
 # Run setup command.
 #
