@@ -29,6 +29,24 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 """Manage simulation configuration data.
+
+Configuration data are normally loaded from a yaml file. Some standard
+configurations are included with this package and can be loaded by name,
+for example:
+
+    >>> test_config = load_config('test')
+
+Otherwise any filename with extension .yaml can be loaded::
+
+    my_config = load_config('path/my_config.yaml')
+
+Configuration data is accessed using attribute notation to specify a
+sequence of keys:
+
+    >>> test_config.name
+    'Test Simulation'
+    >>> test_config.atmosphere.airmass
+    1.0
 """
 
 import yaml
@@ -145,3 +163,63 @@ class Configuration(Node):
                 self._assign('abs_base_path', base_path.format(**os.environ))
             except KeyError as e:
                 raise ValueError('Environment variable not set: {0}.'.format(e))
+
+
+def load_config(name, config_type=Configuration):
+    """Load configuration data from a YAML file.
+
+    Valid configuration files are YAML files containing no custom types, no
+    sequences (lists), and with all mapping (dict) keys being valid python
+    identifiers.
+
+    Parameters
+    ----------
+    name : str
+        Name of the configuration to load, which can either be a pre-defined
+        name or else the name of a yaml file (with extension .yaml) to load.
+        Pre-defined names are mapped to corresponding files in this package's
+        data/config/ directory.
+
+    Returns
+    -------
+    Configuration
+        Initialized configuration object.
+
+    Raises
+    ------
+    ValueError
+        File name has wrong extension or does not exist.
+    RuntimeError
+        Configuration data failed a validation test.
+    """
+    base_name, extension = os.path.splitext(name)
+    if extension not in ('', '.yaml'):
+        raise ValueError('Config file must have .yaml extension.')
+    if extension:
+        file_name = name
+    else:
+        file_name = astropy.utils.data._find_pkg_data_path(
+            'data/config/{0}.yaml'.format(name))
+    if not os.path.isfile(file_name):
+        raise ValueError('No such config file "{0}".'.format(file_name))
+
+    # Validate that all mapping keys are valid python identifiers.
+    valid_key = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*\Z')
+    with open(file_name) as f:
+        next_value_is_key = False
+        for token in yaml.scan(f):
+            if isinstance(
+                token,
+                (yaml.BlockSequenceStartToken, yaml.FlowSequenceStartToken)):
+                raise RuntimeError('Config sequences not implemented yet.')
+            if next_value_is_key:
+                if not isinstance(token, yaml.ScalarToken):
+                    raise RuntimeError(
+                        'Invalid config key type: {0}'.format(token))
+                if not valid_key.match(token.value):
+                    raise RuntimeError(
+                        'Invalid config key name: {0}'.format(token.value))
+            next_value_is_key = isinstance(token, yaml.KeyToken)
+
+    with open(file_name) as f:
+        return config_type(yaml.safe_load(f))
