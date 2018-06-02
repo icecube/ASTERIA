@@ -12,7 +12,7 @@ import sys
 from distutils.command.sdist import sdist as DistutilsSdist
 from setuptools import setup, find_packages
 #
-from python.ussr._git import git_version, SetVersion
+from python.ussr._git import get_version, SetVersion
 #
 # Begin setup
 #
@@ -24,7 +24,7 @@ setup_keywords['author'] = 'IceCube Collaboration'
 setup_keywords['author_email'] = 'sn-wg@icecube.wisc.edu'
 setup_keywords['license'] = 'BSD'
 setup_keywords['url'] = 'https://github.com/IceCubeOpenSource/USSR'
-setup_keywords['version'] = git_version()
+setup_keywords['version'] = get_version()
 #
 # Use README.md as a long_description.
 #
