@@ -9,7 +9,7 @@ import astropy.units as u
 import astropy.constants as c
 from scipy import interpolate
 
-from neutrino import Flavor
+from .neutrino import Flavor
 
 
 class Interaction(ABC):
