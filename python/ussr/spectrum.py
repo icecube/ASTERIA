@@ -54,7 +54,7 @@ class NuFlux:
         self.EvsT, self.LvsT, self.AvsT = {}, {}, {}
 
         for flavor in Flavor:
-  `          fl = flavor.name.upper()
+  `         fl = flavor.name.upper()
 
             self.E[flavor] = table['E_{:s}'.format(fl)].to('MeV')
             self.L[flavor] = table['L_{:s}'.format(fl)].to('erg/s')
