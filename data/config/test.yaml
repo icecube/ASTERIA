@@ -1,8 +1,12 @@
 name: IceCube fast supernova simulation
 
 # The base path will be prepended to all relative path values below.
-# Expressions of form {...} will be expanded using environment variables.
-base_path: <PACKAGE_DATA>
+# - Expressions of form {...} will be expanded using environment variables.
+# - Set to <PACKAGE_DATA> will use an absolute installation path.
+# - Set to an empty string to force paths relative to the working directory.
+# - Set to some other absolute path.
+#base_path: '{USSR}/data'
+base_path: 'data'
 
 # Turn up simulation verbosity.
 verbose: no
