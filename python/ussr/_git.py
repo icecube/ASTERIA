@@ -31,10 +31,38 @@
 """Some code for interacting with git.
 """
 
+import re
 from os.path import abspath, exists, isdir, isfile, join
+from setuptools import Command
+from distutils.log import INFO, WARN, ERROR
 
 
-def version(git='git'):
+def get_version():
+    """Get the value of ``__version__`` without having to import the module.
+
+    Returns
+    -------
+    :class:`str`
+        The value of ``__version__``.
+    """
+    ver = 'unknown'
+    try:
+        version_dir = find_version_directory()
+    except IOError:
+        return ver
+    version_file = join(version_dir, '_version.py')
+    print(version_file)
+    if not isfile(version_file):
+        update_version()
+    with open(version_file, "r") as f:
+        for line in f.readlines():
+            mo = re.match("__version__ = '(.*)'", line)
+            if mo:
+                ver = mo.group(1)
+    return ver
+
+
+def get_git_version(git='git'):
     """Use ``git describe`` to generate a version string.
 
     Parameters
@@ -75,34 +103,6 @@ def version(git='git'):
     return ver
 
 
-def find_version_directory():
-    """Return the name of a directory containing version information.
-
-    Looks for files in the following places:
-
-    * python/ussr/_version.py
-    * ussr/_version.py
-
-    Returns
-    -------
-    :class:`str`
-        Name of a directory that can or does contain version information.
-
-    Raises
-    ------
-    IOError
-        If no valid directory can be found.
-    """
-    setup_dir = abspath('.')
-    if isdir(join(setup_dir, 'python', 'ussr')):
-        version_dir = join(setup_dir, 'python', 'ussr')
-    elif isdir(join(setup_dir, 'ussr')):
-        version_dir = join(setup_dir, 'ussr')
-    else:
-        raise IOError("Could not find a directory containing version information!")
-    return version_dir
-
-
 def update_version(tag=None):
     """Update the _version.py file.
 
@@ -121,10 +121,62 @@ def update_version(tag=None):
         ver = tag
     else:
         if isdir(".git"):
-            ver = version()
+            ver = get_git_version()
         else:
             raise IOError("Repository type is not git.")
     version_file = join(version_dir, '_version.py')
     with open(version_file, "w") as f:
         f.write("__version__ = '{}'\n".format(ver))
     return
+
+
+def find_version_directory():
+    """Return the name of a directory containing version information.
+
+    Looks for files in the following places:
+
+    * python/ussr/_version.py
+    * ussr/_version.py
+
+    Returns
+    -------
+    :class:`str`
+        Name of a directory that can or does contain version information.
+
+    Raises
+    ------
+    IOError
+        If no valid directory can be found.
+    """
+    packagename='ussr'
+    setup_dir = abspath('.')
+    if isdir(join(setup_dir, 'python', packagename)):
+        version_dir = join(setup_dir, 'python', packagename)
+    elif isdir(join(setup_dir, packagename)):
+        version_dir = join(setup_dir, packagename)
+    else:
+        raise IOError("Could not find a directory containing version information!")
+    return version_dir
+
+
+class SetVersion(Command):
+    """Allow users to easily update the package version with
+    ``python setup.py version``.
+    """
+    description = "update _version.py from git repo"
+    user_options = [('tag=', 't',
+                     'Set the version to a name in preparation for tagging.'),
+                    ]
+    boolean_options = []
+
+    def initialize_options(self):
+        self.tag = None
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        meta = self.distribution.metadata
+        update_version(tag=self.tag)
+        ver = get_version()
+        self.announce("Version is now {}.".format(ver), level=INFO)
