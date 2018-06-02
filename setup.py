@@ -6,12 +6,13 @@ from __future__ import absolute_import, division, print_function
 #
 import glob
 import os
+import re
 import sys
-#
-# setuptools sdist command ignores MANIFEST.in
 #
 from distutils.command.sdist import sdist as DistutilsSdist
 from setuptools import setup, find_packages
+#
+from python.ussr._git import git_version, SetVersion
 #
 # Begin setup
 #
@@ -23,7 +24,7 @@ setup_keywords['author'] = 'IceCube Collaboration'
 setup_keywords['author_email'] = 'sn-wg@icecube.wisc.edu'
 setup_keywords['license'] = 'BSD'
 setup_keywords['url'] = 'https://github.com/IceCubeOpenSource/USSR'
-#setup_keywords['version'] = 
+setup_keywords['version'] = git_version()
 #
 # Use README.md as a long_description.
 #
@@ -40,12 +41,13 @@ setup_keywords['zip_safe'] = False
 setup_keywords['use_2to3'] = False
 setup_keywords['packages'] = find_packages('python')
 setup_keywords['package_dir'] = {'':'python'}
-# setup_keywords['cmdclass'] = ...
+setup_keywords['cmdclass'] = {'version': SetVersion, 'sdist': DistutilsSdist}
 setup_keywords['test_suite']='{name}.test.test_suite'.format(**setup_keywords)
 #
 # Internal data directories.
 #
-setup_keywords['package_data'] = {'ussr': ['spectra/*']}
+setup_keywords['package_data'] = {'ussr': ['data/config/*',
+                                           'data/spectra/*']}
 #
 # Run setup command.
 #
