@@ -45,8 +45,8 @@ sequence of keys:
 
     >>> test_config.name
     'Test Simulation'
-    >>> test_config.atmosphere.airmass
-    1.0
+    >>> test_config.source.name
+    'Sukhbold 9.6Msun progenitor with SFHo equation of state'
 """
 
 import os
