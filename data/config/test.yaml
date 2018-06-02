@@ -2,8 +2,7 @@ name: IceCube fast supernova simulation
 
 # The base path will be prepended to all relative path values below.
 # Expressions of form {...} will be expanded using environment variables.
-#base_path: <PACKAGE_DATA>
-base_path:
+base_path: <PACKAGE_DATA>
 
 # Turn up simulation verbosity.
 verbose: no
