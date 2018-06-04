@@ -29,7 +29,7 @@ will install softlinks in your python path to the source in your git checkout.
 
 ## License
 
-[BSD License](LICENSE)
+[BSD License](LICENSE.rst)
 
 USSR is free software licensed under a 3-clause BSD-style license.
 
