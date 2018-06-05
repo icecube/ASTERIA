@@ -54,7 +54,68 @@ import re
 import yaml
 
 import astropy.units
+import astropy.constants
 import astropy.utils.data
+
+
+# Extract a number from a string with optional leading and
+# trailing whitespace.
+_float_pattern = re.compile(r'\s*([-+]?[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?)\s*')
+
+
+def parse_quantity(quantity, dimensions=None):
+    """Parse a string containing a numeric value with optional units.
+
+    The result is a :class:`Quantity <astropy.units.Quantity` object even
+    when units are not present. Optional units are interpreted by
+    :class:`astropy.units.Unit`. Some valid examples::
+
+        1.23
+        1.23um
+        123 um / arcsec
+        1 electron/adu
+
+    Used by :meth:`Configuration.get_constants`.
+
+    Parameters
+    ----------
+    quantity : str or astropy.units.Quantity
+        String to parse.  If a quantity is provided, it is checked against
+        the expected dimensions and passed through.
+    dimensions : str or astropy.units.Unit or None
+        The units of the input quantity are expected to have the same
+        dimensions as these units, if not None.  Raises a ValueError if
+        the input quantity is not convertible to dimensions.
+
+    Returns
+    -------
+    astropy.units.Quantity
+        If dimensions is not None, the returned quantity will be converted
+        to its units.
+
+    Raises
+    ------
+    ValueError
+        Unable to parse quantity.
+    """
+    if not isinstance(quantity, astropy.units.Quantity):
+        # Look for a valid number starting the string.
+        found_number = _float_pattern.match(quantity)
+        if not found_number:
+            raise ValueError('Unable to parse quantity.')
+        value = float(found_number.group(1))
+        unit = quantity[found_number.end():]
+        quantity = astropy.units.Quantity(value, unit)
+    if dimensions is not None:
+        try:
+            if not isinstance(dimensions, astropy.units.Unit):
+                dimensions = astropy.units.Unit(dimensions)
+            quantity = quantity.to(dimensions)
+        except (ValueError, astropy.units.UnitConversionError):
+            raise ValueError('Quantity "{0}" is not convertible to {1}.'
+                             .format(quantity, dimensions))
+    return quantity
+
 
 class Node(object):
     """A single node of a configuration data structure.
@@ -148,15 +209,6 @@ class Configuration(Node):
         Updates the wavelength and abs_base_path attributes based on
         the current settings of the wavelength_grid and base_path nodes.
         """
-#        # Initialize our wavelength grid.
-#        grid = self.wavelength_grid
-#        nwave = 1 + int(math.floor(
-#            (grid.max - grid.min) / grid.step))
-#        if nwave <= 0:
-#            raise ValueError('Invalid wavelength grid.')
-#        wave_unit = astropy.units.Unit(grid.unit)
-#        wave = (grid.min + grid.step * np.arange(nwave)) * wave_unit
-#        self._assign('wavelength', wave)
 
         # Use environment variables to interpolate {NAME} in the base path.
         base_path = self.base_path
