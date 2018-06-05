@@ -13,5 +13,11 @@ verbose: no
 
 # The source configuration is loaded by the ussr.source module.
 source:
-    name: Sukhbold 9.6Msun progenitor with SFHo equation of state
-    path: spectra/sukhbold-SFHo-z9.6.fits
+    name: Sukh_SFHo_z9.6
+    model: Sukhbold 9.6Msun progenitor with SFHo equation of state
+    progenitor:
+        mass: 9.6 M_sun
+        distance : 10 kpc
+    table:
+        format: fits
+        path: spectra/sukhbold-SFHo-z9.6.fits
