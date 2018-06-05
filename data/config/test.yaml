@@ -5,8 +5,8 @@ name: IceCube fast supernova simulation
 # - Set to <PACKAGE_DATA> will use an absolute installation path.
 # - Set to an empty string to force paths relative to the working directory.
 # - Set to some other absolute path.
-#base_path: '{USSR}/data'
-base_path: 'data'
+base_path: '{USSR}/data'
+#base_path: 'data'
 
 # Turn up simulation verbosity.
 verbose: no
