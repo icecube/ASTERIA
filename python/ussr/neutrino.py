@@ -21,9 +21,9 @@ class Flavor(Enum):
     """CCSN model neutrino types.
     """
     nu_e = 1,
-    nu_e_bar = 2,
-    nu_x = 3,
-    nu_x_bar = 4
+    nu_x = 2,
+    nu_e_bar = -1,
+    nu_x_bar = -2
 
     def to_tex(self):
         """LaTeX-comptable string representations of flavor.
@@ -45,53 +45,6 @@ class Flavor(Enum):
         return self in (Flavor.nu_e_bar, Flavor.nu_x_bar)
 
 
-#class Flavor(Enum):
-#    """Encapsulate neutrino flavors as a python enum.
-#    """
-#
-#    nu_e = r'$\nu_e$'
-#    nu_mu = r'$\nu_\mu$'
-#    nu_tau = r'$\nu_\tau$'
-#    nu_e_bar = r'$\overline{\nu}_e$'
-#    nu_mu_bar = r'$\overline{\nu}_\mu$'
-#    nu_tau_bar = r'$\overline{\nu}_\tau$'
-#
-#    @property
-#    def is_electron(self):
-#        return self in (Flavor.nu_e, Flavor.nu_e_bar)
-#
-#    @property
-#    def is_muon(self):
-#        return self in (Flavor.nu_mu, Flavor.nu_mu_bar)
-#
-#    @property
-#    def is_tau(self):
-#        return self in (Flavor.tau_mu, Flavor.tau_mu_bar)
-#
-#    @property
-#    def is_x(self):
-#        return self in (Flavor.nu_mu, Flavor.nu_tau)
-#
-#    @property
-#    def is_xbar(self):
-#        return self in (Flavor.nu_mu_bar, Flavor.nu_tau_bar)
-#
-#    @property
-#    def is_neutrino(self):
-#        return self in (Flavor.nu_e, Flavor.nu_mu, Flavor.nu_tau)
-#
-#    @property
-#    def is_antineutrino(self):
-#        return self in (Flavor.nu_e_bar, Flavor.nu_mu_bar, Flavor.nu_tau_bar)
-#
-#    def __str__(self):
-#        return self.value
-#
-#
-#neutrinos = (Flavor.nu_e, Flavor.nu_mu, Flavor.nu_tau)
-#antineutrinos = (Flavor.nu_e_bar, Flavor.nu_mu_bar, Flavor.nu_tau_bar)
-#
-#
 #class Oscillation(object):
 #
 #    def __init__(self, theta12, theta23, theta13, deltaCP,
