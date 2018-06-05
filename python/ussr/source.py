@@ -15,6 +15,8 @@ from .config import parse_quantity
 from astropy import units as u
 from astropy.table import Table
 
+import numpy as np
+from scipy.special import loggamma, gdtr
 from scipy.interpolate import InterpolatedUnivariateSpline
 
 
@@ -30,6 +32,16 @@ class Source:
         self.luminosity = luminosity
         self.mean_energy = mean_energy
         self.pinch = pinch
+
+        # Energy PDF function is assumed to be like a gamma function,
+        # parameterized by mean energy and pinch parameter alpha. True for
+        # nearly all CCSN models.
+        self.energy_pdf = lambda a, Ea, E: \
+            np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) + a * np.log(E) - \
+                   (1 + a) * np.log(Ea) - (1 + a) * (E / Ea))
+
+        # Energy CDF, useful for random energy sampling.
+        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))
 
     def get_luminosity(self, t, flavor=Flavor.nu_e_bar):
         """Return source luminosity at time t for a given flavor.
@@ -47,7 +59,7 @@ class Source:
         luminosity : float
             Source luminosity (units of power).
         """
-        return luminosity[flavor](t)
+        return self.luminosity[flavor](t)
 
     def get_flux(self, t, flavor=Flavor.nu_e_bar):
         """Return source flux at time t for a given flavor.
@@ -65,7 +77,35 @@ class Source:
         flux : float
             Source flux.
         """
-        return luminosity[flavor](t) / self.progenitor_distance**2
+        return self.luminosity[flavor](t) / self.progenitor_distance**2
+
+    def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
+        """Compute the PDF of the neutrino energy distribution at time t.
+
+        Parameters
+        ----------
+
+        t : float
+            Time relative to core bounce.
+         flavor : :class:`ussr.neutrino.Flavor`
+            Neutrino flavor.
+         E : `numpy.ndarray`
+            Sorted grid of neutrino energies to compute the energy PDF.
+
+         Returns
+         -------
+         spectrum : `numpy.ndarray`
+            Table of PDF values computed as a function of energy.
+        """
+        # Given t, get current average energy and pinch parameter.
+        # Use simple 1D linear interpolation
+        a = self.pinch[flavor](t)
+        Ea = self.mean_energy[flavor](t)
+        if a <= 0. or Ea <= 0.:
+            return np.zeros_like(E)
+        if E[0] == 0.:
+            E[0] = 1e-10 * u.MeV
+        return self.energy_pdf(a, Ea, E.value).real
 
 
 def initialize(config):
