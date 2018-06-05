@@ -11,8 +11,6 @@ luminosity and spectrum vs. time as a function of neutrino flavor. It is
 expected that the model data are stored in FITS files.
 """
 
-from enum import Enum
-
 import numpy as np
 from scipy.special import loggamma, gdtr
 
@@ -21,21 +19,6 @@ from astropy.table import Table
 from astropy.modeling.tabular import Tabular1D
 
 from .neutrino import Flavor
-
-#class Flavor(Enum):
-#    """CCSN model neutrino types.
-#    """
-#    nu_e = 1
-#    nu_e_bar = 2
-#    nu_x = 3
-#    nu_x_bar = 4
-#
-#    def to_tex(self):
-#        """LaTeX-compatible string representation of flavor.
-#        """
-#        if '_bar' in self.name:
-#            return r'$\overline{{\nu}}_{0}$'.format(self.name[3])
-#        return r'$\{0}$'.format(self.name)
 
 
 class NuFlux:
@@ -130,19 +113,5 @@ class NuFlux:
         j = j[cut]
         en = E[j] + (E[j + 1] - E[j]) / (cdf[j + 1] - cdf[j]) * (u[cut] - cdf[j])
         energies[cut] = en
-
-        # for i in range(n):
-            # Generate a random number between 0 and 1 and compare to the CDF
-            # of the neutrino energy distribution at time t.
-            # u = np.random.uniform()
-            # j = np.searchsorted(cdf, u)
-            # if j <= 0:
-                # energies[i] = E[0].to('MeV').value
-            # elif j >= len(E)-1:
-                # energies[i] = E[-1].to('MeV').value
-            # else:
-                # Linearly interpolate in the CDF to produce a random energy
-                # en = E[j] + (E[j + 1] - E[j]) / (cdf[j + 1] - cdf[j]) * (u - cdf[j])
-                # energies[i] = en.to('MeV').value
 
         return energies
