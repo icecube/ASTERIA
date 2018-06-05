@@ -20,21 +20,22 @@ import astropy.units as u
 from astropy.table import Table
 from astropy.modeling.tabular import Tabular1D
 
+from .neutrino import Flavor
 
-class Flavor(Enum):
-    """CCSN model neutrino types.
-    """
-    nu_e = 1
-    nu_e_bar = 2
-    nu_x = 3
-    nu_x_bar = 4
-
-    def to_tex(self):
-        """LaTeX-compatible string representation of flavor.
-        """
-        if '_bar' in self.name:
-            return r'$\overline{{\nu}}_{0}$'.format(self.name[3])
-        return r'$\{0}$'.format(self.name)
+#class Flavor(Enum):
+#    """CCSN model neutrino types.
+#    """
+#    nu_e = 1
+#    nu_e_bar = 2
+#    nu_x = 3
+#    nu_x_bar = 4
+#
+#    def to_tex(self):
+#        """LaTeX-compatible string representation of flavor.
+#        """
+#        if '_bar' in self.name:
+#            return r'$\overline{{\nu}}_{0}$'.format(self.name[3])
+#        return r'$\{0}$'.format(self.name)
 
 
 class NuFlux:
