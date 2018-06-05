@@ -87,14 +87,14 @@ class Source:
 
         t : float
             Time relative to core bounce.
-         flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`ussr.neutrino.Flavor`
             Neutrino flavor.
-         E : `numpy.ndarray`
+        E : `numpy.ndarray`
             Sorted grid of neutrino energies to compute the energy PDF.
 
-         Returns
-         -------
-         spectrum : `numpy.ndarray`
+        Returns
+        -------
+        spectrum : `numpy.ndarray`
             Table of PDF values computed as a function of energy.
         """
         # Given t, get current average energy and pinch parameter.
@@ -106,6 +106,47 @@ class Source:
         if E[0] == 0.:
             E[0] = 1e-10 * u.MeV
         return self.energy_pdf(a, Ea, E.value).real
+
+    def sample_energies(self, t, E, n=1, flavor=Flavor.nu_e_bar):
+        """Generate a random sample of neutrino energies at some time t for a
+        particular neutrino flavor. The energies are generated via inverse
+        transform sampling of the CDF of the neutrino energy distribution.
+
+        Parameters
+        ----------
+
+        t : float
+            Time relative to core bounce.
+        E : `numpy.ndarray`
+            Sorted grid of neutrino energies to compute the energy PDF.
+        n : int
+            Number of energy samples to produce.
+        flavor : :class:`ussr.neutrino.Flavor`
+            Neutrino flavor.
+
+        Returns
+        -------
+        energies : `numpy.ndarray`
+            Table of energies sampled from the energy spectrum.
+        """
+        cdf = self.energy_cdf(flavor, t, E)
+        energies = np.zeros(n, dtype=float)
+
+        # Generate a random number between 0 and 1 and compare to the CDF
+        # of the neutrino energy distribution at time t
+        u = np.random.uniform(n)
+        j = np.searchsorted(cdf, u)
+
+        # Linearly interpolate in the CDF to produce a random energy
+        energies[j <= 0] = E[0].to('MeV').value
+        energies[j >= len(E)-1] = E[-1].to('MeV').value
+
+        cut = (0 < j) & (j < len(E)-1)
+        j = j[cut]
+        en = E[j] + (E[j+1] - E[j]) / (cdf[j+1] - cdf[j]) * (u[cut] - cdf[j])
+        energies[cut] = en
+
+        return energies
 
 
 def initialize(config):
