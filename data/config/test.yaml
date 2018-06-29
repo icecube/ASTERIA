@@ -11,6 +11,21 @@ base_path: '{USSR}/data'
 # Turn up simulation verbosity.
 verbose: no
 
+# The detector configuration is loaded by the ussr.detector module.
+detector:
+    name: IceCube_IC-86
+    geometry:
+        max_height: 1900.
+        deepcore_string: 81
+        table:
+            format: ascii
+            path: detector/Icecube_geometry.20110102.complete.txt
+    effvol:
+        deepcore_rel_eff: 1.35
+        table:
+            format: ascii
+            path: detector/effectivevolume_benedikt_AHA_normalDoms.txt
+
 # The source configuration is loaded by the ussr.source module.
 source:
     name: Sukh_SFHo_z9.6

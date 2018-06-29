@@ -1,13 +1,22 @@
+# -*- coding: utf-8 -*-
 """ Module to simulate IceCube detector """
 
-import numpy as np
+from __future__ import print_function, division
+
+from .config import parse_quantity
+
+from astropy import units as u
 from astropy.table import Table
+
+import numpy as np
 from scipy.interpolate import PchipInterpolator
 
-class Detector(object):
+class Detector:
+
     """ Class for IceCube detector """
-    def __init__(self, doms_table, effvol_table, max_height=1900, f_dc_str=81, dc_rel_eff=1.35):
-        """ Constructor sets up detector """
+
+    def __init__(self, doms_table, effvol_table, max_height=1900,
+                 f_dc_str=81, dc_rel_eff=1.35):
 
         # Read in and sort effective volume table
         effvol = np.genfromtxt(effvol_table)
@@ -97,6 +106,28 @@ class Detector(object):
         # Possion-flutuated
         return np.random.poisson(signals)
 
+
+def initialize(config):
+    """Initialize a Detector model from configuration parameters.
+
+    Parameters
+    ----------
+
+    config : :class:`ussr.config.Configuration`
+        Configuration parameters used to create a Detector.
+
+    Returns
+    -------
+    Detector
+        An initialized detector model.
+    """
+
+    geomfile = '/'.join([config.abs_base_path,
+                         config.detector.geometry.table.path])
+    effvfile = '/'.join([config.abs_base_path,
+                         config.detector.effvol.table.path])
+
+    return Detector(geomfile, effvfile)
 
 """
 def main():
