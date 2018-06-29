@@ -23,6 +23,7 @@ Alternatively, for rapid development the command
 
 ```
 python setup.py develop
+export USSR=/path/to/ussr_folder
 ```
 
 will install softlinks in your python path to the source in your git checkout.
