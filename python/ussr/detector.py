@@ -121,8 +121,13 @@ def initialize(config):
     Detector
         An initialized detector model.
     """
-    return Detector(config.detector.geometry.table.path,
-                    config.detector.effvol.table.path)
+
+    geomfile = '/'.join([config.abs_base_path,
+                         config.detector.geometry.table.path])
+    effvfile = '/'.join([config.abs_base_path,
+                         config.detector.effvol.table.path])
+
+    return Detector(geomfile, effvfile)
 
 """
 def main():
