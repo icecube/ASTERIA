@@ -1,4 +1,4 @@
-# Unified Supernova Simulation Routine (USSR)
+# ASTERIA: A Supernova TEst Routine for IceCube Analysis
 
 ## Introduction
 
