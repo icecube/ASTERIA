@@ -295,15 +295,19 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-
+		
+		# See (12) in source - Converted to MeV Units
         norm = 1.5e-44
         ymax = 1./(1 + self.Me/(2*Enu))
+        
+        # xs is definite integral over differential cross section from 0 to ymax.
         xs = norm*Enu * (
             ymax**3 * epsilon_p**2/3.
             - ymax**2 * 0.5*(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)
             + ymax * (epsilon_p**2 + epsilon_m**2)
         )
-
+		
+		# Check to make sure this is the total cross section... So Compute integral for all XS's and then compare.
         return xs * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
