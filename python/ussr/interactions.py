@@ -377,16 +377,17 @@ class Oxygen16CC(Interaction):
         :param e_nu: neutrino energy.
         :returns: cross section.
         """
+        
+		# Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+        
         if not flavor.is_electron:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
 
-        # Convert all units to MeV
-        Enu = e_nu.to('MeV').value
-
         if flavor == Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
+            if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut = Enu >= self.Eth_nu
                 xs = np.zeros_like(Enu)
                 xs[cut] = self._xsfunc(Enu[cut], (4.73e-40, 0.25, 15., 6.))
@@ -399,7 +400,7 @@ class Oxygen16CC(Interaction):
                     xs = self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.))
             return xs * u.cm**2
         elif flavor == Flavor.nu_e_bar:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
+            if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut1 = np.logical_and(Enu >= self.Eth_nubar, Enu < 42.3293)
                 cut2 = Enu >= 42.3293
                 xs = np.zeros_like(Enu)
@@ -418,8 +419,8 @@ class Oxygen16CC(Interaction):
                         xs = self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914))
             return xs * u.cm**2
         else:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
@@ -429,13 +430,13 @@ class Oxygen16CC(Interaction):
         :param e_nu: neutrino energy.
         :returns: lepton energy.
         """
-        if not flavor.is_electron:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.MeV
-            return 0. * u.MeV
-
-        # Convert all units to MeV
+		# Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
+        if not flavor.is_electron:
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.MeV
+            return 0. * u.MeV
 
         # Compute correct minimum energy
         if flavor == Flavor.nu_e:
@@ -541,15 +542,15 @@ class Oxygen18(Interaction):
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
         :returns: cross section.
-        """
-        # Only electron neutrinos interact with O18!
-        if flavor != Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
-            return 0. * u.cm**2
-
+        """        
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
+        # Only electron neutrinos interact with O18!
+        if flavor != Flavor.nu_e:
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
+            return 0. * u.cm**2
 
         # Handle list input
         if isinstance(Enu, (list, tuple, np.ndarray)):
@@ -570,17 +571,18 @@ class Oxygen18(Interaction):
         :param e_nu: neutrino energy.
         :returns: mean energy.
         """
+		# Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+        
         # Only electron neutrinos interact with O18!
         if flavor != Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.MeV
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.MeV
             return 0. * u.MeV
 
-        # Convert all units to MeV
-        Enu = e_nu.to('MeV').value
 
         e_min = self.e_th + self.e_ckov
-        if isinstance(e_nu, (list, tuple, np.ndarray)):
+        if isinstance(Enu, (list, tuple, np.ndarray)):
             lep = np.where(Enu < e_min, 0., Enu - e_min)
         else:
             lep = 0.
