@@ -269,6 +269,8 @@ class InvBetaTab(Interaction):
 
 class ElectronScatter(Interaction):
     """Cross sections for elastic neutrino-electron scattering.
+       Note: Pure W Exchange is included as the energy threshold is far beyond the expected neutrino energy range.
+       Note: Subtraction of Cherenkov threshold energy is not performed
     """
 
     def __init__(self):
@@ -303,15 +305,46 @@ class ElectronScatter(Interaction):
         # xs is definite integral over differential cross section from 0 to ymax.
         xs = norm*Enu * (
             ymax**3 * epsilon_p**2/3.
-            - ymax**2 * 0.5*(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)
+            - ymax**2 * (epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/2
             + ymax * (epsilon_p**2 + epsilon_m**2)
         )
 		
-		# Check to make sure this is the total cross section... So Compute integral for all XS's and then compare.
         return xs * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
-        pass
+        """Mean Lepton Energy from Marciano and Parsa, J. Phys. G 29:2969, 2003.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :returns: neutrino integrated product of lepton final-state energy with differential cross section.
+        """
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+        # Define flavor-dependent parameters
+        epsilons = [-self.sinw2, 0.]
+        if flavor.is_electron:
+            epsilons[1] = -0.5 - self.sinw2
+        else:
+            epsilons[1] =  0.5 - self.sinw2
+
+        if flavor.is_neutrino:
+            epsilon_p, epsilon_m = epsilons
+        else:
+            epsilon_m, epsilon_p = epsilons
+		
+		# See (12) in source - Converted to MeV Units
+        norm = 1.5e-44
+        ymax = 1./(1 + self.Me/(2*Enu))
+        
+        # El is definite integral over product of lepton energy with differential cross section from 0 to ymax.
+        El = norm*Enu * (
+            ymax**4 * epsilon_p**2/4.
+            - ymax**3 *(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/3
+            + ymax**2 * (epsilon_p**2 + epsilon_m**2)/2
+        )
+		
+        return El * u.MeV
 
 
 class Oxygen16CC(Interaction):
