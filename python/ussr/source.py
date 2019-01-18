@@ -59,7 +59,26 @@ class Source:
         luminosity : float
             Source luminosity (units of power).
         """
-        return self.luminosity[flavor](t)
+        return self.luminosity[flavor](t) * (u.erg / u.s)
+
+    def get_mean_energy(self, t, flavor=Flavor.nu_e_bar):
+        """Return source mean energy at time t for a given flavor.
+
+        Parameters
+        ----------
+        
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`ussr.neutrino.Flavor`
+            Neutrino flavor.
+
+        Returns
+        -------
+        mean_energy : float
+            Source mean energy (units of energy).
+        """
+        return self.mean_energy[flavor](t) * u.MeV
+
 
     def get_flux(self, t, flavor=Flavor.nu_e_bar):
         """Return source flux at time t for a given flavor.
@@ -77,7 +96,8 @@ class Source:
         flux : float
             Source flux.
         """
-        return self.luminosity[flavor](t) / self.progenitor_distance**2
+        return self.luminosity[flavor](t) / self.mean_energy[flavor](t)  * (u.erg.to( u.MeV ) / u.s)
+        #return self.luminosity[flavor](t) / self.progenitor_distance**2
 
     def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
         """Compute the PDF of the neutrino energy distribution at time t.
