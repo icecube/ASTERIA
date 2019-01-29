@@ -23,12 +23,13 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 class Source:
     
     def __init__(self, name, model, progenitor_mass, progenitor_distance,
-                 luminosity={}, mean_energy={}, pinch={}):
+                 time={}, luminosity={}, mean_energy={}, pinch={}):
 
         self.name = name
         self.model = model
         self.progenitor_mass = progenitor_mass
         self.progenitor_distance = progenitor_distance
+        self.time = time
         self.luminosity = luminosity
         self.mean_energy = mean_energy
         self.pinch = pinch
@@ -43,6 +44,17 @@ class Source:
         # Energy CDF, useful for random energy sampling.
         self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))
 
+    def get_time(self):
+        """Return source time as numpy array.
+.
+
+        Returns
+        -------
+        time : float
+            Source time profile (units of s).
+        """
+        return self.time
+    
     def get_luminosity(self, t, flavor=Flavor.nu_e_bar):
         """Return source luminosity at time t for a given flavor.
 
@@ -87,16 +99,25 @@ class Source:
         ----------
         
         t : float
-            Time relative to core bounce.
+            Time relative to core bounce (units seconds).
         flavor : :class:`ussr.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
         -------
         flux : float
-            Source flux.
-        """
-        return self.luminosity[flavor](t) / self.mean_energy[flavor](t)  * (u.erg.to( u.MeV ) / u.s)
+            Source number flux (unit-less, count of neutrinos).
+        """      
+        
+        luminosity  = self.get_luminosity(t, flavor).to( u.MeV/u.s )
+        mean_energy = self.get_mean_energy(t, flavor) 
+        
+        # Where the mean energy is not zero, return rate in units neutrinos per second, elsewhere, returns zero.
+        rate = np.divide( luminosity, mean_energy, where=( mean_energy!=0 ), out=np.zeros( luminosity.size )/u.s)
+        flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate
+        
+        return flux
+			 
         #return self.luminosity[flavor](t) / self.progenitor_distance**2
 
     def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
@@ -192,7 +213,7 @@ def initialize(config):
         fitsfile = '/'.join([config.abs_base_path, config.source.table.path])
         sn_data_table = Table.read(fitsfile)
 
-        t = sn_data_table['TIME'].to('s')
+        time = sn_data_table['TIME'].to('s')
 
         # Loop over all flavors in the table:
         for flavor in Flavor:
@@ -202,9 +223,9 @@ def initialize(config):
             E = sn_data_table['E_{:s}'.format(fl)].to('MeV')
             alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
 
-            luminosity[flavor] = InterpolatedUnivariateSpline(t, L)
-            mean_energy[flavor] = InterpolatedUnivariateSpline(t, E)
-            pinch[flavor] = InterpolatedUnivariateSpline(t, alpha) 
+            luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
+            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1)
+            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1) 
 
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
@@ -217,6 +238,7 @@ def initialize(config):
                   config.source.model,
                   parse_quantity(config.source.progenitor.mass),
                   parse_quantity(config.source.progenitor.distance),
+                  time,
                   luminosity,
                   mean_energy,
                   pinch)
