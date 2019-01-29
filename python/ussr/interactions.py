@@ -269,7 +269,7 @@ class InvBetaTab(Interaction):
 
 class ElectronScatter(Interaction):
     """Cross sections for elastic neutrino-electron scattering.
-       Note: Pure W Exchange is included as the energy threshold is far beyond the expected neutrino energy range.
+       Note: Pure W Exchange is excluded as the energy threshold is far beyond the expected neutrino energy range.
        Note: Subtraction of Cherenkov threshold energy is not performed
     """
 
@@ -283,9 +283,13 @@ class ElectronScatter(Interaction):
         :param e_nu: neutrino energy.
         :returns: neutrino cross section.
         """
+        
+        if e_nu[0] == 0.:
+            e_nu[0] = 1e-10 * u.MeV
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
 
+            
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
         if flavor.is_electron:
@@ -337,14 +341,14 @@ class ElectronScatter(Interaction):
         norm = 1.5e-44
         ymax = 1./(1 + self.Me/(2*Enu))
         
-        # El is definite integral over product of lepton energy with differential cross section from 0 to ymax.
-        El = norm*Enu * (
+        # lep is definite integral over product of lepton energy with differential cross section from 0 to ymax.
+        lep = norm*Enu * (
             ymax**4 * epsilon_p**2/4.
             - ymax**3 *(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/3
             + ymax**2 * (epsilon_p**2 + epsilon_m**2)/2
         )
-		
-        return El * u.MeV
+		# Note: Units are MeV * cm**2 
+        return lep * u.MeV * u.cm**2
 
 
 class Oxygen16CC(Interaction):
