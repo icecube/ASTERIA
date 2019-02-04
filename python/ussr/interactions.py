@@ -137,7 +137,7 @@ class InvBetaPar(Interaction):
         # Calculate mean positron energy and momentum using the crappy estimate
         # from Strumia and Vissani eq. 25.
         Ee = Enu - (self.Mn - self.Mp)
-        pe = np.sqrt(Ee ** 2 - self.Me ** 2)
+        pe = np.sqrt(Ee ** 2 - self.Me ** 2, where=(Ee ** 2 - self.Me ** 2)>0, out=np.zeros_like(Ee))
 
         # Handle possibility of list/array input
         if isinstance(Enu, (list, tuple, np.ndarray)):
@@ -145,7 +145,7 @@ class InvBetaPar(Interaction):
             cut = Enu > self.Eth
             xs[cut] = 1e-43 * pe[cut] * Ee[cut] * \
                 Enu[cut] ** (-0.07056 + 0.02018 * np.log(Enu[cut]) - 0.001953 * np.log(Enu[cut]) ** 3)
-            return xs * u.cm ** 2
+
         # Handle float input
         else:
             if Enu <= self.Eth:
@@ -368,12 +368,12 @@ class ElectronScatter(Interaction):
         else:
             epsilon_m, epsilon_p = epsilons
 		
-		# See (12) in source - Converted to MeV Units
-        norm = 1.5e-44
+		# See (12) in source - units cm**2 / MeV
+        norm = 1.5e-44 
         ymax = 1./(1 + self.Me/(2*Enu))
         
         # lep is definite integral over product of lepton energy with differential cross section from 0 to ymax.
-        lep = norm*Enu * (
+        lep = norm*Enu**2 * (
             ymax**4 * epsilon_p**2/4.
             - ymax**3 *(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/3
             + ymax**2 * (epsilon_p**2 + epsilon_m**2)/2
@@ -442,7 +442,7 @@ class Oxygen16CC(Interaction):
                     xs = 0.
                 else:
                     xs = self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.))
-            return xs * u.cm**2
+
         elif flavor == Flavor.nu_e_bar:
             if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut1 = np.logical_and(Enu >= self.Eth_nubar, Enu < 42.3293)
