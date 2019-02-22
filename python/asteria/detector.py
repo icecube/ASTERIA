@@ -113,7 +113,7 @@ def initialize(config):
     Parameters
     ----------
 
-    config : :class:`ussr.config.Configuration`
+    config : :class:`asteria.config.Configuration`
         Configuration parameters used to create a Detector.
 
     Returns
