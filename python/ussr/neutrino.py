@@ -27,11 +27,15 @@ class Flavor(Enum):
         Electron antineutrino.
 
     .. data:: nu_x
-        Muon neutrino/antineutrino or tau neutrino/antineutrino.
+        Muon neutrino or tau neutrino.
+        
+    .. data:: nu_x_bar
+        Muon antineutrino or tau antineutrino.
     """
     nu_e = 1,
     nu_e_bar = -1,
     nu_x = 2
+    nu_x_bar = -2
 
     def to_tex(self):
         """LaTeX-comptable string representations of flavor.
@@ -46,11 +50,11 @@ class Flavor(Enum):
 
     @property
     def is_neutrino(self):
-        return self in (Flavor.nu_e)
+        return self in (Flavor.nu_e, Flavor.nu_x)
 
     @property
     def is_antineutrino(self):
-        return self in (Flavor.nu_e_bar)
+        return self in (Flavor.nu_e_bar, Flavor.nu_x_bar)
 
 
 #class Oscillation(object):
