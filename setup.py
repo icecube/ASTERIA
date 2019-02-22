@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+#
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 from __future__ import absolute_import, division, print_function
 #
@@ -23,7 +24,7 @@ setup_keywords['description'] = 'IceCube supernova simulation package'
 setup_keywords['author'] = 'IceCube Collaboration'
 setup_keywords['author_email'] = 'sn-wg@icecube.wisc.edu'
 setup_keywords['license'] = 'BSD'
-setup_keywords['url'] = 'https://github.com/IceCubeOpenSource/USSR'
+setup_keywords['url'] = 'https://github.com/IceCubeOpenSource/ASTERIA'
 setup_keywords['version'] = get_version()
 #
 # Use README.md as a long_description.
@@ -42,7 +43,8 @@ setup_keywords['use_2to3'] = False
 setup_keywords['packages'] = find_packages('python')
 setup_keywords['package_dir'] = {'': 'python'}
 setup_keywords['cmdclass'] = {'version': SetVersion, 'sdist': DistutilsSdist}
-setup_keywords['test_suite']='{name}.test.test_suite'.format(**setup_keywords)
+setup_keywords['test_suite']='nose.collector'
+setup_keywords['tests_require']=['nose']
 #
 # Internal data directories.
 #
