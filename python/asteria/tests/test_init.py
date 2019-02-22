@@ -1,4 +1,4 @@
 import asteria
-
+  
 def test_version_exists():
-    assert hasattr(asteria, '__ersion__')
+    assert hasattr(asteria, '__version__')
