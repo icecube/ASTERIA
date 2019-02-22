@@ -25,13 +25,29 @@ class Interaction(ABC):
 
         # Cherenkov threshold energy [MeV]
         self.e_ckov = 0.783
-
+        
+        # Move this to scale_to_H2O conditional blocks?
+        self.H2O_in_ice = 3.053e28 # u.m**3
+        
         # Energy of Compton electrons produced by 2.225 MeV gammas from
         # neutron capture. Evaluates to 0.95 MeV. Should be rechecked, as
         # there may be multiple Compton scattering.
         # self.e_compton = self.compton_electron_mean_energy(2.225)
         self.e_compton_n = 0.95
-
+        
+        # Electron path length per leptonic MeV above cherenkov threshold. [m/MeV]
+        self.e_path_per_MeV = 0.580e-2 * u.m / u.MeV;
+        # Positron path length per leptonic MeV above cherenkov threshold. [m/MeV]
+        self.p_path_per_MeV = 0.577e-2 * u.m / u.MeV;
+        
+        # Scaling factor to account for the number of photons produced by
+        # an electron which differs from a positron due to the slight 
+        # difference in path length per MeV
+        self.p2e_path_ratio = self.p_path_per_MeV.value / self.e_path_per_MeV.value ;
+        
+        # Number of photons per leptonic MeV. [1/MeV]
+        self.photons_per_lepton_MeV = self.e_path_per_MeV * self.photons_per_path()
+        
         super().__init__()
 
     @abstractmethod
@@ -41,6 +57,7 @@ class Interaction(ABC):
     @abstractmethod
     def mean_lepton_energy(self, flavor, e_nu):
         pass
+        
 
     def compton_cherenkov_energy_dist(self, e_electron, e_photon):
         """Compute compton-cherenkov electron energy unnormalized distribution
@@ -96,6 +113,39 @@ class Interaction(ABC):
 
         # Calculate electron mean energy in MeV
         return e_mean * u.MeV
+        
+    def photons_per_path(self, min_wavelength = 300e-9 * u.m, max_wavelength = 600e-9 * u.m ):
+        """Compute the number of photons emitted per unit distance (m)
+         of electron path length by integrating wavelength out of the 
+         Frank-Tamm formula. Index of refraction was given by Eq. (6) 
+         of Price & Bergstrom, AO 36:004181, 1997.
+         
+
+        :param min_wavelength: lower integral limit. Default = 300 nm
+        :param max_wavelength: upper integral limit. Default = 600 nm
+            Defaults taken from USSR.
+        
+        :returns: number of photons with wavelength between 
+            integration limits per unit eletron path length.
+        """
+        min_lambda = min_wavelength.to(u.m).value
+        max_lambda = max_wavelength.to(u.m).value
+        
+        # Parameters from Price & Bergstrom
+        n_div = 700e-9 # u.m
+        n_mul = 1.2956
+        n_pow = -0.021735
+        
+        # Integral of Frank-Tamm Formula with substituted wavelength dependence.
+        frank_tamm = lambda x: 2*np.pi*c.alpha.value * \
+             (n_div**(2*n_pow) / (n_mul**2 * (1+2*n_pow)*x**(1+2*n_pow)) - 1/x)
+        
+        #photons_per_leptonic_MeV = self.e_length_above_Ech_per_MeV.value * \
+        return (frank_tamm(max_lambda) - frank_tamm(min_lambda) )  / u.m 
+        
+        #return effvol_photon * photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
+        #return  photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
+        
 
 
 class InvBetaPar(Interaction):
@@ -108,12 +158,16 @@ class InvBetaPar(Interaction):
         # Calculate IBD threshold
         self.Eth = self.Mn + self.Me - self.Mp
         self.delta = (self.Mn ** 2 - self.Mp ** 2 - self.Me ** 2) / (2 * self.Mp)
+        
+        # Number of H atoms in H2O molecule.
+        self.H_per_H2O = 2
 
-    def cross_section(self, flavor, e_nu):
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Inverse beta decay cross section, Strumia and Vissani eq. 25.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
@@ -124,11 +178,12 @@ class InvBetaPar(Interaction):
 
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
 
         # Calculate mean positron energy and momentum using the crappy estimate
         # from Strumia and Vissani eq. 25.
         Ee = Enu - (self.Mn - self.Mp)
-        pe = np.    sqrt(Ee ** 2 - self.Me ** 2)
+        pe = np.sqrt(Ee ** 2 - self.Me ** 2, where=(Ee ** 2 - self.Me ** 2)>0, out=np.zeros_like(Ee))
 
         # Handle possibility of list/array input
         if isinstance(Enu, (list, tuple, np.ndarray)):
@@ -136,14 +191,19 @@ class InvBetaPar(Interaction):
             cut = Enu > self.Eth
             xs[cut] = 1e-43 * pe[cut] * Ee[cut] * \
                 Enu[cut] ** (-0.07056 + 0.02018 * np.log(Enu[cut]) - 0.001953 * np.log(Enu[cut]) ** 3)
-            return xs * u.cm ** 2
+
         # Handle float input
         else:
             if Enu <= self.Eth:
                 return 0. * u.cm ** 2
-            return 1e-43 * u.cm ** 2 * pe * Ee * \
+                
+            xs = 1e-43 * pe * Ee * \
                 Enu ** (-0.07056 + 0.02018 * np.log(Enu) - 0.001953 * np.log(Enu) ** 3)
-
+        
+        if scale_to_H2O:
+            return self.H_per_H2O * xs * u.cm**2
+        return xs * u.cm**2
+        
     def mean_lepton_energy(self, flavor, e_nu):
         """Mean lepton energy from Abbasi et al., A&A 535:A109, 2011, p.6.
         Could also use Strumia and Vissani eq. 16.
@@ -173,7 +233,7 @@ class InvBetaPar(Interaction):
             if Enu > self.Eth:
                 return (Enu - self.delta) * (1. - Enu / (Enu + self.Mp))# - self.e_ckov - self.e_compton_n
             return 0. * u.MeV
-
+        
 
 class InvBetaTab(Interaction):
     """Tabulated inverse beta decay computation by Strumia and Vissani,
@@ -210,13 +270,17 @@ class InvBetaTab(Interaction):
 
         self.XvsE = interpolate.interp1d(self.E, self.x)
         self.lepVsE = interpolate.interp1d(self.E, self.lep)
+        
+        # Number of H atoms in H2O molecule.
+        self.H_per_H2O = 2
 
-    def cross_section(self, flavor, e_nu):
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Tabulated inverse beta decay cross section from
         Strumia and Vissani, Table 1.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy with proper units. Can be an array.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
@@ -233,12 +297,16 @@ class InvBetaTab(Interaction):
             cut = Enu > self.Eth
             xs = np.zeros(len(Enu), dtype=float)
             xs[cut] = self.XvsE(Enu[cut]) * 1e-41
-            return xs * u.cm**2
+            
         else:
             if Enu > self.Eth:
-                return self.XvsE(Enu) * 1e-41 * u.cm ** 2
+                xs = self.XvsE(Enu) * 1e-41 
             return 0. * u.cm**2
-
+        
+        if scale_to_H2O:
+            return self.H_per_H2O * xs * u.cm**2
+        return xs * u.cm**2
+        
     def mean_lepton_energy(self, flavor, e_nu):
         """Tabulated mean lepton energy after the interaction from
         Strumia and Vissani, Table 1.
@@ -269,20 +337,93 @@ class InvBetaTab(Interaction):
 
 class ElectronScatter(Interaction):
     """Cross sections for elastic neutrino-electron scattering.
+       Note: Subtraction of Cherenkov threshold energy is not performed
     """
 
     def __init__(self):
         super().__init__()
+        
+        # Number of electrons in H2O.
+        self.e_per_H2O = 10
+        
+    def _integrated_XSxE(self, params, E, y ):
+        """Integrated product of differential cross section and final state lepton
+        energy. """
+        norm, eps_p, eps_m, y_ckov = params
+        XSxE = norm* E**2 * (
+              1/4. * y**4 * eps_p**2
+            - 1/3. * y**3 * (eps_p*eps_m*self.Me/E + 2*eps_p**2 + eps_p**2 * y_ckov)
+            + 1/2. * y**2 * (eps_p**2 + eps_m**2 + ( 2*eps_p**2 + eps_p*eps_m*self.Me/E) * y_ckov)
+            +        y    * (eps_m**2 + eps_p**2 ) * y_ckov )
+        return XSxE
 
-    def cross_section(self, flavor, e_nu):
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Cross section from Marciano and Parsa, J. Phys. G 29:2969, 2003.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: neutrino cross section.
+        """
+        
+        if e_nu[0] == 0.:
+            e_nu[0] = 1e-10 * u.MeV
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+
+            
+        # Define flavor-dependent parameters
+        epsilons = [-self.sinw2, 0.]
+        if flavor.is_electron:
+            epsilons[1] = -0.5 - self.sinw2
+        else:
+            epsilons[1] =  0.5 - self.sinw2
+
+        if flavor.is_neutrino:
+            epsilon_p, epsilon_m = epsilons
+        else:
+            epsilon_m, epsilon_p = epsilons
+		
+		# See (12) in source - Converted to MeV Units
+        norm = 1.5e-44
+        ymax = 1./(1 + self.Me/(2*Enu))
+        
+        # xs is definite integral over differential cross section from 0 to ymax.
+        xs = norm*Enu * (
+            ymax**3 * epsilon_p**2/3.
+            - ymax**2 * (epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/2
+            + ymax * (epsilon_p**2 + epsilon_m**2)
+        )
+		
+        if scale_to_H2O:
+            return self.e_per_H2O * xs * u.cm**2
+        return xs * u.cm**2
+
+    def mean_lepton_energy(self, flavor, e_nu, scale_to_H2O=True):
+        """Mean Lepton Energy from Marciano and Parsa, J. Phys. G 29:2969, 2003.
+
+        :param flavor: neutrino flavor.
+        :param e_nu: neutrino energy.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
+        NOTE: This "mean energy" is the integrated product of the differential
+              cross section and lepton final-state energy. Scaling the cross
+              section to H2O affects the "mean energy" as well.
+        :returns: neutrino integrated product of lepton final-state energy with differential cross section.
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
+        
+        if e_nu[0] == 0.:
+            e_nu[0] = 1e-10 * u.MeV
+        # Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+        
+        cut = Enu > (self.e_ckov - self.Me)
+		# See (12) in source - units cm**2 / MeV
+        norm = 1.5e-44         
+        ymax = 1./( 1 + self.Me/( 2*Enu[cut] )  )        
+        y_ckov = (self.e_ckov - self.Me)/Enu[cut]
 
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
@@ -295,19 +436,24 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-
-        norm = 1.5e-44
-        ymax = 1./(1 + self.Me/(2*Enu))
-        xs = norm*Enu * (
-            ymax**3 * epsilon_p**2/3.
-            - ymax**2 * 0.5*(epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)
-            + ymax * (epsilon_p**2 + epsilon_m**2)
+		
+        lep = np.zeros_like( Enu )
+        params = (norm, epsilon_p, epsilon_m, 0) 
+        
+        
+        # lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
+        # lep[cut] -= self._integrated_XSxE(params, Enu[cut], 0)
+        lep[cut] += norm*Enu[cut]**2 * (
+            ymax**4 * epsilon_p**2 /4.
+            - ymax**3 *(epsilon_p*epsilon_m*self.Me/Enu[cut] + 2*epsilon_p**2)/3
+            + ymax**2 * (epsilon_p**2 + epsilon_m**2)/2
         )
+        
 
-        return xs * u.cm**2
-
-    def mean_lepton_energy(self, flavor, e_nu):
-        pass
+		# Note: Units are MeV * cm**2 
+        if scale_to_H2O:
+            return self.e_per_H2O * lep * u.MeV * u.cm**2
+        return lep * u.MeV * u.cm**2
 
 
 class Oxygen16CC(Interaction):
@@ -321,6 +467,12 @@ class Oxygen16CC(Interaction):
         # Interaction threshold energies, in MeV
         self.Eth_nu = 15.4
         self.Eth_nubar = 11.4
+        
+        # Abundance of the oxygen-16 isotope: 99.76%
+        self.O16frac = 0.99762
+        
+        # Number of oxygen atoms in H2O (For Consistency).
+        self.O_per_H2O = 1
 
     def _xsfunc(self, E, pars):
         """Parametric fit function for the CC O16 interaction.
@@ -333,23 +485,25 @@ class Oxygen16CC(Interaction):
         a, b, c, d = pars
         return a * (E**b - c**b)**d
 
-    def cross_section(self, flavor, e_nu):
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Compute the CC cross section for oxygen-16.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: cross section.
         """
+        
+		# Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+        
         if not flavor.is_electron:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
 
-        # Convert all units to MeV
-        Enu = e_nu.to('MeV').value
-
         if flavor == Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
+            if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut = Enu >= self.Eth_nu
                 xs = np.zeros_like(Enu)
                 xs[cut] = self._xsfunc(Enu[cut], (4.73e-40, 0.25, 15., 6.))
@@ -360,9 +514,9 @@ class Oxygen16CC(Interaction):
                     xs = 0.
                 else:
                     xs = self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.))
-            return xs * u.cm**2
+
         elif flavor == Flavor.nu_e_bar:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
+            if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut1 = np.logical_and(Enu >= self.Eth_nubar, Enu < 42.3293)
                 cut2 = Enu >= 42.3293
                 xs = np.zeros_like(Enu)
@@ -379,11 +533,15 @@ class Oxygen16CC(Interaction):
                         xs = self._xsfunc(Enu, (2.11357e-40, 0.224172, 8.36303, 6.80079))
                     else:
                         xs = self._xsfunc(Enu, (2.11357e-40, 0.260689, 16.7893, 4.23914))
-            return xs * u.cm**2
+            
         else:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
+        
+        if scale_to_H2O:
+            return self.O_per_H2O * self.O16frac * xs * u.cm**2
+        return xs * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
         """Compute mean energy of lepton emitted in CC interaction.
@@ -392,13 +550,13 @@ class Oxygen16CC(Interaction):
         :param e_nu: neutrino energy.
         :returns: lepton energy.
         """
-        if not flavor.is_electron:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.MeV
-            return 0. * u.MeV
-
-        # Convert all units to MeV
+		# Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
+        if not flavor.is_electron:
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.MeV
+            return 0. * u.MeV
 
         # Compute correct minimum energy
         if flavor == Flavor.nu_e:
@@ -448,11 +606,18 @@ class Oxygen16NC(Interaction):
         self._lepton_energy = self.relative_neutron_prob * self.e_compton_n + \
                               self.relative_photon_prob * self.e_compton_g
 
-    def cross_section(self, flavor, e_nu):
+        # Abundance of the oxygen-16 isotope: 99.76%
+        self.O16frac = 0.99762
+        
+        # Number of oxygen atoms in H2O (For Consistency).
+        self.O_per_H2O = 1
+        
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Calculate cross section.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: neutrino cross section.
         """
         # Convert all units to MeV
@@ -465,6 +630,9 @@ class Oxygen16NC(Interaction):
             if Enu < self.Eth:
                 return 0 * u.cm**2
             xs = 6.7e-40 * (Enu**0.208 - 8.**0.25)**6
+        
+        if scale_to_H2O:
+            return self.O_per_H2O * self.O16frac * xs * u.cm**2
         return xs * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
@@ -486,8 +654,10 @@ class Oxygen16NC(Interaction):
 
 class Oxygen18(Interaction):
     """
-    O18 CC interaction, using estimates from Haxton and Robertson,
-    PRC 59:515, 1999.
+    O18 CC interaction, using quadratic fit to cross section estimated from
+    Kamiokande data from Haxton and Robertson, PRC 59:515, 1999.
+    
+    See page on Mainz Wiki, Neutrino cross sections on natural oxygen.
     """
     def __init__(self):
         super().__init__()
@@ -496,34 +666,55 @@ class Oxygen18(Interaction):
         self.e_th = 1.66
 
         # Abundance of the oxygen-18 isotope: 0.2%
-        self.o18frac = 0.002
+        self.O18frac = 0.002
+        
+        # Number of oxygen atoms in H2O (For Consistency).
+        self.O_per_H2O = 1
+        
+    def _xsfunc(self, E, pars):
+        """Quadratic fit function for the CC O18 interaction.
+        See Mainz Wiki, Neutrino cross section on natural oxygen.
 
-    def cross_section(self, flavor, e_nu):
+        :param E: neutrino energy [MeV].
+        :param pars: three fit parameters.
+        NOTE: Parameter untis are cm**2/MeV**2, cm**2/MeV and cm**2.
+        :returns: cross section [cm^2].
+        """
+        a, b, c = pars
+        return a * E**2 + b * E + c
+
+    def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Oxygen-18 interaction cross section.
 
         :param flavor: neutrino flavor.
         :param e_nu: neutrino energy.
+        :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: cross section.
-        """
-        # Only electron neutrinos interact with O18!
-        if flavor != Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.cm**2
-            return 0. * u.cm**2
-
+        """        
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
+        
+        # Only electron neutrinos interact with O18!
+        if flavor != Flavor.nu_e:
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.cm**2
+            return 0. * u.cm**2
 
         # Handle list input
         if isinstance(Enu, (list, tuple, np.ndarray)):
-            xs = np.where(Enu < self.e_th, 0.,
-                          1.7e-50*Enu**2 + 1.6e-49*Enu - 0.9e-49)
+            xs = np.where(Enu < self.e_th, 0., self._xsfunc(Enu, [1.7e-46, 1.6e-45, -0.9e-45]) )
+
         else:
             if Enu < self.e_th:
                 xs = 0.
             else:
-                xs = 1.7e-50*Enu**2 + 1.6e-49*Enu - 0.9e-49
-
+                xs = self._xsfunc(Enu, [1.7e-46, 1.6e-45, -0.9e-45])
+                
+        if scale_to_H2O:
+            # According to USSR, xs is obtained by scaling by a factor of o18frac. 
+            # This is not mentioned on the Mainz wiki, It is unclear why it is divided by o18frac 
+            #    in the first place. Following this logic, scaled xs appear unscaled, but is correct.
+            return self.O_per_H2O * xs * u.cm**2
         return (xs/self.o18frac) * u.cm**2
 
     def mean_lepton_energy(self, flavor, e_nu):
@@ -533,17 +724,18 @@ class Oxygen18(Interaction):
         :param e_nu: neutrino energy.
         :returns: mean energy.
         """
+		# Convert all units to MeV
+        Enu = e_nu.to('MeV').value
+        
         # Only electron neutrinos interact with O18!
         if flavor != Flavor.nu_e:
-            if isinstance(e_nu, (list, tuple, np.ndarray)):
-                return np.zeros_like(e_nu) * u.MeV
+            if isinstance(Enu, (list, tuple, np.ndarray)):
+                return np.zeros_like(Enu) * u.MeV
             return 0. * u.MeV
 
-        # Convert all units to MeV
-        Enu = e_nu.to('MeV').value
 
         e_min = self.e_th + self.e_ckov
-        if isinstance(e_nu, (list, tuple, np.ndarray)):
+        if isinstance(Enu, (list, tuple, np.ndarray)):
             lep = np.where(Enu < e_min, 0., Enu - e_min)
         else:
             lep = 0.
