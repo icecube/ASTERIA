@@ -1,9 +1,9 @@
 # Licensed under a 3-clause BSD style license - see LICENSE.rst
 # -*- coding: utf-8 -*-
 """
-====
-ussr
-====
+=======
+asteria
+=======
 Tools for IceCube supernova simulations, including neutrino luminosity and
 energy spectra data files.
 """

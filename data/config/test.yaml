@@ -5,13 +5,13 @@ name: IceCube fast supernova simulation
 # - Set to <PACKAGE_DATA> will use an absolute installation path.
 # - Set to an empty string to force paths relative to the working directory.
 # - Set to some other absolute path.
-base_path: '{USSR}/data'
+base_path: '{ASTERIA}/data'
 #base_path: 'data'
 
 # Turn up simulation verbosity.
 verbose: no
 
-# The detector configuration is loaded by the ussr.detector module.
+# The detector configuration is loaded by the asteria.detector module.
 detector:
     name: IceCube_IC-86
     geometry:
@@ -26,7 +26,7 @@ detector:
             format: ascii
             path: detector/effectivevolume_benedikt_AHA_normalDoms.txt
 
-# The source configuration is loaded by the ussr.source module.
+# The source configuration is loaded by the asteria.source module.
 source:
     name: Sukh_SFHo_z9.6
     model: Sukhbold 9.6Msun progenitor with SFHo equation of state

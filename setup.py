@@ -12,13 +12,13 @@ import sys
 from distutils.command.sdist import sdist as DistutilsSdist
 from setuptools import setup, find_packages
 #
-from python.ussr._git import get_version, SetVersion
+from python.asteria._git import get_version, SetVersion
 #
 # Begin setup
 #
 setup_keywords = dict()
 #
-setup_keywords['name'] = 'ussr'
+setup_keywords['name'] = 'asteria'
 setup_keywords['description'] = 'IceCube supernova simulation package'
 setup_keywords['author'] = 'IceCube Collaboration'
 setup_keywords['author_email'] = 'sn-wg@icecube.wisc.edu'
@@ -46,8 +46,8 @@ setup_keywords['test_suite']='{name}.test.test_suite'.format(**setup_keywords)
 #
 # Internal data directories.
 #
-setup_keywords['data_files'] = [('ussr/data/config', glob('data/config/*')),
-                                ('ussr/data/spectra', glob('data/spectra/*'))]
+setup_keywords['data_files'] = [('asteria/data/config', glob('data/config/*')),
+                                ('asteria/data/spectra', glob('data/spectra/*'))]
 #
 # Run setup command.
 #
