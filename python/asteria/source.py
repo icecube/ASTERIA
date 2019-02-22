@@ -77,7 +77,7 @@ class Source:
         
         t : float
             Time relative to core bounce.
-        flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
@@ -95,7 +95,7 @@ class Source:
         
         t : float
             Time relative to core bounce.
-        flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
@@ -114,7 +114,7 @@ class Source:
         
         t : float
             Time relative to core bounce (units seconds).
-        flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
@@ -142,7 +142,7 @@ class Source:
 
         t : float
             Time relative to core bounce.
-        flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
         E : `numpy.ndarray`
             Sorted grid of neutrino energies to compute the energy PDF.
@@ -187,7 +187,7 @@ class Source:
             Sorted grid of neutrino energies to compute the energy PDF.
         n : int
             Number of energy samples to produce.
-        flavor : :class:`ussr.neutrino.Flavor`
+        flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
@@ -244,7 +244,7 @@ def initialize(config):
     Parameters
     ----------
 
-    config : :class:`ussr.config.Configuration`
+    config : :class:`asteria.config.Configuration`
         Configuration parameters used to create a Source.
 
     Returns
