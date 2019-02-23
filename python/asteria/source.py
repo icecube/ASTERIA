@@ -15,11 +15,57 @@ from .config import parse_quantity
 from astropy import units as u
 from astropy.table import Table
 
+from abc import ABC, abstractmethod
+
 import numpy as np
 from scipy.special import loggamma, gdtr
-from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.interpolate import InterpolatedUnivariateSpline, PchipInterpolator
 
 #See Pchipinterpolator
+
+
+class Distance(ABC):
+    """Basic abstract class to generate progenitor distance(s)."""
+
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def get_distance(self, n=1):
+        pass
+
+
+class FixedDistance(Distance):
+    """Generate fixed distances for the progenitor."""
+
+    def __init__(self, d):
+        super().__init__()
+        self.dist = d
+
+    def get_distance(self, n=1):
+        if n == 1:
+            return self.dist
+        else:
+            return np.asarray(n*[self.dist.value]) * self.dist.unit
+
+
+class ProbDistance(Distance):
+    """Generate a random distribution of distances for the progenitor according
+    to some model cumulative distribution."""
+    
+    def __init__(self, distance_cdf):
+        super().__init__()
+        tab = Table.read(distance_cdf)
+        self.dist = tab['distance']
+        self.cdf = tab['sn_cdf']
+        self.dVsCDF = PchipInterpolator(self.cdf, self.dist)
+
+    def get_distance(self, n=1):
+        u = np.random.uniform(0., 1., n)
+        if n == 1:
+            return self.dVsCDF(u[0]) * self.dist.unit
+        else:
+            return self.dVsCDF(u) * self.dist.unit
 
 
 class Source:
