@@ -31,7 +31,7 @@ class Distance(ABC):
         super().__init__()
 
     @abstractmethod
-    def get_distance(self, n=1):
+    def get_distance(self, size=1):
         pass
 
 
@@ -42,11 +42,11 @@ class FixedDistance(Distance):
         super().__init__()
         self.dist = d
 
-    def get_distance(self, n=1):
-        if n == 1:
+    def get_distance(self, size=1):
+        if size == 1:
             return self.dist
         else:
-            return np.asarray(n*[self.dist.value]) * self.dist.unit
+            return np.asarray(size*[self.dist.value]) * self.dist.unit
 
 
 class ProbDistance(Distance):
@@ -60,9 +60,9 @@ class ProbDistance(Distance):
         self.cdf = tab['sn_cdf']
         self.dVsCDF = PchipInterpolator(self.cdf, self.dist)
 
-    def get_distance(self, n=1):
-        u = np.random.uniform(0., 1., n)
-        if n == 1:
+    def get_distance(self, size=1):
+        u = np.random.uniform(0., 1., size)
+        if size == 1:
             return self.dVsCDF(u[0]) * self.dist.unit
         else:
             return self.dVsCDF(u) * self.dist.unit
