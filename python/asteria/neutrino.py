@@ -57,6 +57,12 @@ class Flavor(Enum):
         return self in (Flavor.nu_e_bar, Flavor.nu_x_bar)
 
 
+class PMNS(object):
+
+    def __init__(self):
+        pass
+
+
 #class Oscillation(object):
 #
 #    def __init__(self, theta12, theta23, theta13, deltaCP,
