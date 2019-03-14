@@ -57,6 +57,45 @@ class Flavor(Enum):
         return self in (Flavor.nu_e_bar, Flavor.nu_x_bar)
 
 
+class ValueCI(object):
+
+    def __init__(self, val, ci_lo, ci_hi):
+        """Initialize a value with potentially asymmetric error bars.
+        Assume the CI refers to 68% region around the central value.
+
+        Parameters
+        ----------
+        val : float
+            Centra value.
+        ci_lo : float
+            Lower range of 68% C.I. around central value.
+        ci_hi : float
+            Upper range of 68% C.I. around central value.
+        """
+        self.value = val
+        self.ci_lo = ci_lo
+        self.ci_hi = ci_hi
+
+    def get_random(self, n=1):
+        """Randomly sample values from the distribution.
+        If the distribution is asymmetric, treat it as a 2-sided Gaussian.
+
+        Parameters
+        ----------
+        n : int
+            Number of random draws.
+
+        Returns
+        -------
+        Returns n random draws from a symmetric/asymmetric Gaussian about
+        the central value.
+        """
+        if self.ci_lo == self.ci_hi:
+            return np.random.normal(loc=self.value, scale=self.ci_lo, size=n)
+        else:
+            return np.random.normal(loc=self.value, scale=self.ci_lo, size=n)
+        
+
 class PMNS(object):
 
     def __init__(self):
