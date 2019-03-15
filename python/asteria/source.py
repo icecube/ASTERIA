@@ -46,18 +46,27 @@ class Source:
         self.v_energy_pdf =  np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
 
         # Energy CDF, useful for random energy sampling.
-        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))
+        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))            
+               
+    def parts_by_index(self, x, n): 
+        """Returns a list of size-n numpy arrays containing indices for the 
+        elements of x, and one size-m array ( with m<n ) if there are remaining 
+        elements of x.
+        
+        
+        Returns
+        -------
+        i_part : list
+            List of index partitions (partitions are numpy array).
+        """
+        nParts = x.size//n    
+        i_part = [ np.arange( i*n, (i+1)*n ) for i in range(nParts) ]
 
-    def energy_spectrum_profile(self, a, Ea, E):
-        # Returns the energy PDF discretized to every point in the space
-        # ( (a, Ea), E) Where a and Ea are n-element time-profiles of the SN Model 
-        # parameters and E is an m-element list of neutrino energies.
-        # Modifed vesion of the ufunc energy_pdf, but is compatible with vector input
-        # Very memory intensive, for default dt = 0.0001s on [-1,15] and dE = 0.1 [0,100]
-        # The returned n x m matrix of floats is 1.28 GB.
-        # Could be improved.
-        return np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) - (1 + a) * np.log(Ea)) * \
-               np.exp(np.outer(a, np.log(E)) - np.outer((1 + a)/Ea,  E)).T 
+        if len(i_part)*n != x.size:
+            i_part += [ np.arange( len(i_part)*n, x.size ) ]
+        
+        return i_part
+        
     def get_time(self):
         """Return source time as numpy array.
 .
@@ -214,8 +223,31 @@ class Source:
 
         return energies
         
-    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum):
-        
+    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, n=1000):
+        """Compute the energy deposited in a cubic meter of ice by photons
+        from SN neutrino interactions.
+
+        Parameters
+        ----------
+
+        time : float (units s)
+            Time relative to core bounce.            
+        E : `numpy.ndarray`
+            Sorted grid of neutrino energies
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+        photon_spectrum : `numpy.ndarray` (Units vary, m**2)
+            Grid of the product of lepton cross section with lepton mean energy
+            and lepton path length per MeV, sorted according to parameter E
+        n : int
+            Maximum number of time steps to compute at once. A temporary numpy array
+            of size n x time.size is created and can be very memory inefficient.
+
+        Returns
+        -------
+        E_per_V
+            Energy per m**3 of ice deposited  by neutrinos of requested flavor
+        """
         H2O_in_ice = 3.053e28 # 1 / u.m**3
                 
         t = time.to(u.s).value
@@ -230,8 +262,11 @@ class Source:
             flux *= 2
         
         print('Beginning {0} simulation....'.format(flavor._name_), end='')
-        E_per_V =  np.zeros( time.size )
-        E_per_V += np.trapz( self.energy_spectrum(t, Enu, flavor) * phot, Enu.value, axis=0)
+        # The following two lines exploit the fact that astropy quantities will
+        # always return a number when numpy size is called on them, even if it is 1.
+        E_per_V =  np.zeros( time.size ) 
+        for i_part in self.parts_by_index(time, n): # Limits memory usage
+            E_per_V[i_part] += np.trapz( self.energy_spectrum(t[i_part], Enu, flavor) * phot, Enu.value, axis=0)
         E_per_V *= flux * H2O_in_ice / ( 4 * np.pi * dist**2)
         print('Completed')
     
@@ -272,8 +307,8 @@ def initialize(config):
             alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
 
             luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
-            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1)
-            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1) 
+            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1 )
+            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1 )  
 
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
