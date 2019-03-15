@@ -354,9 +354,9 @@ class ElectronScatter(Interaction):
               1/4. * y**4 * eps_p**2
             - 1/3. * y**3 * (eps_p*eps_m*self.Me/E + 2*eps_p**2 + eps_p**2 * y_ckov)
             + 1/2. * y**2 * (eps_p**2 + eps_m**2 + ( 2*eps_p**2 + eps_p*eps_m*self.Me/E) * y_ckov)
-            +        y    * (eps_m**2 + eps_p**2 ) * y_ckov )
+            -        y    * (eps_m**2 + eps_p**2 ) * y_ckov )
         return XSxE
-
+    
     def cross_section(self, flavor, e_nu, scale_to_H2O=True):
         """Cross section from Marciano and Parsa, J. Phys. G 29:2969, 2003.
 
@@ -422,7 +422,7 @@ class ElectronScatter(Interaction):
         cut = Enu > (self.e_ckov - self.Me)
 		# See (12) in source - units cm**2 / MeV
         norm = 1.5e-44         
-        ymax = 1./( 1 + self.Me/( 2*Enu[cut] )  )        
+        y_max = 1./( 1 + self.Me/( 2*Enu[cut] )  )        
         y_ckov = (self.e_ckov - self.Me)/Enu[cut]
 
         # Define flavor-dependent parameters
@@ -438,17 +438,11 @@ class ElectronScatter(Interaction):
             epsilon_m, epsilon_p = epsilons
 		
         lep = np.zeros_like( Enu )
-        params = (norm, epsilon_p, epsilon_m, 0) 
+        params = (norm, epsilon_p, epsilon_m, y_ckov) 
         
         
-        # lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
-        # lep[cut] -= self._integrated_XSxE(params, Enu[cut], 0)
-        lep[cut] += norm*Enu[cut]**2 * (
-            ymax**4 * epsilon_p**2 /4.
-            - ymax**3 *(epsilon_p*epsilon_m*self.Me/Enu[cut] + 2*epsilon_p**2)/3
-            + ymax**2 * (epsilon_p**2 + epsilon_m**2)/2
-        )
-        
+        lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
+        lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)        
 
 		# Note: Units are MeV * cm**2 
         if scale_to_H2O:
