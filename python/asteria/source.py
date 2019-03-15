@@ -46,19 +46,7 @@ class Source:
         self.v_energy_pdf =  np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
 
         # Energy CDF, useful for random energy sampling.
-        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))
-
-    def energy_spectrum_profile(self, a, Ea, E):
-        # Returns the energy PDF discretized to every point in the space
-        # ( (a, Ea), E) Where a and Ea are n-element time-profiles of the SN Model 
-        # parameters and E is an m-element list of neutrino energies.
-        # Modifed vesion of the ufunc energy_pdf, but is compatible with vector input
-        # Very memory intensive, for default dt = 0.0001s on [-1,15] and dE = 0.1 [0,100]
-        # The returned n x m matrix of floats is 1.28 GB.
-        # Could be improved.
-        return np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) - (1 + a) * np.log(Ea)) * \
-               np.exp(np.outer(a, np.log(E)) - np.outer((1 + a)/Ea,  E)).T 
-               
+        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))            
                
     def parts_by_index(self, x, n): 
         """Returns a list of size-n numpy arrays containing indices for the 
