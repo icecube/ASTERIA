@@ -40,7 +40,7 @@ class SimpleMixing(object):
         """
         
         nu_e = [a + b for a, b in zip(nu_list[2], nu_list[3])]  
-        nu_x = [(a + b + c)/2 for a, b, c in zip(nu_list[0], nu_list1[2], nu_list[3])]
+        nu_x = [(a + b + c)/2 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_e_bar = [a*self.c2t12 + (b+c)*self.s2t12 for a, b, c \
             in zip(nu_list[1], nu_list[2], nu_list[3])]
         nu_x_bar = [((1.0-self.c2t12)*a + (1.0+self.c2t12)*(b+c))/2 for a, b, c \
