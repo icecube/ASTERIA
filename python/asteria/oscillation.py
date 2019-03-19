@@ -9,7 +9,7 @@ from astropy.constants import c, hbar
 
 
 class SimpleMixing(object):
-	"""Class that does very simple SN neutrino flavor mixing. Based on
+    """Class that does very simple SN neutrino flavor mixing. Based on
     calculation in SNOwGLoBES.
     """
     
@@ -54,13 +54,13 @@ class SimpleMixing(object):
         Parameters
         ----------
         nu_list : ndarray 
-        	neutrino fluxes ordered by flavor (nu_e, nu_e_bar, nu_x, nu_x_bar)
+            neutrino fluxes ordered by flavor (nu_e, nu_e_bar, nu_x, nu_x_bar)
         
         Returns
         -------
         nu_new = ndarray
-        	neutrino fluxes after mixing (nu_e, nu_e_bar, nu_x, nu_x_bar)
-		"""
+            neutrino fluxes after mixing (nu_e, nu_e_bar, nu_x, nu_x_bar)
+        """
         nu_e = [a*self.s2t12 + b*self.c2t12 for a, b in zip(nu_list[0], nu_list[1])]   
         nu_x = [((1.0-self.s2t12)*a + (1.0+self.s2t12)*(b+c))/2 for a, b, c \
             in zip(nu_list[0], nu_list[2], nu_list[3])] 
