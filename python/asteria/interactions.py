@@ -3,6 +3,7 @@
 """
 
 from abc import ABC, abstractmethod
+from enum import Enum
 
 import numpy as np
 import astropy.units as u
@@ -737,3 +738,61 @@ class Oxygen18(Interaction):
                 lep = Enu - e_min
 
         return lep * u.MeV
+
+
+class Interactions(Enum):
+    """Neutrino interactions.
+
+    .. data:: InvBetaPar
+        Parameterized inverse beta decay.
+
+    .. data:: InvBetaTab
+        Tabulated inverse beta decay.
+
+    .. data:: ElectronScatter
+        Elastic neutrino-electron scattering.
+
+    .. data:: Oxygen16CC
+        O16 charged-current interaction.
+
+    .. data:: Oxygen16NC
+        O16 neutral-current interaction
+
+    .. data:: Oxygen18
+        O18 charged-current interaction
+
+    """    
+    InvBetaPar      = InvBetaPar()
+    InvBetaTab      = InvBetaTab()
+    ElectronScatter = ElectronScatter()
+    Oxygen16CC      = Oxygen16CC()
+    Oxygen16NC      = Oxygen16NC()
+    Oxygen18        = Oxygen18()
+    
+    def __init__(self, interaction):
+        self.cross_section      = interaction.cross_section
+        self.mean_lepton_energy = interaction.mean_lepton_energy
+
+    @property
+    def is_InvBetaPar(self):
+        return isinstance(self.value, InvBetaPar)
+
+    @property
+    def is_InvBetaTab(self):
+        return isinstance(self.value, InvBetaTab)
+
+    @property
+    def is_ElectronScatter(self):
+        return isinstance(self.value, ElectronScatter)
+
+    @property
+    def is_Oxygen16CC(self):
+        return isinstance(self.value, Oxygen16CC)
+
+    @property
+    def is_Oxygen16NC(self):
+        return isinstance(self.value, Oxygen16NC)
+
+    @property
+    def is_Oxygen18(self):
+        return isinstance(self.value, Oxygen18)
