@@ -58,7 +58,7 @@ class SimpleMixing(object):
         nu_new = ndarray
             neutrino fluxes after mixing (nu_e, nu_e_bar, nu_x, nu_x_bar)
         """
-        nu_e = [a*self.s2t12 + b*self.c2t12 for a, b in zip(nu_list[0], nu_list[1])]
+        nu_e = [a*self.s2t12 + (b+c)*self.c2t12 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_x = [((1.0-self.s2t12)*a + (1.0+self.s2t12)*(b+c))/2 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_e_bar = [a + b for a, b in zip(nu_list[2], nu_list[3])]
         nu_x_bar = [(a + b + c)/2 for a, b, c in zip(nu_list[1], nu_list[2], nu_list[3])]
