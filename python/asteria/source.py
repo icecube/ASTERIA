@@ -115,33 +115,40 @@ class Source:
         return self.mean_energy[flavor](t) * u.MeV
 
 
-    def get_flux(self, time, flavor=Flavor.nu_e_bar):
-        """Return source flux at time t for a given flavor.
+    def get_flux(self, time, flavor=Flavor.nu_e_bar, distance=None):
+        """Return source number flux at time t for a given flavor.
 
         Parameters
         ----------
         
         t : float
             Time relative to core bounce (units seconds).
+        dist : float
+            Progenitor distance
         flavor : :class:`asteria.neutrino.Flavor`
             Neutrino flavor.
 
         Returns
         -------
         flux : float
-            Source number flux (unit-less, count of neutrinos).
-        """      
+            Source number flux over each time bin (units 1/m^2)
+        """ 
+        
+        # Include option that distance == 0? If so, this would allow flux at source to be determined.
+        if distance is None:
+            dist = self.progenitor_distance
+            
+        dist = distance.to( u.m ).value
         t = time.to(u.s).value
         luminosity  = self.get_luminosity(t, flavor).to( u.MeV/u.s ).value
-        mean_energy = self.get_mean_energy(t, flavor).value
+        mean_energy = self.get_mean_energy(t, flavor).to( u.MeV ).value
         
         # Where the mean energy is not zero, return rate in units neutrinos per second, elsewhere, returns zero.
         rate = np.divide( luminosity, mean_energy, where=( mean_energy!=0 ), out=np.zeros( luminosity.size ))
-        flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate
+        flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate / (4*np.pi*dist**2)
         
-        return flux
-			 
-        #return self.luminosity[flavor](t) / self.progenitor_distance**2
+        return flux / (u.m**2)
+        
 
     def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
         """Compute the PDF of the neutrino energy distribution at time t.
@@ -223,7 +230,7 @@ class Source:
 
         return energies
         
-    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, n=1000):
+    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, dist=None, n=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
         from SN neutrino interactions.
 
@@ -248,6 +255,8 @@ class Source:
         E_per_V
             Energy per m**3 of ice deposited  by neutrinos of requested flavor
         """
+        
+        # NOTE: I don't like having this constant here. It should be in the interactions class.
         H2O_in_ice = 3.053e28 # 1 / u.m**3
                 
         t = time.to(u.s).value
@@ -256,8 +265,7 @@ class Source:
             Enu[0] = 1e-10 * u.MeV
         phot = photon_spectrum.to(u.m**2).value.reshape((-1,1)) # m**2
         
-        dist = self.progenitor_distance.to(u.m).value # m**2
-        flux = self.get_flux( time, flavor ) # Unitless
+        flux = self.get_flux( time, flavor, dist).to( 1 / u.m**2 ).value # Unitless
         if not flavor.is_electron:
             flux *= 2
         
@@ -267,7 +275,10 @@ class Source:
         E_per_V =  np.zeros( time.size ) 
         for i_part in self.parts_by_index(time, n): # Limits memory usage
             E_per_V[i_part] += np.trapz( self.energy_spectrum(t[i_part], Enu, flavor) * phot, Enu.value, axis=0)
-        E_per_V *= flux * H2O_in_ice / ( 4 * np.pi * dist**2)
+            
+        #It would be useful to remove the flux scaling form this part to speed calculatio time, as right now, this
+        # is the only way to scale the flux to distance without rewriting this code.
+        E_per_V *= flux * H2O_in_ice 
         print('Completed')
     
         return E_per_V * u.MeV / u.m**3
