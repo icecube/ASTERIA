@@ -868,6 +868,125 @@ class _InteractionsMeta(EnumMeta):
 
     
     
+class _InteractionsMeta(EnumMeta):
+    """ Internal Meta-class for Interactions enumeration object.
+    Extends functionality of enum.Enum __new__ and __call__ methods.
+    
+    .. data:: _InteractionDict : dict
+        Dictionary of ASTERIA neutrino interaction objects.
+    
+    """
+    _InteractionDict = {'InvBetaPar'      : InvBetaPar(),
+                        'InvBetaTab'      : InvBetaTab(),
+                        'ElectronScatter' : ElectronScatter(),
+                        'Oxygen16CC'      : Oxygen16CC(),
+                        'Oxygen16NC'      : Oxygen16NC(),
+                        'Oxygen18'        : Oxygen18() }
+               
+    def __call__(cls, requests=None):
+        """Given a dictionary of requests for ASTERIA interactions, returns an
+        enumeration containing the requested interactions.           
+            
+           .. param :: cls : Interactions
+              Called object. (Similar to 'self' keyword)
+            
+           .. param :: requests : dict 
+              Dictionary of requested interactions
+               - Keys with value True are initialized as enumeration members
+               - Keys with value False and keys missing from requests are added to excluded. 
+                
+        """
+        
+        # If no requests have been made, raise an error.
+        if requests is None:
+            raise RuntimeError('No Interactions Requested. ') 
+        # Otherwise, create a new Enum object...
+        
+        # Populate an _EnumDict with fields required for Enum creation, using update() WILL NOT
+        #    add these fields as enumeration members. 
+        metacls = cls.__class__ 
+        bases = (Enum, )
+        classdict = _EnumDict()
+        fields = {'__doc__'               : cls.__doc__,
+                  '__init__'              : cls.__init__,
+                  '__module__'            : cls.__module__,
+                  '__qualname__'          : 'Interactions',
+                  '_generate_next_value_' : cls._generate_next_value_,
+                  'cross_section'         : cls.cross_section,
+                  'mean_lepton_energy'    : cls.mean_lepton_energy,
+                  'photons_per_lepton_MeV': cls.photons_per_lepton_MeV,
+                  'p2e_path_ratio'        : cls.p2e_path_ratio,
+                  'included'              : [],
+                  'excluded'              : [] }
+        classdict.update({ key : val for key, val in fields.items()})
+        
+        # Add requested Interactions to classdict. Using dict[key] ensures these fields WILL
+        #   be added as enumeration members.
+        for key, val in requests.items():
+            if isinstance(val, bool):
+                if val:
+                    classdict[key] = metacls._InteractionDict[key]
+                    classdict['included'].append(key)
+                else:
+                    classdict['excluded'].append(key)
+            else:
+                raise ValueError('Requests must be dictionary with bool values. '+
+                                 'Given: {0} for key {1}'.format(type(val), key))
+          
+        # Perform error checking before enumeration creation.
+        if not classdict['included']:
+            raise RuntimeError('No Interactions Requested')
+        
+        # Exclude any missing interactions from the enumeration members       
+        missing = [key for key in metacls._InteractionDict if 
+                   key not in classdict and key not in classdict['excluded']]
+        classdict['excluded'] + missing
+        
+        if {'InvBetaTab', 'InvBetaPar'} <= set(classdict['included']):
+            raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
+                               'only one instance of IBD is allowed.')
+            
+    
+        # Create and return an Enum object using _InteractionsMeta.__new__      
+        return metacls.__new__(metacls, 'Interactions', bases, classdict)
+    
+    def __new__(metacls, cls, bases, classdict): 
+        """Returns an Enum object containing neutrino interactions.
+    
+            .. param:: metacls : class 
+                Meta-class of new Enum object being created (_InteractionsMeta).
+                
+            .. param:: cls : str
+                String for name of new Enum object being created
+                
+            .. param:: bases : tuple
+                Tuple of base classes ( enum.Enum,).  
+                
+            .. param:: classdict : _EnumDict
+                Extended dictionary object (from package enum) for creating an Enum object.                
+        """
+        
+        # If a request has been made, classdict will already contain the field 'excluded' and
+        #    the requested interactions. If no request has been made, the default value
+        #    which excludes only interactions.InvBetaTab, will be used.
+        if 'excluded' not in classdict:
+            classdict.update({'excluded' : ['InvBetaTab']} )
+        if 'included' not in classdict:
+            classdict.update({'included' : ['InvBetaPar', 'ElectronScatter', 'Oxygen16NC',
+                                            'Oxygen16CC', 'Oxygen18']} )
+        
+            # Get the remaining interactions and add them as enumeration members
+            missing = [key for key in metacls._InteractionDict if 
+                       key not in classdict['excluded']]
+            for key in missing:
+                classdict[key] = metacls._InteractionDict[key]
+                classdict['included'].append(key)
+            
+        # Create and return an Enum object using Enum.__new__ method.
+        return super().__new__(metacls, cls, bases, classdict)
+
+    
+    
 class Interactions(Enum, metaclass=_InteractionsMeta):
     """Neutrino Interaction types. 
     
@@ -896,12 +1015,13 @@ class Interactions(Enum, metaclass=_InteractionsMeta):
     def __init__(self, value):
         """Initialize an Enumeration member with an ASTERIA Interaction.
         
-        .. data:: value : asteria.interactions.Interaction
-            Reference to corresponding ASTERIA Interaction object.
+        :: Member Properties
         
+        .. data:: value : asteria.interactions.Interaction
+            Pointer to corresponding ASTERIA Interaction object.
+
         .. data:: __doc__ : str
             Doc-string of corresponding ASTERIA Interaction object."""
-        self._value_ = getattr(modules[__name__], self._name_)()
         self.__doc__ = self._value_.__doc__
         
      
@@ -917,7 +1037,7 @@ class Interactions(Enum, metaclass=_InteractionsMeta):
     
     @property
     def photons_per_lepton_MeV(self):
-        """ Returns corresponding ASTERIA Interaction photons_per_lepton_MeV data member. """
+        """ Returns corresponding ASTERIA Interaction photons_per_lepton_MeV method. """
         return self.value.photons_per_lepton_MeV
     
     @property
