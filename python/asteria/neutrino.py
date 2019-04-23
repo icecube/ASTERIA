@@ -159,15 +159,15 @@ class Flavor(Enum, metaclass=_FlavorMeta):
 
     @property
     def is_electron(self):
-        return self in (Flavor.nu_e, Flavor.nu_e_bar)
+        return self.value in (Flavor.nu_e.value, Flavor.nu_e_bar.value)
 
     @property
     def is_neutrino(self):
-        return self in (Flavor.nu_e, Flavor.nu_x)
+        return self.value in (Flavor.nu_e.value, Flavor.nu_x.value)
 
     @property
     def is_antineutrino(self):
-        return self in (Flavor.nu_e_bar, Flavor.nu_x_bar)
+        return self.value in (Flavor.nu_e_bar.value, Flavor.nu_x_bar.value)
 
 
 class ValueCI(object):
