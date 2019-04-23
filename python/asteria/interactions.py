@@ -460,8 +460,8 @@ class ElectronScatter(Interaction):
         
         
         lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
-        lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)        
-        lep /= self.cross_section(flavor, Enu).to( u.cm**2).value
+        lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)    
+        lep /= self.cross_section(flavor, e_nu).to( u.cm**2).value
         
         if scale_to_H2O:
             return self.e_per_H2O * lep * u.MeV 
