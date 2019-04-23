@@ -36,3 +36,9 @@ source:
     table:
         format: fits
         path: spectra/sukhbold-SFHo-z9.6.fits
+
+# The IO configuration is loaded by the asteria.IO module.
+IO:
+    table:
+        format: h5
+        path: processed/sukhbold-SFHo-z9.6.h5
