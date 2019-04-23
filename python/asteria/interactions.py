@@ -60,6 +60,10 @@ class Interaction(ABC):
     def mean_lepton_energy(self, flavor, e_nu):
         pass
         
+    @abstractmethod
+    def photon_scaling_factor(self, flavor):
+        pass
+        
 
     def compton_cherenkov_energy_dist(self, e_electron, e_photon):
         """Compute compton-cherenkov electron energy unnormalized distribution
@@ -235,6 +239,12 @@ class InvBetaPar(Interaction):
             if Enu > self.Eth:
                 return (Enu - self.delta) * (1. - Enu / (Enu + self.Mp))# - self.e_ckov - self.e_compton_n
             return 0. * u.MeV
+            
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
         
 
 class InvBetaTab(Interaction):
@@ -335,6 +345,12 @@ class InvBetaTab(Interaction):
             if Enu > self.Eth:
                 return self.lepVsE(Enu) * u.MeV
             return 0. * u.MeV
+            
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
 
 class ElectronScatter(Interaction):
@@ -450,6 +466,9 @@ class ElectronScatter(Interaction):
         if scale_to_H2O:
             return self.e_per_H2O * lep * u.MeV 
         return lep * u.MeV 
+        
+    def photon_scaling_factor(self, flavor):
+        return self.photons_per_lepton_MeV
 
 
 class Oxygen16CC(Interaction):
@@ -538,6 +557,12 @@ class Oxygen16CC(Interaction):
         if scale_to_H2O:
             return self.O_per_H2O * self.O16frac * xs * u.cm**2
         return xs * u.cm**2
+        
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
     def mean_lepton_energy(self, flavor, e_nu):
         """Compute mean energy of lepton emitted in CC interaction.
@@ -646,6 +671,9 @@ class Oxygen16NC(Interaction):
         else:
             lep = 0. if Enu < self.Eth else self._lepton_energy
         return lep * u.MeV
+        
+    def photon_scaling_factor(self, flavor):
+        return self.photons_per_lepton_MeV
 
 
 class Oxygen18(Interaction):
@@ -775,98 +803,11 @@ class _InteractionsMeta(EnumMeta):
         if requests is None:
             return cls 
         
-        # Create new Enum object using InteractionsMeta.__new__(). We create the necessary
-        #   Arguments to call this method, including the _EnumDict 'classdict' and the fields
-        #   required by the enum package.
-        metacls = cls.__class__
-        bases = (Enum, )
-        classdict = _EnumDict()
-        fields = {'__doc__'               : cls.__doc__,
-                  '__init__'              : cls.__init__,
-                  '__module__'            : cls.__module__,
-                  '__qualname__'          : 'Interactions',
-                  '_generate_next_value_' : cls._generate_next_value_,
-                  'cross_section'         : cls.cross_section,
-                  'mean_lepton_energy'    : cls.mean_lepton_energy,
-                  'photons_per_lepton_MeV': cls.photons_per_lepton_MeV,
-                  'p2e_path_ratio'        : cls.p2e_path_ratio,
-                  'excluded'              : [] }
-        
-        # Add required fields to classdict. Using dict.update() ensure these fields WILL NOT
-        #   be added as enumeration members.
-        classdict.update({ key : val for key, val in fields.items()})
-        
-        # Add requested fields to classdict. Using dict[key] = ... ensures these fields WILL
-        #   be added as enumeration members.
-        for key, val in requests.items():
-            if isinstance(val, bool):
-                if val:                
-                    # Key-value pairs with Non-unique values are discarded, this ensures the requested keys
-                    #   have unique values.
-                    classdict[key] = len(classdict)
-                else:
-                    classdict['excluded'].append(key)
-            else:
-                raise ValueError('Requests must be dictionary with bool values; '+
-                                 'given {0}'.format(type(val)))
-                                 
-        # If the set on the left is a subset of the set of unique keys in classdict, then multiple
-        #   instances of the Inverse Beta Decay interactions have been requested. Raise an error.
-        if {'InvBetaTab', 'InvBetaPar'} <= set(classdict.keys()):
-            raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
-                               'only one instance of IBD is allowed.')
-                               
-        if set(classdict['excluded']) == set(metacls.default.keys()):
-            raise RuntimeError('No Interactions Requested')
-                            
-        # If dict requests is missing any of the keys found in _interactionsMeta.default,
-        #   record this in the 'excluded' field.
-        for key, val in metacls.default.items():
-            if key not in requests: 
-                classdict['excluded'].append(key)
-        
-        # Use InteractionsMeta.__new__ to create an enumeration with only the requested interactions.        
-        return metacls.__new__(metacls, 'Interactions', bases, classdict)
-    
-    def __new__(metacls, cls, bases, classdict): 
-        """Returns an Enum object containing neutrino interactions.
-    
-            .. param:: metacls : class 
-                Meta-class of new Enum object being created (_InteractionsMeta).
-                
-            .. param:: cls : str
-                String for name of new Enum object being created
-                
-            .. param:: bases : tuple
-                Tuple of base classes ( enum.Enum,).  
-                
-            .. param:: classdict : _EnumDict
-                Extended dictionary object (from package enum) for creating an Enum object.                
-        """
-        # If an interaction is requested to be excluded or missing it will be added to the 'excluded'
-        #   field of classdict. If this field is missing, create it.
-        if 'excluded' not in classdict:
-            classdict.update({'excluded' : []} )
-        
-        # Check if the class dict already contains any interactions or if
-        #   if interactions are requested to be inactive.  
-        missing = {key: val for key, val in metacls.default.items() if 
-                   key not in classdict and 
-                   key not in classdict['excluded']}
-        
-        # Add the missing interactions to the classdict as enumeration members or as 'excluded' members
-        for key, val in missing.items():
-            if val:
-                # Key-value pairs with Non-unique values are discarded, this ensures the requested keys
-                #   have unique values.
-                classdict[key] = len(classdict)
-            else:
-                classdict['excluded'].append(key)
-            
-        # Create the interaction enumeration using Enum.__new__ method.
-        return super().__new__(metacls, cls, bases, classdict)     
-
-    
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
     
 class _InteractionsMeta(EnumMeta):
     """ Internal Meta-class for Interactions enumeration object.
