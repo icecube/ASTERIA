@@ -811,10 +811,12 @@ class _InteractionsMeta(EnumMeta):
         elif any( key not in metacls._InteractionDict for key in requests):
             raise AttributeError('Unknown interaction(s) "{0}" Requested'.format(
                                  '", "'.join( set(requests)-set(metacls._InteractionDict)) ))
-        # If requests does not have all boolean values, throw an error  .  
+         # If requests does not have all boolean values, throw an error  .  
         elif not all( isinstance( val, bool) for val in requests.values() ):
+            errordict = {key: val for key, val in requests.items 
+                         if not isinstance(requests[key], bool)}
             raise ValueError('Requests must be dictionary with bool values. '+
-                             'Given: {0} for key {1}'.format(type(val), key))
+                             'Given elements: {0}'.format(errordict))
         # If both implementations of Inverse Beta Decay are requested, throw an error.
         elif requests['InvBetaTab'] and requests['InvBetaPar']:
             raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
