@@ -794,9 +794,7 @@ class _InteractionsMeta(EnumMeta):
             
            .. param :: requests : dict 
               Dictionary of requested interactions
-               - Keys with value True are initialized as enumeration members
-               - Keys with value False and keys missing from requests are added to excluded. 
-                
+               - Keys with value True are initialized as enumeration members                
         """
         # Declare Meta-class _InteractionsMeta for error-checking.
         metacls = cls.__class__         
