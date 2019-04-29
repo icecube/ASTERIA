@@ -4,19 +4,28 @@ from .neutrino import Flavor
 import numpy as np
 import tables
 
+
 class _Binning(tables.IsDescription):
+    """Storage of binning information (e.g., for time and energy).
+    """
     start  = tables.Float64Col()   
     stop   = tables.Float64Col() 
     step   = tables.Float64Col()
     size   = tables.Int64Col()
+
     
 class _Flavors(tables.IsDescription):
+    """Storage of neutrino flavor data.
+    """
     nu_e     = tables.BoolCol(dflt=False)
     nu_e_bar = tables.BoolCol(dflt=False)
     nu_x     = tables.BoolCol(dflt=False)
     nu_x_bar = tables.BoolCol(dflt=False)
 
+
 class _Interactions(tables.IsDescription):
+    """Storage of interaction data.
+    """
     InvBetaTab      = tables.BoolCol(dflt=False)
     InvBetaPar      = tables.BoolCol(dflt=False)
     ElectronScatter = tables.BoolCol(dflt=False)
@@ -24,28 +33,36 @@ class _Interactions(tables.IsDescription):
     Oxygen16NC      = tables.BoolCol(dflt=False)
     Oxygen18        = tables.BoolCol(dflt=False)
 
+
 def initialize(config):
-    """Creates hdf5 file for storing processed simulations
+    """Creates hdf5 file for storing processed simulations.
     
     .. param :: config : asteria.config.Configuration
         - Loaded ASTERIA model Configuration object.
     """
     h5path = '/'.join([config.abs_base_path, config.IO.table.path])
     try:
-        h5file = tables.open_file( filename=h5path, mode='w', title='Simulations of ASTERIA Source: '+ config.source.name)
+        h5file = tables.open_file(filename=h5path, mode='w',
+                                  title='Simulations of ASTERIA Source: {}'.format(config.source.name))
     
-        grp_options = h5file.create_group('/', 'options', 'Requested Simulation Options' )
+        grp_options = h5file.create_group('/', 'options',
+                                          'Requested Simulation Options' )
         
-        tab_tbins = h5file.create_table(grp_options, 'Time', _Binning, 'Signature time binning [s]' )
-        tab_Ebins = h5file.create_table(grp_options, 'Enu', _Binning, 'Neutrino spectrum energy binning [MeV]' )  
-        tab_Flavors = h5file.create_table(grp_options, 'Flavors', _Flavors, 'CCSN model neutrino Flavors' )
-        tab_Interactions = h5file.create_table(grp_options, 'Interactions', _Interactions, 'Neutrino Interactions' )
+        tab_tbins = h5file.create_table(grp_options, 'Time', _Binning,
+                                        'Signature time binning [s]' )
+        tab_Ebins = h5file.create_table(grp_options, 'Enu', _Binning,
+                                        'Neutrino spectrum energy binning [MeV]')  
+        tab_Flavors = h5file.create_table(grp_options, 'Flavors', _Flavors,
+                                          'CCSN model neutrino Flavors' )
+        tab_Interactions = h5file.create_table(grp_options, 'Interactions', _Interactions,
+                                               'Neutrino Interactions' )
 
         grp_data = h5file.create_group("/", 'data', 'ASTERIA output')
+
         for flavor in Flavor:
             vlarray_flavor = h5file.create_vlarray(grp_data, flavor.name,
                                                    tables.Float64Atom(shape=()),
-                                                   'Flavor: '+flavor.name )
+                                                   'Flavor: {}'.format(flavor.name))
     except NameError as e:
         h5file.close()
         raise NameError(e)
@@ -55,6 +72,7 @@ def initialize(config):
         raise ValueError(e)
 
     h5file.close()
+
     
 def WriteOption(table, option):
     row = table.row
@@ -62,6 +80,7 @@ def WriteOption(table, option):
         row[key] = val
     row.append()
     table.flush() 
+
     
 # def FindOption(table, option):
     # statements = []
@@ -73,6 +92,7 @@ def WriteOption(table, option):
             
     # condition = '&'.join( statements )
     # return set( row.nrow for row in table.where(condition) )
+
     
 def WriteBinning(table, binning):
     bins = table.row
@@ -82,7 +102,7 @@ def WriteBinning(table, binning):
     bins['step'] = (binning.max() - binning.min())/(binning.size-1)
     bins.append()
     table.flush()
-    
+
     
 def find(group, Interactions, Flavors, Enu, time):
     """ Returns indices of simulations matching the provided options
@@ -101,6 +121,9 @@ def find(group, Interactions, Flavors, Enu, time):
         
     .. param :: time : ndarry
         - numpy array containing time binning of simulation.    
+
+    .. return :: simIndex : int
+        - Index of found row in output table.
     """
     tab_interactions = group.Interactions
     tab_flavors = group.Flavors
@@ -111,9 +134,9 @@ def find(group, Interactions, Flavors, Enu, time):
     statements = []
     for key,val in Interactions.requests.items():
         if val:
-            statements.append( '('+ key + ')' )
+            statements.append('('+ key + ')')
         else:
-            statements.append(' ~( ' + key + ')')
+            statements.append('~(' + key + ')')
             
     condition = '&'.join( statements )
     pass_interactions = set( row.nrow for row in tab_interactions.where(condition) )
@@ -131,28 +154,29 @@ def find(group, Interactions, Flavors, Enu, time):
 
     # Find Simulations that have the requested neutrino Energy binning.
     statements = []
-    statements.append( '(start == {0}) '.format(Enu.min()) )
-    statements.append( ' (stop == {0}) '.format(Enu.max()) )
-    statements.append( ' (step == {0}) '.format( (Enu.max() - Enu.min())/(Enu.size-1) ))
-    condition = '&'.join( statements )
-    pass_Enu = set( row.nrow for row in tab_Enu.where(condition) )
+    statements.append('(start == {0})'.format(Enu.min()))
+    statements.append('(stop == {0})'.format(Enu.max()))
+    statements.append('(step == {0})'.format((Enu.max() - Enu.min())/(Enu.size-1)))
+    condition = '&'.join(statements)
+    pass_Enu = set(row.nrow for row in tab_Enu.where(condition))
 
     # Find Simulations that have the requested time binning.
     statements = []
-    statements.append( '(start <= {0}) '.format(time.min()) )
-    statements.append( ' (stop >= {0}) '.format(time.max()) )
-    statements.append( ' (step == {0}) '.format( (time.max() - time.min())/(time.size-1) ))
-    condition = '&'.join( statements )
-    pass_time = set( row.nrow for row in tab_time.where(condition) )
+    statements.append('(start <= {0})'.format(time.min()))
+    statements.append('(stop >= {0})'.format(time.max()))
+    statements.append('(step == {0})'.format((time.max() - time.min())/(time.size-1)))
+    condition = '&'.join(statements)
+    pass_time = set(row.nrow for row in tab_time.where(condition))
 
-    pass_all = list(pass_time.intersection( pass_Enu, pass_flavors, pass_interactions))
+    pass_all = list(pass_time.intersection(pass_Enu, pass_flavors, pass_interactions))
     
     if not pass_all:
         simIndex = None
     elif len(pass_all) > 1:
-        raise ValueError('Multiple matching simulations detected, aborting')
+        raise ValueError('Multiple matching simulations detected, aborting.')
     else:
         simIndex = pass_all[0]
+
     return simIndex
     
     
@@ -161,10 +185,10 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
     
     # Test file existence 
     if not isfile(h5path):
-        print('Creating file: '+ h5path)
+        print('Creating file: {}'.format(h5path))
         initialize(config)        
         
-    h5file = tables.open_file( filename=h5path, mode='a' )
+    h5file = tables.open_file(filename=h5path, mode='a')
     grp_options = h5file.root.options
     grp_data = h5file.root.data
 
@@ -206,13 +230,30 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
     
     
 def load(config, Interactions, Flavors, Enu, time):
+    """Find a row in a table and load it.
+    
+    .. param:: Interactions : asteria.interactions.Interactions
+        - Enumeration of interactions used to create simulation
+        
+    .. param :: Flavors : asteria.neutrino.Flavor
+        - Enumeration of CCSN Model neutrino types used to create simulation
+        
+    .. param :: Enu : ndarray
+        - numpy array containing energy binning of simulation
+        
+    .. param :: time : ndarry
+        - numpy array containing time binning of simulation.    
+
+    .. return :: result : ndarray
+        - Results array, e.g., photonic energy per unit volume.
+    """
     h5path = '/'.join([config.abs_base_path, config.IO.table.path])
     
     # Test file existence 
     if not isfile(h5path):
-        raise FileNotFoundError('File {0} not found.'.format(h5path) )
+        raise FileNotFoundError('File {0} not found.'.format(h5path))
         
-    h5file = tables.open_file( filename=h5path, mode='r' )
+    h5file = tables.open_file(filename=h5path, mode='r')
     grp_options = h5file.root.options
     
     simIndex = find(grp_options, Interactions, Flavors, Enu, time)
@@ -222,7 +263,6 @@ def load(config, Interactions, Flavors, Enu, time):
         print('No matching Simulation found')
         h5file.close()
         return None
-    
     else:
         t_min = grp_options.Time.read(simIndex)['start']
         dt = grp_options.Time.read(simIndex)['step']    
@@ -231,7 +271,7 @@ def load(config, Interactions, Flavors, Enu, time):
         saved_time = np.arange(t_min, t_max + dt, dt)
         time_slice = (saved_time >= time.min()) & (saved_time <= time.max())
         
-        result = np.zeros(shape=( len(Flavors), len(time))  )
+        result = np.zeros(shape=(len(Flavors), len(time)))
         
         grp_data = h5file.root.data
         for nu, flavor in enumerate(Flavors):
