@@ -64,7 +64,6 @@ class Interaction(ABC):
     def photon_scaling_factor(self, flavor):
         pass
         
-
     def compton_cherenkov_energy_dist(self, e_electron, e_photon):
         """Compute compton-cherenkov electron energy unnormalized distribution
 
@@ -151,7 +150,6 @@ class Interaction(ABC):
         
         #return effvol_photon * photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
         #return  photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
-        
 
 
 class InvBetaPar(Interaction):
@@ -389,7 +387,6 @@ class ElectronScatter(Interaction):
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
 
-            
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
         if flavor.is_electron:
@@ -401,18 +398,18 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-		
-		# See (12) in source - Converted to MeV Units
+
+        # See (12) in source - Converted to MeV Units
         norm = 1.5e-44
         ymax = 1./(1 + self.Me/(2*Enu))
         
-        # xs is definite integral over differential cross section from 0 to ymax.
+        # xs is definite integral over differential cross section on 0 to ymax.
         xs = norm*Enu * (
             ymax**3 * epsilon_p**2/3.
             - ymax**2 * (epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/2
             + ymax * (epsilon_p**2 + epsilon_m**2)
         )
-		
+
         if scale_to_H2O:
             return self.e_per_H2O * xs * u.cm**2
         return xs * u.cm**2
@@ -430,18 +427,19 @@ class ElectronScatter(Interaction):
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
-        
-        
+
         if e_nu[0] == 0.:
             e_nu[0] = 1e-10 * u.MeV
+
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         cut = Enu > (self.e_ckov - self.Me)
-		# See (12) in source - units cm**2 / MeV
+
+        # See (12) in source - units cm**2 / MeV
         norm = 1.5e-44         
-        y_max = 1./( 1 + self.Me/( 2*Enu[cut] )  )        
-        y_ckov = (self.e_ckov - self.Me)/Enu[cut]
+        y_max = 1. / (1 + self.Me/(2*Enu[cut]))
+        y_ckov = (self.e_ckov - self.Me) / Enu[cut]
 
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
@@ -454,14 +452,13 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-		
+
         lep = np.zeros_like( Enu )
         params = (norm, epsilon_p, epsilon_m, y_ckov) 
-        
-        
+
         lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
         lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)    
-        lep /= self.cross_section(flavor, e_nu).to( u.cm**2).value
+        lep /= self.cross_section(flavor, e_nu).to(u.cm**2).value
         
         if scale_to_H2O:
             return self.e_per_H2O * lep * u.MeV 
@@ -508,8 +505,7 @@ class Oxygen16CC(Interaction):
         :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: cross section.
         """
-        
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         if not flavor.is_electron:
@@ -571,7 +567,7 @@ class Oxygen16CC(Interaction):
         :param e_nu: neutrino energy.
         :returns: lepton energy.
         """
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         if not flavor.is_electron:
@@ -734,9 +730,10 @@ class Oxygen18(Interaction):
                 xs = self._xsfunc(Enu, [1.7e-46, 1.6e-45, -0.9e-45])
                 
         if scale_to_H2O:
-            # According to USSR, xs is obtained by scaling by a factor of o18frac. 
-            # This is not mentioned on the Mainz wiki, It is unclear why it is divided by o18frac 
-            #    in the first place. Following this logic, scaled xs appear unscaled, but is correct.
+            # According to USSR, xs is obtained by scaling by a factor of
+            # o18frac. This is not mentioned on the Mainz wiki. It is unclear
+            # why it is divided by o18frac in the first place. Following this
+            # logic, scaled xs appear unscaled, but is correct.
             return self.O_per_H2O * xs * u.cm**2
         return (xs/self.o18frac) * u.cm**2
 
@@ -747,7 +744,7 @@ class Oxygen18(Interaction):
         :param e_nu: neutrino energy.
         :returns: mean energy.
         """
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         # Only electron neutrinos interact with O18!
@@ -772,6 +769,7 @@ class Oxygen18(Interaction):
             return self.photons_per_lepton_MeV
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
+
     
 class _InteractionsMeta(EnumMeta):
     """ Internal Meta-class for Interactions enumeration object.
@@ -779,7 +777,6 @@ class _InteractionsMeta(EnumMeta):
     
     .. data:: _InteractionDict : dict
         Dictionary of ASTERIA neutrino interaction objects.
-    
     """
     _InteractionDict = {'InvBetaPar'      : InvBetaPar(),
                         'InvBetaTab'      : InvBetaTab(),
@@ -885,8 +882,7 @@ class _InteractionsMeta(EnumMeta):
         # Create and return an Enum object using Enum.__new__ method.
         return super().__new__(metacls, cls, bases, classdict)
 
-    
-    
+
 class Interactions(Enum, metaclass=_InteractionsMeta):
     """Neutrino Interaction types. 
     
