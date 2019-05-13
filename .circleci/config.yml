@@ -1,0 +1,27 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/python:stretch
+    steps:
+      - checkout
+      - restore_cache:
+          key: pip-v1-{{ arch }}-{{ checksum "setup.py" }}
+      - run:
+          name: "Install dependencies"
+          command: |
+            python setup.py egg_info
+            pip install -r python/*.egg-info/requires.txt --user
+      - save_cache:
+          key: pip-v1-{{ arch }}-{{ checksum "setup.py" }}
+          paths:
+            - /home/circleci/.local/lib/python3.7/site-packages
+      - run:
+          name: "Install ASTERIA"
+          command: python setup.py install --user
+      - run:
+          name: "Run Tests"
+          command: python setup.py test
+
+
