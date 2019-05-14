@@ -45,7 +45,8 @@ setup_keywords['package_dir'] = {'': 'python'}
 setup_keywords['cmdclass'] = {'version': SetVersion, 'sdist': DistutilsSdist}
 setup_keywords['test_suite']='nose.collector'
 setup_keywords['tests_require']=['nose']
-setup_keywords['install_requires']=['numpy', 'scipy', 'pyyaml', 'astropy']
+setup_keywords['install_requires']=['numpy', 'scipy', 'pyyaml', 'astropy',
+                                    'matplotlib']
 #
 # Internal data directories.
 #
