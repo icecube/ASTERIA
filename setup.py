@@ -45,8 +45,13 @@ setup_keywords['package_dir'] = {'': 'python'}
 setup_keywords['cmdclass'] = {'version': SetVersion, 'sdist': DistutilsSdist}
 setup_keywords['test_suite']='nose.collector'
 setup_keywords['tests_require']=['nose']
-setup_keywords['install_requires']=['numpy', 'scipy', 'pyyaml', 'astropy',
-                                    'matplotlib']
+
+requires = []
+with open('requirements.txt', 'r') as f:
+    for line in f:
+        if line.strip():
+            requires.append(line.strip())
+setup_keywords['install_requires'] = requires
 #
 # Internal data directories.
 #
