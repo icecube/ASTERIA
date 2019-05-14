@@ -11,8 +11,7 @@ jobs:
       - run:
           name: "Install dependencies"
           command: |
-            python setup.py egg_info
-            pip install -r python/asteria.egg-info/requires.txt --user
+            pip install -r requirements.txt --user --progress-bar off
       - save_cache:
           key: pip-v1-{{ arch }}-{{ checksum "setup.py" }}
           paths:
