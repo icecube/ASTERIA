@@ -3,7 +3,8 @@
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import Enum, EnumMeta, _EnumDict
+from sys import modules
 
 import numpy as np
 import astropy.units as u
@@ -59,7 +60,10 @@ class Interaction(ABC):
     def mean_lepton_energy(self, flavor, e_nu):
         pass
         
-
+    @abstractmethod
+    def photon_scaling_factor(self, flavor):
+        pass
+        
     def compton_cherenkov_energy_dist(self, e_electron, e_photon):
         """Compute compton-cherenkov electron energy unnormalized distribution
 
@@ -146,7 +150,6 @@ class Interaction(ABC):
         
         #return effvol_photon * photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
         #return  photons_per_leptonic_MeV * self.H2O_in_ice/( 4*np.pi ) 
-        
 
 
 class InvBetaPar(Interaction):
@@ -234,6 +237,12 @@ class InvBetaPar(Interaction):
             if Enu > self.Eth:
                 return (Enu - self.delta) * (1. - Enu / (Enu + self.Mp))# - self.e_ckov - self.e_compton_n
             return 0. * u.MeV
+            
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
         
 
 class InvBetaTab(Interaction):
@@ -334,6 +343,12 @@ class InvBetaTab(Interaction):
             if Enu > self.Eth:
                 return self.lepVsE(Enu) * u.MeV
             return 0. * u.MeV
+            
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
 
 class ElectronScatter(Interaction):
@@ -372,7 +387,6 @@ class ElectronScatter(Interaction):
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
 
-            
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
         if flavor.is_electron:
@@ -384,18 +398,18 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-		
-		# See (12) in source - Converted to MeV Units
+
+        # See (12) in source - Converted to MeV Units
         norm = 1.5e-44
         ymax = 1./(1 + self.Me/(2*Enu))
         
-        # xs is definite integral over differential cross section from 0 to ymax.
+        # xs is definite integral over differential cross section on 0 to ymax.
         xs = norm*Enu * (
             ymax**3 * epsilon_p**2/3.
             - ymax**2 * (epsilon_p*epsilon_m*self.Me/Enu + 2*epsilon_p**2)/2
             + ymax * (epsilon_p**2 + epsilon_m**2)
         )
-		
+
         if scale_to_H2O:
             return self.e_per_H2O * xs * u.cm**2
         return xs * u.cm**2
@@ -413,18 +427,19 @@ class ElectronScatter(Interaction):
         """
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
-        
-        
+
         if e_nu[0] == 0.:
             e_nu[0] = 1e-10 * u.MeV
+
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         cut = Enu > (self.e_ckov - self.Me)
-		# See (12) in source - units cm**2 / MeV
+
+        # See (12) in source - units cm**2 / MeV
         norm = 1.5e-44         
-        y_max = 1./( 1 + self.Me/( 2*Enu[cut] )  )        
-        y_ckov = (self.e_ckov - self.Me)/Enu[cut]
+        y_max = 1. / (1 + self.Me/(2*Enu[cut]))
+        y_ckov = (self.e_ckov - self.Me) / Enu[cut]
 
         # Define flavor-dependent parameters
         epsilons = [-self.sinw2, 0.]
@@ -437,18 +452,20 @@ class ElectronScatter(Interaction):
             epsilon_p, epsilon_m = epsilons
         else:
             epsilon_m, epsilon_p = epsilons
-		
+
         lep = np.zeros_like( Enu )
         params = (norm, epsilon_p, epsilon_m, y_ckov) 
-        
-        
-        lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
-        lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)        
 
-		# Note: Units are MeV * cm**2 
+        lep[cut] += self._integrated_XSxE(params, Enu[cut], y_max)
+        lep[cut] -= self._integrated_XSxE(params, Enu[cut], y_ckov)    
+        lep /= self.cross_section(flavor, e_nu).to(u.cm**2).value
+        
         if scale_to_H2O:
-            return self.e_per_H2O * lep * u.MeV * u.cm**2
-        return lep * u.MeV * u.cm**2
+            return self.e_per_H2O * lep * u.MeV 
+        return lep * u.MeV 
+        
+    def photon_scaling_factor(self, flavor):
+        return self.photons_per_lepton_MeV
 
 
 class Oxygen16CC(Interaction):
@@ -488,8 +505,7 @@ class Oxygen16CC(Interaction):
         :param scale_to_H2O: indicator to scale cross section to H2O target.
         :returns: cross section.
         """
-        
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         if not flavor.is_electron:
@@ -537,6 +553,12 @@ class Oxygen16CC(Interaction):
         if scale_to_H2O:
             return self.O_per_H2O * self.O16frac * xs * u.cm**2
         return xs * u.cm**2
+        
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
     def mean_lepton_energy(self, flavor, e_nu):
         """Compute mean energy of lepton emitted in CC interaction.
@@ -545,7 +567,7 @@ class Oxygen16CC(Interaction):
         :param e_nu: neutrino energy.
         :returns: lepton energy.
         """
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         if not flavor.is_electron:
@@ -645,11 +667,13 @@ class Oxygen16NC(Interaction):
         else:
             lep = 0. if Enu < self.Eth else self._lepton_energy
         return lep * u.MeV
+        
+    def photon_scaling_factor(self, flavor):
+        return self.photons_per_lepton_MeV
 
 
 class Oxygen18(Interaction):
-    """
-    O18 CC interaction, using quadratic fit to cross section estimated from
+    """O18 CC interaction, using quadratic fit to cross section estimated from
     Kamiokande data from Haxton and Robertson, PRC 59:515, 1999.
     
     See page on Mainz Wiki, Neutrino cross sections on natural oxygen.
@@ -706,9 +730,10 @@ class Oxygen18(Interaction):
                 xs = self._xsfunc(Enu, [1.7e-46, 1.6e-45, -0.9e-45])
                 
         if scale_to_H2O:
-            # According to USSR, xs is obtained by scaling by a factor of o18frac. 
-            # This is not mentioned on the Mainz wiki, It is unclear why it is divided by o18frac 
-            #    in the first place. Following this logic, scaled xs appear unscaled, but is correct.
+            # According to USSR, xs is obtained by scaling by a factor of
+            # o18frac. This is not mentioned on the Mainz wiki. It is unclear
+            # why it is divided by o18frac in the first place. Following this
+            # logic, scaled xs appear unscaled, but is correct.
             return self.O_per_H2O * xs * u.cm**2
         return (xs/self.o18frac) * u.cm**2
 
@@ -719,7 +744,7 @@ class Oxygen18(Interaction):
         :param e_nu: neutrino energy.
         :returns: mean energy.
         """
-		# Convert all units to MeV
+        # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
         # Only electron neutrinos interact with O18!
@@ -738,61 +763,179 @@ class Oxygen18(Interaction):
                 lep = Enu - e_min
 
         return lep * u.MeV
+        
+    def photon_scaling_factor(self, flavor):
+        if flavor is not Flavor.nu_e_bar:
+            return self.photons_per_lepton_MeV
+        else:
+            return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
-
-class Interactions(Enum):
-    """Neutrino interactions.
-
-    .. data:: InvBetaPar
-        Parameterized inverse beta decay.
-
-    .. data:: InvBetaTab
-        Tabulated inverse beta decay.
-
-    .. data:: ElectronScatter
-        Elastic neutrino-electron scattering.
-
-    .. data:: Oxygen16CC
-        O16 charged-current interaction.
-
-    .. data:: Oxygen16NC
-        O16 neutral-current interaction
-
-    .. data:: Oxygen18
-        O18 charged-current interaction
-
-    """    
-    InvBetaPar      = InvBetaPar()
-    InvBetaTab      = InvBetaTab()
-    ElectronScatter = ElectronScatter()
-    Oxygen16CC      = Oxygen16CC()
-    Oxygen16NC      = Oxygen16NC()
-    Oxygen18        = Oxygen18()
     
-    def __init__(self, interaction):
-        self.cross_section      = interaction.cross_section
-        self.mean_lepton_energy = interaction.mean_lepton_energy
+class _InteractionsMeta(EnumMeta):
+    """ Internal Meta-class for Interactions enumeration object.
+    Extends functionality of enum.Enum __new__ and __call__ methods.
+    
+    .. data:: _InteractionDict : dict
+        Dictionary of ASTERIA neutrino interaction objects.
+    """
+    _InteractionDict = {'InvBetaPar'      : InvBetaPar(),
+                        'InvBetaTab'      : InvBetaTab(),
+                        'ElectronScatter' : ElectronScatter(),
+                        'Oxygen16CC'      : Oxygen16CC(),
+                        'Oxygen16NC'      : Oxygen16NC(),
+                        'Oxygen18'        : Oxygen18() }
+               
+    def __call__(cls, requests=None):
+        """Given a dictionary of requests for neutrino interactions, returns an
+        enumeration containing the requested interactions.           
+            
+           .. param :: cls : Interactions
+              Called object. (Similar to 'self' keyword)
+            
+           .. param :: requests : dict 
+              Dictionary of requested interactions
+               - Keys with value True are initialized as enumeration members                
+        """
+        # Declare Meta-class _InteractionsMeta for error-checking.
+        metacls = cls.__class__         
+        
+        # If no requests have been made, raise an error.
+        if requests is None or all( not val for val in requests.values() ):
+            raise RuntimeError('No Interactions Requested. ') 
+        # If an unknown interaction is requested, raise an error.
+        elif any( key not in metacls._InteractionDict for key in requests):
+            raise AttributeError('Unknown interaction(s) "{0}" Requested'.format(
+                                 '", "'.join( set(requests)-set(metacls._InteractionDict)) ))
+         # If requests does not have all boolean values, throw an error  .  
+        elif not all( isinstance( val, bool) for val in requests.values() ):
+            errordict = {key: val for key, val in requests.items 
+                         if not isinstance(requests[key], bool)}
+            raise ValueError('Requests must be dictionary with bool values. '+
+                             'Given elements: {0}'.format(errordict))
+        # If both implementations of Inverse Beta Decay are requested, throw an error.
+        elif requests['InvBetaTab'] and requests['InvBetaPar']:
+            raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
+                               'only one instance of IBD is allowed.')
+        # Otherwise, create a new Enum object...
+        
+        
+        # Retrieve interactions (if any) that were missing from requests.
+        missing = {key: False for key in metacls._InteractionDict if 
+                   key not in requests }
+        requests.update( missing )
+        
+        # Sort requests according to metacls._InteractionDict
+        requests = {key: requests[key] for key in metacls._InteractionDict }
+        
+        # Populate an _EnumDict with fields required for Enum creation.
+        bases = (Enum, )
+        classdict = _EnumDict()
+        fields = {'__doc__'               : cls.__doc__,
+                  '__init__'              : cls.__init__,
+                  '__module__'            : cls.__module__,
+                  '__qualname__'          : 'Interactions',
+                  '_generate_next_value_' : cls._generate_next_value_,
+                  'cross_section'         : cls.cross_section,
+                  'mean_lepton_energy'    : cls.mean_lepton_energy,
+                  'photon_scaling_factor' : cls.photon_scaling_factor,
+                  'requests'              : requests }
+        classdict.update({ key : val for key, val in fields.items()})
+        
+        # Create and return an Enum object using _InteractionsMeta.__new__      
+        return metacls.__new__(metacls, 'Interactions', bases, classdict)
+    
+    def __new__(metacls, cls, bases, classdict): 
+        """Returns an Enum object containing neutrino interactions.
+    
+            .. param:: metacls : class 
+                Meta-class of new Enum object being created (_InteractionsMeta).
+                
+            .. param:: cls : str
+                String for name of new Enum object being created
+                
+            .. param:: bases : tuple
+                Tuple of base classes ( enum.Enum,).  
+                
+            .. param:: classdict : _EnumDict
+                Extended dictionary object (from package enum) for creating an Enum object.                
+        """
+        
+        # If no request has been made, make a request for the default interactions
+        if 'requests' not in classdict:
+            classdict.update({'requests' : {'InvBetaPar'      : True,
+                                            'InvBetaTab'      : False,
+                                            'ElectronScatter' : True,
+                                            'Oxygen16CC'      : True,
+                                            'Oxygen16NC'      : True,
+                                            'Oxygen18'        : True } })
+                                            
+        for key, val in classdict['requests'].items():
+            if val:
+                # Add a member to the enumeration.
+                classdict[key] = metacls._InteractionDict[key]
+            else:
+                # DO NOT add a member to the enumeration.
+                classdict.update({ key : metacls._InteractionDict[key] })
+        
+        # Create and return an Enum object using Enum.__new__ method.
+        return super().__new__(metacls, cls, bases, classdict)
 
-    @property
-    def is_InvBetaPar(self):
-        return isinstance(self.value, InvBetaPar)
 
+class Interactions(Enum, metaclass=_InteractionsMeta):
+    """Neutrino Interaction types. 
+    
+    .. param (Optional):: requests : dict       
+        Dictionary of requested interactions. Each key must be
+        the string of an neutrino Interaction name, values must
+        be True/False. The default is given below.
+        
+        default = {'InvBetaPar'      : True,
+                   'InvBetaTab'      : False,
+                   'ElectronScatter' : True,
+                   'Oxygen16CC'      : True,
+                   'Oxygen16NC'      : True,
+                   'Oxygen18'        : True }
+                   
+    .. data :: InvBetaPar
+        Parameterized Inverse Beta Decay.
+    
+    .. data :: InvBetaTab
+        Tabulated Inverse Beta Decay.
+        
+    .. data :: ElectronScatter
+        Elastic neutrino-electron scattering.
+        
+    .. data :: Oxygen16CC
+        Oxygen-16 charged-current interaction.
+        
+    .. data :: Oxygen16NC
+        Oxygen-16 neutral-current interaction.
+    
+    .. data :: Oxygen18
+        Oxygen-18 charged-current interaction.
+    
+    .. data :: requests : dict
+        Dictionary of requests made for interactions (e.g. default).
+        
+    See also: _InteractionsMeta Meta-class, which extends the
+    functionality of this object and defines its type.        
+    """
     @property
-    def is_InvBetaTab(self):
-        return isinstance(self.value, InvBetaTab)
-
+    def __doc__(self):
+        """Returns Doc-string of corresponding ASTERIA Interaction object."""
+        return self.value.__doc__
+    
     @property
-    def is_ElectronScatter(self):
-        return isinstance(self.value, ElectronScatter)
-
+    def cross_section(self):
+        """Returns ASTERIA Interaction cross_section method. """
+        return self.value.cross_section
+    
     @property
-    def is_Oxygen16CC(self):
-        return isinstance(self.value, Oxygen16CC)
-
+    def mean_lepton_energy(self):
+        """Returns corresponding ASTERIA Interaction mean_lepton_energy method. """
+        return self.value.mean_lepton_energy
+    
     @property
-    def is_Oxygen16NC(self):
-        return isinstance(self.value, Oxygen16NC)
-
-    @property
-    def is_Oxygen18(self):
-        return isinstance(self.value, Oxygen18)
+    def photon_scaling_factor(self):
+        """Returns corresponding ASTERIA Interaction photon_scaling_factor method. """
+        return self.value.photon_scaling_factor
