@@ -21,6 +21,16 @@ jobs:
           command: python setup.py install --user
       - run:
           name: "Run Tests"
-          command: python setup.py test
+          command: |
+            python setup.py test
+            mkdir -p test-results/asteria
+            mv test-results.xml test-results/asteria/results.xml
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: htmlcov
+      - store_artifacts:
+          path: test-results
+
 
 
