@@ -1,4 +1,4 @@
-# ASTERIA: A Supernova TEst Routine for IceCube Analysis
+# ASTERIA: A Supernova TEst Routine for IceCube Analysis [![CircleCI](https://circleci.com/gh/IceCubeOpenSource/ASTERIA.svg?style=svg)](https://circleci.com/gh/IceCubeOpenSource/ASTERIA)
 
 ## Introduction
 
