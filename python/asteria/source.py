@@ -301,15 +301,26 @@ def initialize(config):
         # Loop over all flavors in the table:
         for flavor in Flavor:
             fl = flavor.name.upper()
+            if any( fl in col for col in sn_data_table.keys() ):
 
-            L = sn_data_table['L_{:s}'.format(fl)].to('erg/s')
-            E = sn_data_table['E_{:s}'.format(fl)].to('MeV')
-            alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
+                L = sn_data_table['L_{:s}'.format(fl)].to('erg/s')
+                E = sn_data_table['E_{:s}'.format(fl)].to('MeV')
+                alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
 
+            elif fl == 'NU_X_BAR':
+                L = sn_data_table['L_NU_X'].to('erg/s')
+                E = sn_data_table['E_NU_X'].to('MeV')
+                alpha = sn_data_table['ALPHA_NU_X'] 
+            
+            else:
+                raise KeyError("""'{0}'""".format(fl)) 
+                
             luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
             mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1 )
             pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1 )  
-
+            
+                
+            
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
         raise ValueError('Unsupported format: "ASCII"')
