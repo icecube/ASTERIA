@@ -149,3 +149,51 @@ class SimpleEarth(Body):
         """
         idx = np.digitize(r.to('km').value, [0., 3480., 6371.]) - 1
         return self._ye[idx]
+
+class TwoLayerModel(Body):
+    """A simple two-layered model for the densities of the core and the mantle
+    """
+
+    def __init__(self):
+        # Radial bin edges, in units of km.
+        self._rbins = np.asarray(
+            [0.0, 3480.0, 6371.0])
+
+        # Constant density values, in units of g/cm3.
+        self._rho = np.asarray(
+            [11.5000, 4.5000, 0.0000])
+
+        # Electron fraction values: inner/outer core and mantle.
+        self._ye = np.asarray([ 0.4656, 0.4957 ])
+
+    def density(self, r):
+        """Return density as a function of distance from the core.
+
+        Parameters
+        ----------
+        r : float or ndarray
+            Radial distance from core, in length units (astropy).
+
+        Returns
+        -------
+        rho : float or ndarray
+            Density at radial position(s) r.
+        """
+        idx = np.digitize(r.to('km').value, self._rbins) - 1
+        return self._rho[idx] * u.g / u.cm**3
+        
+    def y_e(self, r):
+        """Return electron fraction as a function of distance from the core.
+
+        Parameters
+        ----------
+        r : float or ndarray
+            Radial distance from core, in length units (astropy).
+
+        Returns
+        -------
+        Y_e : float or ndarray
+            Electron fraction at radial position(s) r.
+        """
+        idx = np.digitize(r.to('km').value, [0., 3480., 6371.]) - 1
+        return self._ye[idx]
