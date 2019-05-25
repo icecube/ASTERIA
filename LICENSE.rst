@@ -1,4 +1,4 @@
-Copyright (c) 2017-2018, IceCube Collaboration (https://icecube.wisc.edu).
+Copyright (c) 2017-2019, IceCube Collaboration (https://icecube.wisc.edu).
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification,
