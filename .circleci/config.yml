@@ -1,0 +1,36 @@
+version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/python:stretch
+    steps:
+      - checkout
+      - restore_cache:
+          key: pip-v1-{{ arch }}-{{ checksum "requirements.txt" }}
+      - run:
+          name: "Install dependencies"
+          command: |
+            pip install -r requirements.txt --user --progress-bar off
+      - save_cache:
+          key: pip-v1-{{ arch }}-{{ checksum "requirements.txt" }}
+          paths:
+            - /home/circleci/.local/lib/python3.7/site-packages
+      - run:
+          name: "Install ASTERIA"
+          command: python setup.py install --user
+      - run:
+          name: "Run Tests"
+          command: |
+            python setup.py test
+            mkdir -p test-results/asteria
+            mv test-results.xml test-results/asteria/results.xml
+      - store_test_results:
+          path: test-results
+      - store_artifacts:
+          path: htmlcov
+      - store_artifacts:
+          path: test-results
+
+
+
