@@ -21,52 +21,6 @@ import numpy as np
 from scipy.special import loggamma, gdtr
 from scipy.interpolate import InterpolatedUnivariateSpline, PchipInterpolator
 
-#See Pchipinterpolator
-
-
-class Distance(ABC):
-    """Basic abstract class to generate progenitor distance(s)."""
-
-    def __init__(self):
-        super().__init__()
-
-    @abstractmethod
-    def get_distance(self, size=1):
-        pass
-
-
-class FixedDistance(Distance):
-    """Generate fixed distances for the progenitor."""
-
-    def __init__(self, d):
-        super().__init__()
-        self.dist = d
-
-    def get_distance(self, size=1):
-        if size == 1:
-            return self.dist
-        else:
-            return np.asarray(size*[self.dist.value]) * self.dist.unit
-
-
-class ProbDistance(Distance):
-    """Generate a random distribution of distances for the progenitor according
-    to some model cumulative distribution."""
-    
-    def __init__(self, distance_cdf):
-        super().__init__()
-        tab = Table.read(distance_cdf)
-        self.dist = tab['distance']
-        self.cdf = tab['sn_cdf']
-        self.dVsCDF = PchipInterpolator(self.cdf, self.dist)
-
-    def get_distance(self, size=1):
-        u = np.random.uniform(0., 1., size)
-        if size == 1:
-            return self.dVsCDF(u[0]) * self.dist.unit
-        else:
-            return self.dVsCDF(u) * self.dist.unit
-
 
 class Source:
     
