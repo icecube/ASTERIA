@@ -72,7 +72,7 @@ class FixedDistance(Distance):
         if self.sigma is not None:
             d = np.random.normal(self.dist.value, self.sigma.value, size)
         else:
-            d = np.full(size, self.dist.value) * self.dist.unit
+            d = np.full(size, self.dist.value)
 
         return d * self.dist.unit
 
