@@ -15,11 +15,11 @@ from .config import parse_quantity
 from astropy import units as u
 from astropy.table import Table
 
+from abc import ABC, abstractmethod
+
 import numpy as np
 from scipy.special import loggamma, gdtr
-from scipy.interpolate import InterpolatedUnivariateSpline
-
-#See Pchipinterpolator
+from scipy.interpolate import InterpolatedUnivariateSpline, PchipInterpolator
 
 
 class Source:
