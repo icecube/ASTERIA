@@ -32,7 +32,15 @@ source:
     model: Sukhbold 9.6Msun progenitor with SFHo equation of state
     progenitor:
         mass: 9.6 M_sun
-        distance : 10 kpc
+        # Distance model: can be FixedDistance or StellarDensity
+        distance_model: FixedDistance
+            distance : 10 kpc
+            uncertainty : 0 kpc
+#        distance_model: StellarDensity
+#            format: fits
+#            path: stellar/sn_radial_distrib_adams.fits
+#            add_LMC: False
+#            add_SMC: False
     table:
         format: fits
         path: spectra/sukhbold-SFHo-z9.6.fits
