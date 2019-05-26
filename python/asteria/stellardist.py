@@ -17,7 +17,7 @@ from scipy.interpolate import PchipInterpolator
 
 
 class Distance(ABC):
-    """Basic abstrct class to generate progenitor distance(s).
+    """Abstract base class for generating progenitor distance(s).
     """
     def __init__(self):
         super().__init__()
