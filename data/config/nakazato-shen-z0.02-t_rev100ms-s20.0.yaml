@@ -32,7 +32,11 @@ source:
     model: Nakazato 20.0Msun progenitor with Shen equation of state, metallicity z=0.02 and shock revival time t_rev=100ms
     progenitor:
         mass: 20.0 M_sun
-        distance : 10 kpc
+        # Distance model: can be FixedDistance or StellarDensity
+        distance:
+            model: FixedDistance
+            distance: 10 kpc
+            uncertainty: 0 kpc
     table:
         format: fits
         path: spectra/nakazato-shen-z0.02-t_rev100ms-s20.0.fits
