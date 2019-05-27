@@ -17,7 +17,7 @@ from scipy.interpolate import PchipInterpolator
 
 
 class Distance(ABC):
-    """Basic abstrct class to generate progenitor distance(s).
+    """Abstract base class for generating progenitor distance(s).
     """
     def __init__(self):
         super().__init__()
@@ -36,6 +36,11 @@ class Distance(ABC):
         distance : ndarray
             Distance(s) to CCSN progenitor.
         """
+        pass
+
+    @abstractmethod
+    def __str__(self):
+        """Express as a string."""
         pass
 
 
@@ -76,6 +81,19 @@ class FixedDistance(Distance):
 
         return d * self.dist.unit
 
+    def __str__(self):
+        """Express as a string.
+
+        Returns
+        -------
+        s : str
+            String representation of FixedDistance.
+        """
+        s = 'Fixed Distance:\n- distance = {}'.format(self.dist)
+        if self.sigma is not None:
+            s += '\n- sigma    = {}'.format(self.sigma)
+        return s
+
 
 class StellarDensity(Distance):
     """Generate distances according to a Sun-centric radial mass density."""
@@ -100,6 +118,8 @@ class StellarDensity(Distance):
         self.cdf = hdu['CDF'].data
         self.name = hdu['CDF'].header['NAME']
         self.publication = hdu['CDF'].header['PUB']
+        self.use_LMC = add_LMC
+        self.use_SMC = add_SMC
 
         # Virial mass of the MW is ~1.5e12 Msun; see L. Watkins et al., 
         # ApJ 873:118 (2019), arXiv:1804.11348 [astro-ph.GA].
@@ -158,4 +178,19 @@ class StellarDensity(Distance):
         """
         u = np.random.uniform(0.,1., size)
         return self._inv_cdf(u) * self.dist.unit
+
+    def __str__(self):
+        """Express as a string.
+
+        Returns
+        -------
+        s : str
+            String representation of StellarDensity.
+        """
+        s = 'Stellar density:\n'
+        s += '- model   = {}\n'.format(self.name)
+        s += '- paper   = {}\n'.format(self.publication)
+        s += '- use LMC = {}\n'.format(self.use_LMC)
+        s += '- use SMC = {}'.format(self.use_SMC)
+        return s
 
