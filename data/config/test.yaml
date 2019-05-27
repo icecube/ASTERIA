@@ -33,11 +33,12 @@ source:
     progenitor:
         mass: 9.6 M_sun
         # Distance model: can be FixedDistance or StellarDensity
-        distance_model: FixedDistance
-            distance : 10 kpc
-            uncertainty : 0 kpc
-#        distance_model: StellarDensity
-#            format: fits
+        distance:
+            model: FixedDistance
+            distance: 10 kpc
+            uncertainty: 0 kpc
+#        distance
+#            model: StellarDensity
 #            path: stellar/sn_radial_distrib_adams.fits
 #            add_LMC: False
 #            add_SMC: False
