@@ -326,18 +326,18 @@ def initialize(config):
 
     # Set up the distance model.
     distance_model = None
-    dmtype = config.source.progenitor.distance_model
+    dmtype = config.source.progenitor.distance.model
     if dmtype == 'FixedDistance':
         # FixedDistance model.
-        r  = parse_quantity(config.source.progenitor.distance_model.distance)
-        dr = parse_quantity(config.source.progenitor.distance_model.uncertainty)
+        r  = parse_quantity(config.source.progenitor.distance.distance)
+        dr = parse_quantity(config.source.progenitor.distance.uncertainty)
         distance_model = FixedDistance(r, dr)
     elif dmtype == 'StellarDensity':
         # StellarDensity model, with options to add LMC and SMC.
         fitsfile = '/'.join([config.abs_base_path,
-                             config.source.progenitor.distance_model.path])
-        lmc = parse_quantity(config.source.progenitor.distance_model.add_LMC)
-        smc = parse_quantity(config.source.progenitor.distance_model.add_SMC)
+                             config.source.progenitor.distance.path])
+        lmc = parse_quantity(config.source.progenitor.distance.add_LMC)
+        smc = parse_quantity(config.source.progenitor.distance.add_SMC)
         distance_model = StellarDensity(fitsfile, lmc, smc)
     else:
         raise ValueError('Unrecognized distance_model: {}'.format(dmtype))
