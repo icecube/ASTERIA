@@ -55,8 +55,10 @@ class _FlavorMeta(EnumMeta):
                                  '", "'.join( set(requests)-set(metacls._FlavorDict)) ))
         # If requests does not have all boolean values, throw an error.  
         elif not all( isinstance( val, bool) for val in requests.values() ):
+            bad_vals = [' {0} : {1}'.format(key, val) for key, val in 
+                        requests.items() if not isinstance( val, bool) ]
             raise ValueError('Requests must be dictionary with bool values. '+
-                             'Given: {0} for key {1}'.format(type(val), key))
+                              'Given... '+ ',\n\t{:59}'.format('').join(bad_vals))
         # Otherwise, create a new Enum object...
         
         
