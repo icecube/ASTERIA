@@ -75,7 +75,7 @@ class TestFlavor(unittest.TestCase):
         self.assertNotIn(customFlavor.nu_e_bar, customFlavor)
         self.assertNotIn(customFlavor.nu_x_bar, customFlavor)
 
-    def test_errors_empty(self):        
+    def test_errors_no_requests(self):        
         with self.assertRaises(RuntimeError):
             Flavor()
 
@@ -96,20 +96,15 @@ class TestFlavor(unittest.TestCase):
                      'nu_x_bar' : None }
             Flavor(empty)
 
-    def test_errors_flavors(self):            
+    def test_error_invalid_flavors(self):            
         with self.assertRaises(AttributeError):
             custom = {'sterile'  : True,
                       'nu_e_bar' : True,
                       'nu_x'     : False,
                       'nu_x_bar' : False }
             Flavor(custom)
-  
-        with self.assertRaises(AttributeError):
-            custom = {'sterile'  : False,
-                      'nu_e_bar' : False}
-            Flavor(custom)
 
-    def test_errors_flavors(self):            
+    def test_errors_invalid_requests(self):            
         with self.assertRaises(ValueError):
             custom = {'nu_e'     : 1,
                       'nu_e_bar' : 0,
