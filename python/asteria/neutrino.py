@@ -51,14 +51,14 @@ class _FlavorMeta(EnumMeta):
             raise RuntimeError('No flavors requested. ')
         # If an unknown flavor is requested, rais an error.    
         elif any( key not in metacls._FlavorDict for key in requests):
-            raise AttributeError('Unknown flavor(s) "{0}" Requested'.format(
+            raise AttributeError('Unknown flavor(s) "{0}" Requested'.format( \
                                  '", "'.join( set(requests)-set(metacls._FlavorDict)) ))
         # If requests does not have all boolean values, throw an error.  
         elif not all( isinstance( val, bool) for val in requests.values() ):
             bad_vals = [' {0} : {1}'.format(key, val) for key, val in 
                         requests.items() if not isinstance( val, bool) ]
             raise ValueError('Requests must be dictionary with bool values. '+
-                              'Given... '+ ',\n\t{:59}'.format('').join(bad_vals))
+                              'Given... '+ ',\n{:67}'.format('').join(bad_vals))
         # Otherwise, create a new Enum object...
         
         
