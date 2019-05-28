@@ -1,4 +1,4 @@
-from asteria.neutrino import Flavor
+from asteria.neutrino import Flavor, Ordering
 import unittest
 
 class TestOrdering(unittest.TestCase):
