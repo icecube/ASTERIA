@@ -116,4 +116,28 @@ class TestFlavor(unittest.TestCase):
                       'nu_x'     : 2,
                       'nu_x_bar' : 1. }
             Flavor(custom)
+            
+    def test_to_tex(self):
+        self.assertEqual(Flavor.nu_e.to_tex(), '$\\nu_e$' )
+        self.assertEqual(Flavor.nu_e_bar.to_tex(), '$\\overline{\\nu}_e$')
+        self.assertEqual(Flavor.nu_x.to_tex(), '$\\nu_x$')
+        self.assertEqual(Flavor.nu_x_bar.to_tex(), '$\\overline{\\nu}_x$')
+        
+    def test_electron(self):
+        self.assertTrue(Flavor.nu_e.is_electron)
+        self.assertTrue(Flavor.nu_e_bar.is_electron)
+        self.assertFalse(Flavor.nu_x.is_electron)
+        self.assertFalse(Flavor.nu_x_bar.is_electron)
+        
+    def test_neutrino(self):
+        self.assertTrue(Flavor.nu_e.is_neutrino)
+        self.assertFalse(Flavor.nu_e_bar.is_neutrino)
+        self.assertTrue(Flavor.nu_x.is_neutrino)
+        self.assertFalse(Flavor.nu_x_bar.is_neutrino)
+    
+    def test_antineutrino(self):
+        self.assertFalse(Flavor.nu_e.is_antineutrino)
+        self.assertTrue(Flavor.nu_e_bar.is_antineutrino)
+        self.assertFalse(Flavor.nu_x.is_antineutrino)
+        self.assertTrue(Flavor.nu_x_bar.is_antineutrino)
 
