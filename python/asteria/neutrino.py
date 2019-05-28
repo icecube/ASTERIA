@@ -49,10 +49,10 @@ class _FlavorMeta(EnumMeta):
         # If no requests have been made, raise an error.
         if requests is None or all( not val for val in requests.values() ):
             raise RuntimeError('No flavors requested. ')
-        # If an unknown flavor is requested, rais an error.    
+        # If an unknown flavor is requested, raise an error.    
         elif any( key not in metacls._FlavorDict for key in requests):
-            raise AttributeError('Unknown flavor(s) "{0}" Requested'.format( \
-                                 '", "'.join( set(requests)-set(metacls._FlavorDict)) ))
+            bad_keys = set(requests)-set(metacls._FlavorDict)
+            raise AttributeError('Unknown flavor(s) "{0}" Requested'.format('", "'.join(bad_keys) ))
         # If requests does not have all boolean values, throw an error.  
         elif not all( isinstance( val, bool) for val in requests.values() ):
             bad_vals = [' {0} : {1}'.format(key, val) for key, val in 
