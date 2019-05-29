@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 from scipy.special import loggamma, gdtr
-from scipy.interpolate import InterpolatedUnivariateSpline, PchipInterpolator
+from scipy.interpolate import PchipInterpolator
 
 
 class Source:
@@ -94,7 +94,7 @@ class Source:
         luminosity : float
             Source luminosity (units of power).
         """
-        return self.luminosity[flavor](t) * (u.erg / u.s)
+        return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
 
     def get_mean_energy(self, t, flavor=Flavor.nu_e_bar):
         """Return source mean energy at time t for a given flavor.
@@ -112,8 +112,23 @@ class Source:
         mean_energy : float
             Source mean energy (units of energy).
         """
-        return self.mean_energy[flavor](t) * u.MeV
+        return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
 
+    def get_pinch_parameter(self, t, flavor=Flavor.nu_e_bar):
+        """Return source pinching paramter alpha at time t for a given flavor.
+        Parameters
+        ----------
+        
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+        Returns
+        -------
+        pinch : float
+            Source pinching parameter (unitless).
+        """
+        return np.nan_to_num(self.pinch[flavor](t))
 
     def get_flux(self, time, flavor=Flavor.nu_e_bar):
         """Return source flux at time t for a given flavor.
@@ -315,9 +330,9 @@ def initialize(config):
             else:
                 raise KeyError("""'{0}'""".format(fl)) 
                 
-            luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
-            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1 )
-            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1 )  
+            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False )
+            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False )
+            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )  
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
         raise ValueError('Unsupported format: "ASCII"')
