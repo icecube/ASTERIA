@@ -17,7 +17,7 @@ from astropy.table import Table
 
 import numpy as np
 from scipy.special import loggamma, gdtr
-from scipy.interpolate import InterpolatedUnivariateSpline
+from scipy.interpolate import PchipInterpolator
 
 #See Pchipinterpolator
 
@@ -315,9 +315,9 @@ def initialize(config):
             else:
                 raise KeyError("""'{0}'""".format(fl)) 
                 
-            luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
-            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1 )
-            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1 )  
+            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False )
+            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False )
+            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )  
             
                 
             
