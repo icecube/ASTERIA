@@ -94,7 +94,7 @@ class Source:
         luminosity : float
             Source luminosity (units of power).
         """
-        return self.luminosity[flavor](t) * (u.erg / u.s)
+        return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
 
     def get_pinch_parameter(self, t, flavor=Flavor.nu_e_bar):
         """Return source pinching paramter alpha at time t for a given flavor.
@@ -130,7 +130,7 @@ class Source:
         mean_energy : float
             Source mean energy (units of energy).
         """
-        return self.mean_energy[flavor](t) * u.MeV
+        return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
 
 
     def get_flux(self, time, flavor=Flavor.nu_e_bar):
