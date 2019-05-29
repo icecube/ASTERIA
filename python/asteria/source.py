@@ -96,6 +96,24 @@ class Source:
         """
         return self.luminosity[flavor](t) * (u.erg / u.s)
 
+    def get_pinch_parameter(self, t, flavor=Flavor.nu_e_bar):
+        """Return source pinching paramter alpha at time t for a given flavor.
+
+        Parameters
+        ----------
+        
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+
+        Returns
+        -------
+        pinch : float
+            Source pinching parameter (unitless).
+        """
+        return np.nan_to_num(self.pinch[flavor](t)) * u.MeV 
+
     def get_mean_energy(self, t, flavor=Flavor.nu_e_bar):
         """Return source mean energy at time t for a given flavor.
 
