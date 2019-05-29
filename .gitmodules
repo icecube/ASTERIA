@@ -1,0 +1,3 @@
+[submodule "SNFluxData"]
+	path = SNFluxData
+	url = https://github.com/IceCubeOpenSource/SNFluxData
