@@ -1,4 +1,4 @@
-# ASTERIA: A Supernova TEst Routine for IceCube Analysis
+# ASTERIA: A Supernova TEst Routine for IceCube Analysis [![CircleCI](https://circleci.com/gh/IceCubeOpenSource/ASTERIA.svg?style=svg)](https://circleci.com/gh/IceCubeOpenSource/ASTERIA)
 
 ## Introduction
 
@@ -35,4 +35,4 @@ will install softlinks in your python path to the source in your git checkout.
 
 ASTERIA is free software licensed under a 3-clause BSD-style license.
 
-Copyright (c) 2018, the IceCube Collaboration.
+Copyright (c) 2017-2019, the IceCube Collaboration.

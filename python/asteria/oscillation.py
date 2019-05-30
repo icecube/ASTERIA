@@ -22,8 +22,8 @@ class SimpleMixing(object):
              Mixing angle
         '''
         self.t12 = np.radians(t12)
-        self.s2t12 = np.sin(t12)**2
-        self.c2t12 = np.cos(t12)**2
+        self.s2t12 = np.sin(self.t12)**2
+        self.c2t12 = np.cos(self.t12)**2
         
     def normal_mixing(self, nu_list):
         """Performs flavor oscillations as per normal hierarchy.
@@ -42,7 +42,7 @@ class SimpleMixing(object):
         nu_x = [(a + b + c)/2 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_e_bar = [a*self.c2t12 + (b+c)*self.s2t12 for a, b, c in zip(nu_list[1], nu_list[2], nu_list[3])]
         nu_x_bar = [((1.0-self.c2t12)*a + (1.0+self.c2t12)*(b+c))/2 for a, b, c in zip(nu_list[1], nu_list[2], nu_list[3])]
-        nu_new = [nu_e, nu_e_bar, nu_x, nu_x_bar]
+        nu_new = np.asarray([nu_e, nu_e_bar, nu_x, nu_x_bar])
         return nu_new
     
     def inverted_mixing(self, nu_list):
@@ -58,9 +58,9 @@ class SimpleMixing(object):
         nu_new = ndarray
             neutrino fluxes after mixing (nu_e, nu_e_bar, nu_x, nu_x_bar)
         """
-        nu_e = [a*self.s2t12 + b*self.c2t12 for a, b in zip(nu_list[0], nu_list[1])]
+        nu_e = [a*self.s2t12 + (b+c)*self.c2t12 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_x = [((1.0-self.s2t12)*a + (1.0+self.s2t12)*(b+c))/2 for a, b, c in zip(nu_list[0], nu_list[2], nu_list[3])]
         nu_e_bar = [a + b for a, b in zip(nu_list[2], nu_list[3])]
         nu_x_bar = [(a + b + c)/2 for a, b, c in zip(nu_list[1], nu_list[2], nu_list[3])]
-        nu_new = [nu_e, nu_e_bar, nu_x, nu_x_bar]
+        nu_new = np.asarray([nu_e, nu_e_bar, nu_x, nu_x_bar])
         return nu_new
