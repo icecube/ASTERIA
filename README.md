@@ -12,6 +12,23 @@ The code uses estimates of the supernova neutrino luminosity from large-scale
 simulations of core-collapse supernovae to calculate photons in the IceCube
 detector.
 
+## Access
+
+ASTERIA can be cloned from this GitHub repository in the usual way. It also
+pulls in a private submodule containing core-collapse supernova flux
+calculations. To pull the submodule after cloning the repository, run
+
+```
+git submodule update --init --recursive
+```
+
+This only needs to be done the first time you clone ASTERIA. To update the
+submodule in your working copy, run the command
+
+```
+git submodule update --recursive --remote
+```
+
 ## Installation
 
 ASTERIA can be installed by cloning the repository and running
