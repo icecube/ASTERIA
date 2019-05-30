@@ -32,7 +32,11 @@ source:
     model: Nakazato Black hole formation from 30.0Msun progenitor with Shen equation of state and metallicity z=0.004
     progenitor:
         mass: 30.0 M_sun
-        distance : 10 kpc
+        # Distance model: can be FixedDistance or StellarDensity
+        distance:
+            model: FixedDistance
+            distance: 10 kpc
+            uncertainty: 0 kpc
     table:
         format: fits
         path: spectra/nakazato-shen-BH-z0.004-s30.0.fits

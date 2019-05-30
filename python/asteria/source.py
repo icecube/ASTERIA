@@ -10,25 +10,27 @@ of the neutrinos at any given time.
 from __future__ import print_function, division
 
 from .neutrino import Flavor
+from .stellardist import FixedDistance, StellarDensity
 from .config import parse_quantity
 
 from astropy import units as u
 from astropy.table import Table
 
+from abc import ABC, abstractmethod
+
 import numpy as np
 from scipy.special import loggamma, gdtr
-from scipy.interpolate import InterpolatedUnivariateSpline
-
-#See Pchipinterpolator
+from scipy.interpolate import PchipInterpolator
 
 
 class Source:
     
-    def __init__(self, name, model, progenitor_mass, progenitor_distance,
+    def __init__(self, name, 
+                 spectral_model, progenitor_mass, progenitor_distance,
                  time={}, luminosity={}, mean_energy={}, pinch={}):
 
         self.name = name
-        self.model = model
+        self.model = spectral_model
         self.progenitor_mass = progenitor_mass
         self.progenitor_distance = progenitor_distance
         self.time = time
@@ -40,20 +42,22 @@ class Source:
         # parameterized by mean energy and pinch parameter alpha. True for
         # nearly all CCSN models.
         self.energy_pdf = lambda a, Ea, E: \
+            np.zeros_like(E) if Ea <= 0 else \
             np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) + a * np.log(E) - \
                    (1 + a) * np.log(Ea) - (1 + a) * (E / Ea))
                    
         self.v_energy_pdf =  np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
 
         # Energy CDF, useful for random energy sampling.
-        self.energy_cdf = lambda a, Ea, E: gdtr(1., a + 1., (a + 1.) * (E / Ea))            
-               
+        self.energy_cdf = lambda a, Ea, E: \
+            np.zeros_like(E) if Ea <= 0 else \
+            gdtr(1., a + 1., (a + 1.) * (E / Ea))
+
     def parts_by_index(self, x, n): 
         """Returns a list of size-n numpy arrays containing indices for the 
         elements of x, and one size-m array ( with m<n ) if there are remaining 
         elements of x.
-        
-        
+
         Returns
         -------
         i_part : list
@@ -69,7 +73,6 @@ class Source:
         
     def get_time(self):
         """Return source time as numpy array.
-.
 
         Returns
         -------
@@ -94,7 +97,7 @@ class Source:
         luminosity : float
             Source luminosity (units of power).
         """
-        return self.luminosity[flavor](t) * (u.erg / u.s)
+        return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
 
     def get_mean_energy(self, t, flavor=Flavor.nu_e_bar):
         """Return source mean energy at time t for a given flavor.
@@ -112,8 +115,23 @@ class Source:
         mean_energy : float
             Source mean energy (units of energy).
         """
-        return self.mean_energy[flavor](t) * u.MeV
+        return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
 
+    def get_pinch_parameter(self, t, flavor=Flavor.nu_e_bar):
+        """Return source pinching paramter alpha at time t for a given flavor.
+        Parameters
+        ----------
+        
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+        Returns
+        -------
+        pinch : float
+            Source pinching parameter (unitless).
+        """
+        return np.nan_to_num(self.pinch[flavor](t))
 
     def get_flux(self, time, flavor=Flavor.nu_e_bar):
         """Return source flux at time t for a given flavor.
@@ -135,14 +153,14 @@ class Source:
         luminosity  = self.get_luminosity(t, flavor).to( u.MeV/u.s ).value
         mean_energy = self.get_mean_energy(t, flavor).value
         
-        # Where the mean energy is not zero, return rate in units neutrinos per second, elsewhere, returns zero.
-        rate = np.divide( luminosity, mean_energy, where=( mean_energy!=0 ), out=np.zeros( luminosity.size ))
+        # Where the mean energy is not zero, return rate in units neutrinos
+        # per second, elsewhere, returns zero.
+        rate = np.divide(luminosity, mean_energy, where=(mean_energy != 0),
+                         out=np.zeros(luminosity.size))
         flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate
         
         return flux
 			 
-        #return self.luminosity[flavor](t) / self.progenitor_distance**2
-
     def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
         """Compute the PDF of the neutrino energy distribution at time t.
 
@@ -315,23 +333,37 @@ def initialize(config):
             else:
                 raise KeyError("""'{0}'""".format(fl)) 
                 
-            luminosity[flavor] = InterpolatedUnivariateSpline(time, L, ext=1 )
-            mean_energy[flavor] = InterpolatedUnivariateSpline(time, E, ext=1 )
-            pinch[flavor] = InterpolatedUnivariateSpline(time, alpha, ext=1 )  
-            
-                
-            
+            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False )
+            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False )
+            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )  
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
         raise ValueError('Unsupported format: "ASCII"')
-
     else:
         raise ValueError('Unknown format {}'.format(config.source.table.format))
+
+    # Set up the distance model.
+    distance_model = None
+    dmtype = config.source.progenitor.distance.model
+    if dmtype == 'FixedDistance':
+        # FixedDistance model.
+        r  = parse_quantity(config.source.progenitor.distance.distance)
+        dr = parse_quantity(config.source.progenitor.distance.uncertainty)
+        distance_model = FixedDistance(r, dr)
+    elif dmtype == 'StellarDensity':
+        # StellarDensity model, with options to add LMC and SMC.
+        fitsfile = '/'.join([config.abs_base_path,
+                             config.source.progenitor.distance.path])
+        lmc = parse_quantity(config.source.progenitor.distance.add_LMC)
+        smc = parse_quantity(config.source.progenitor.distance.add_SMC)
+        distance_model = StellarDensity(fitsfile, lmc, smc)
+    else:
+        raise ValueError('Unrecognized distance_model: {}'.format(dmtype))
 
     return Source(config.source.name,
                   config.source.model,
                   parse_quantity(config.source.progenitor.mass),
-                  parse_quantity(config.source.progenitor.distance),
+                  distance_model.distance(),
                   time,
                   luminosity,
                   mean_energy,
