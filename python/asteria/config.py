@@ -124,19 +124,15 @@ class Node(object):
         self._assign('_value', value)
         self._assign('_path', path)
 
-
     def keys(self):
         return self._value.keys()
-
 
     def _assign(self, name, value):
         # Bypass our __setattr__
         super(Node, self).__setattr__(name, value)
 
-
     def __str__(self):
         return '.'.join(self._path)
-
 
     def __getattr__(self, name):
         # This method is only called when self.name fails.
@@ -186,30 +182,16 @@ class Configuration(Node):
     ------
     ValueError
         Missing required top-level configuration key.
-
-    Attributes
-    ----------
-    wavelength : astropy.units.Quantity
-        Array of linearly increasing wavelength values used for all simulation
-        calculations.  Determined by the wavelength_grid configuration
-        parameters.
-    abs_base_path : str
-        Absolute base path used for loading tabulated data.  Determined by
-        the basepath configuration parameter.
     """
+
     def __init__(self, config):
 
         Node.__init__(self, config)
         self.update()
 
-
     def update(self):
         """Update this configuration.
-
-        Updates the wavelength and abs_base_path attributes based on
-        the current settings of the wavelength_grid and base_path nodes.
         """
-
         # Use environment variables to interpolate {NAME} in the base path.
         base_path = self.base_path
         if base_path == '<PACKAGE_DATA>':
@@ -220,6 +202,23 @@ class Configuration(Node):
                 self._assign('abs_base_path', base_path.format(**os.environ))
             except KeyError as e:
                 raise ValueError('Environment variable not set: {0}.'.format(e))
+
+    def __str__(self):
+
+        settings = []
+
+        def _traverse(cfg, indent=0, outstr=''):
+            for key in cfg.keys():
+                val = cfg.__getattr__(key)
+                space = ''.join(['    ']*indent)
+                if type(val) != Node:
+                    settings.append('{}{} : {}'.format(space, key, val))
+                else:
+                    settings.append('{}{} :'.format(space, key))
+                    _traverse(val, indent + 1)
+        _traverse(self)
+
+        return '\n'.join(settings)
 
 
 def load_config(name, config_type=Configuration):
