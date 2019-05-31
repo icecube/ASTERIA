@@ -140,4 +140,6 @@ def main(args=None):
 
     # Save simulation to file.
     E_per_V_1kpc =  E_per_V * ccsn.progenitor_distance.to(u.kpc).value**2
-    io.save(conf, Interactions, Flavor, Enu.value, time.value, E_per_V_1kpc)
+    io.save(conf, Interactions, Flavor, Enu.value, time.value, E_per_V_1kpc,
+            force=True)
+
