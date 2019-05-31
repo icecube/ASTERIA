@@ -4,7 +4,8 @@ asteria.scripts.run_asteria
 """
 from __future__ import absolute_import, division, print_function
 
-from asteria import config
+from asteria.config import load_config, Configuration
+from asteria.source import initialize, Source
 
 from astropy import units as u
 
@@ -60,7 +61,7 @@ def parse(options=None):
 
     # Load configuration into a dictionary.
     # Overload the values using the command-line options.
-    conf = config.load_config(args.config, dict)
+    conf = load_config(args.config, dict)
 
     if args.srcname:
         conf['source']['name'] = args.srcname
@@ -90,9 +91,10 @@ def parse(options=None):
         conf['IO']['table']['path'] = args.outfile
 
     # Make options available to the simulation.
-    return config.Configuration(conf)
+    return Configuration(conf)
 
 def main(args=None):
     if isinstance(args, (list, tuple, type(None))):
         conf = parse(args)
-        print(conf)
+        source = initialize(conf)
+        print(source)
