@@ -6,11 +6,16 @@ from __future__ import absolute_import, division, print_function
 
 from asteria.config import load_config, Configuration
 from asteria.source import initialize, Source
+from asteria.neutrino import Flavor
+from asteria.interactions import Interactions
+import asteria.IO as io
 
+import numpy as np
 from astropy import units as u
 
 import os
 from argparse import ArgumentParser
+
 
 def parse(options=None):
     """Parse command line options.
@@ -20,7 +25,7 @@ def parse(options=None):
 
     p = ArgumentParser(description='IceCube Fast CCSN Simulator')
     p.add_argument('-c', '--config', dest='config',
-                   default='{}/data/config/test.yaml'.format(
+                   default='{}/data/config/default.yaml'.format(
                        os.environ['ASTERIA']),
                    help='YAML configuration file.')
     # 
@@ -93,8 +98,41 @@ def parse(options=None):
     # Make options available to the simulation.
     return Configuration(conf)
 
+
 def main(args=None):
     if isinstance(args, (list, tuple, type(None))):
         conf = parse(args)
-        source = initialize(conf)
-        print(source)
+
+    # Create the CCSN source.
+    ccsn = initialize(conf)
+
+    # Prepare energy and time range.
+    Enu  = np.arange(0.1, 100.1, 0.1) * u.MeV
+    time = np.arange(-1, 15, 0.001) * u.s
+
+    # Compute photons from charged particle interactions.
+    ph_spec = np.zeros(shape=(len(Flavor), Enu.size))
+
+    for nu, flavor in enumerate(Flavor):
+        for interaction in Interactions:
+            xs = interaction.cross_section(flavor, Enu).to('m**2').value
+            E_lep = interaction.mean_lepton_energy(flavor, Enu).value
+            scale = interaction.photon_scaling_factor(flavor).to('1/MeV').value
+
+            # Photon spectra per flavor in units of m**2.
+            ph_spec[nu] += xs * E_lep * scale
+    ph_spec *= u.m**2
+
+    # Compute signal per DOM.
+    E_per_V = np.zeros(shape=(len(Flavor), time.size))
+    signal_per_DOM = np.zeros_like(E_per_V)
+
+    ic_dt = 0.002                     # 2 ms bins
+    effvol = 0.1654 * u.m**3 / u.MeV  # simple estimate of DOM effective vol.
+
+    for nu, (flavor, ph_spectrum) in enumerate(zip(Flavor, ph_spec)):
+        E_per_V[nu] = ccsn.photonic_energy_per_vol(time, Enu, flavor, ph_spec)
+
+    # Save simulation to file, scaling results to 1 kpc distance.
+    E_per_V_1kpc = E_per_V * ccsn.progenitor_distance.to(u.kpc).value**2
+    io.save(conf, Interactions, Flavor, Enu.value, time.value, E_per_V_1kpc)
