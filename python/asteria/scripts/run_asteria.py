@@ -106,33 +106,38 @@ def main(args=None):
     # Create the CCSN source.
     ccsn = initialize(conf)
 
-    # Prepare energy and time range.
-    Enu  = np.arange(0.1, 100.1, 0.1) * u.MeV
-    time = np.arange(-1, 15, 0.001) * u.s
+    # Define neutrino energy range.
+    E_min = 0.1; E_max = 100.1; dE = 0.1;
+    Enu = np.arange(E_min, E_max, dE) * u.MeV
 
-    # Compute photons from charged particle interactions.
-    ph_spec = np.zeros(shape=(len(Flavor), Enu.size))
+    # Define post-bounce times at which to evaluate
+    t_min = -1; t_max = 15; dt = 0.0001;
+    time = np.arange(t_min, t_max, dt) * u.s
+
+	# Compute charged particle spectra.
+    photon_spectra = np.zeros(shape=(len(Flavor), Enu.size))
 
     for nu, flavor in enumerate(Flavor):
-        for interaction in Interactions:
-            xs = interaction.cross_section(flavor, Enu).to('m**2').value
+        for interaction in Interactions: 
+            xs    = interaction.cross_section(flavor, Enu).to(u.m**2).value
             E_lep = interaction.mean_lepton_energy(flavor, Enu).value
-            scale = interaction.photon_scaling_factor(flavor).to('1/MeV').value
-
-            # Photon spectra per flavor in units of m**2.
-            ph_spec[nu] += xs * E_lep * scale
-    ph_spec *= u.m**2
+            scale = interaction.photon_scaling_factor(flavor).to(1/u.MeV).value
+            photon_spectra[nu] +=  xs * E_lep * scale # u.m**2 
+    photon_spectra *= u.m**2
 
     # Compute signal per DOM.
-    E_per_V = np.zeros(shape=(len(Flavor), time.size))
+    E_per_V = np.zeros( shape=(len(Flavor), time.size) )
     signal_per_DOM = np.zeros_like(E_per_V)
-
-    ic_dt = 0.002                     # 2 ms bins
-    effvol = 0.1654 * u.m**3 / u.MeV  # simple estimate of DOM effective vol.
-
-    for nu, (flavor, ph_spectrum) in enumerate(zip(Flavor, ph_spec)):
+    
+    icecube_dt = 2e-3 #s
+    
+    effvol = 0.1654 * u.m**3 / u.MeV #Simple estimation of IceCube DOM Eff. Vol.
+    
+    for nu, (flavor, ph_spec) in enumerate(zip(Flavor, photon_spectra)):
         E_per_V[nu] = ccsn.photonic_energy_per_vol(time, Enu, flavor, ph_spec)
+        
+    signal_per_DOM = effvol * E_per_V
 
-    # Save simulation to file, scaling results to 1 kpc distance.
-    E_per_V_1kpc = E_per_V * ccsn.progenitor_distance.to(u.kpc).value**2
+    # Save simulation to file.
+    E_per_V_1kpc =  E_per_V * ccsn.progenitor_distance.to(u.kpc).value**2
     io.save(conf, Interactions, Flavor, Enu.value, time.value, E_per_V_1kpc)
