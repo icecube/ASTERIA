@@ -1,0 +1,48 @@
+name: IceCube fast supernova simulation
+
+# The base path will be prepended to all relative path values below.
+# - Expressions of form {...} will be expanded using environment variables.
+# - Set to <PACKAGE_DATA> will use an absolute installation path.
+# - Set to an empty string to force paths relative to the working directory.
+# - Set to some other absolute path.
+base_path: '{ASTERIA}/data'
+#base_path: 'data'
+
+# Turn up simulation verbosity.
+verbose: no
+
+# The detector configuration is loaded by the asteria.detector module.
+detector:
+    name: IceCube_IC-86
+    geometry:
+        max_height: 1900.
+        deepcore_string: 81
+        table:
+            format: ascii
+            path: detector/Icecube_geometry.20110102.complete.txt
+    effvol:
+        deepcore_rel_eff: 1.35
+        table:
+            format: ascii
+            path: detector/effectivevolume_benedikt_AHA_normalDoms.txt
+
+# The source configuration is loaded by the asteria.source module.
+source:
+    name: OConnor_HShen_s35
+    model: OConnor 35.0Msun progenitor with HShen equation of state
+    progenitor:
+        mass: 35.0 M_sun
+        # Distance model: can be FixedDistance or StellarDensity
+        distance:
+            model: FixedDistance
+            distance: 10 kpc
+            uncertainty: 0 kpc
+    table:
+        format: fits
+        path: snfluxes/OConnor_2013/oconnor_HShen_s35.fits
+
+# The IO configuration is loaded by the asteria.IO module.
+IO:
+    table:
+        format: h5
+        path: processed/oconnor_HShen_s35.h5
