@@ -36,6 +36,10 @@ if os.path.exists('README.md'):
 #
 # Set other keywords for the setup function.
 #
+if os.path.isdir('bin'):
+    # Treat everything in bin as a script to be installed.
+    setup_keywords['scripts'] = \
+    [fname for fname in glob(os.path.join('bin', '*'))]
 setup_keywords['provides'] = [setup_keywords['name']]
 setup_keywords['requires'] = ['Python (>2.7.0)']
 setup_keywords['zip_safe'] = False

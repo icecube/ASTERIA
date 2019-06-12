@@ -203,13 +203,13 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
         WriteBinning(grp_options.Time, time)
         # Write requested flavors
         for nu, flavor in enumerate(Flavors):
-            vlarray = grp_data[ flavor.name ]
-            vlarray.append( result[nu] )
+            vlarray = getattr(grp_data, flavor.name)
+            vlarray.append(result[nu])
         # Write non-requested flavors
         for key, val in Flavors.requests.items():
             if not val:
-                vlarray = grp_data[ key ]
-                vlarray.append( np.empty( time.size ) )
+                vlarray = getattr(grp_data, key)
+                vlarray.append(np.empty(time.size))
     else:
         # If simulation already exists, but no force flag, throw error
         if not force:
@@ -219,12 +219,12 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
         else:
             print('Deleted existing simulation, Rewriting.')                
             for nu, flavor in enumerate(Flavors):
-                vlarray = grp_data[ flavor.name ]
+                vlarray = getattr(grp_data, flavor.name)
                 vlarray[simIndex] = result[nu]
             for key, val in Flavors.requests.items():
                 if not val:
-                    vlarray = grp_data[ key ]
-                    vlarray.append( np.empty( time.size ) )     
+                    vlarray = getattr(grp_data, key)
+                    vlarray.append(np.empty(time.size))     
                 
     h5file.close()
     

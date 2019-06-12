@@ -42,15 +42,13 @@ class Source:
         # parameterized by mean energy and pinch parameter alpha. True for
         # nearly all CCSN models.
         self.energy_pdf = lambda a, Ea, E: \
-            np.zeros_like(E) if Ea <= 0 else \
             np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) + a * np.log(E) - \
                    (1 + a) * np.log(Ea) - (1 + a) * (E / Ea))
                    
-        self.v_energy_pdf =  np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
+        self.v_energy_pdf = np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
 
         # Energy CDF, useful for random energy sampling.
         self.energy_cdf = lambda a, Ea, E: \
-            np.zeros_like(E) if Ea <= 0 else \
             gdtr(1., a + 1., (a + 1.) * (E / Ea))
 
     def parts_by_index(self, x, n): 
@@ -181,9 +179,9 @@ class Source:
         """
         # Given t, get current average energy and pinch parameter.
         # Use simple 1D linear interpolation
-        a = self.pinch[flavor](t)
-        Ea = self.mean_energy[flavor](t)
-        Enu = E.to( u.MeV ).value
+        a = self.get_pinch_parameter(t, flavor)
+        Ea = self.get_mean_energy(t, flavor).to(u.MeV).value
+        Enu = E.to(u.MeV).value
 
         if E[0] == 0.:
             E[0] = 1e-10  # u.MeV
