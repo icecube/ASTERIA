@@ -785,7 +785,7 @@ class _InteractionsMeta(EnumMeta):
                         'Oxygen16NC'      : Oxygen16NC(),
                         'Oxygen18'        : Oxygen18() }
                
-    def __call__(cls, requests=None):
+    def __call__(cls, requests=None, force=False):
         """Given a dictionary of requests for neutrino interactions, returns an
         enumeration containing the requested interactions.           
             
@@ -814,7 +814,7 @@ class _InteractionsMeta(EnumMeta):
                              'Given elements: {0}'.format(errordict))
         # If both implementations of Inverse Beta Decay are requested, throw an error.
         elif {'InvBetaTab', 'InvBetaPar'} <= set(requests) and \
-            requests['InvBetaTab'] and requests['InvBetaPar']: 
+            requests['InvBetaTab'] and requests['InvBetaPar'] and not force: 
             raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
                                'only one instance of IBD is allowed.')
         # Otherwise, create a new Enum object...
