@@ -808,12 +808,13 @@ class _InteractionsMeta(EnumMeta):
                                  '", "'.join( set(requests)-set(metacls._InteractionDict)) ))
          # If requests does not have all boolean values, throw an error  .  
         elif not all( isinstance( val, bool) for val in requests.values() ):
-            errordict = {key: val for key, val in requests.items 
+            errordict = {key: val for key, val in requests.items()
                          if not isinstance(requests[key], bool)}
             raise ValueError('Requests must be dictionary with bool values. '+
                              'Given elements: {0}'.format(errordict))
         # If both implementations of Inverse Beta Decay are requested, throw an error.
-        elif requests['InvBetaTab'] and requests['InvBetaPar']:
+        elif {'InvBetaTab', 'InvBetaPar'} <= set(requests) and \
+            requests['InvBetaTab'] and requests['InvBetaPar']: 
             raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
                                'only one instance of IBD is allowed.')
         # Otherwise, create a new Enum object...
