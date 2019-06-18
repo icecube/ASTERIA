@@ -281,9 +281,8 @@ def load(config, Interactions, Hierarchy, Flavors, Enu, time):
     
     if simIndex is None:
         # If no matching simulations have been found, return none, or throw error?
-        print('No matching Simulation found')
         h5file.close()
-        return None
+        raise AttributeError('No matching Simulation found')
     else:
         t_min = grp_options.Time.read(simIndex)['start']
         dt = grp_options.Time.read(simIndex)['step']    
