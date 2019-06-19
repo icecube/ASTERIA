@@ -33,6 +33,14 @@ class _Interactions(tables.IsDescription):
     Oxygen16NC      = tables.BoolCol(dflt=False)
     Oxygen18        = tables.BoolCol(dflt=False)
 
+class _Hierarchy(tables.IsDescription):
+    """Storage of neutrino mass hierarchy.
+    """
+    any      = tables.BoolCol(dflt=False) 
+    none     = tables.BoolCol(dflt=False)
+    normal   = tables.BoolCol(dflt=False)
+    inverted = tables.BoolCol(dflt=False)
+
 
 def initialize(config):
     """Creates hdf5 file for storing processed simulations.
@@ -44,16 +52,16 @@ def initialize(config):
     try:
         h5file = tables.open_file(filename=h5path, mode='w',
                                   title='Simulations of ASTERIA Source: {}'.format(config.source.name))
-    
         grp_options = h5file.create_group('/', 'options',
                                           'Requested Simulation Options' )
-        
         tab_tbins = h5file.create_table(grp_options, 'Time', _Binning,
                                         'Signature time binning [s]' )
         tab_Ebins = h5file.create_table(grp_options, 'Enu', _Binning,
-                                        'Neutrino spectrum energy binning [MeV]')  
+                                        'Neutrino spectrum energy binning [MeV]')
         tab_Flavors = h5file.create_table(grp_options, 'Flavors', _Flavors,
                                           'CCSN model neutrino Flavors' )
+        tab_hierarchy = h5file.create_table(grp_options, 'Hierarchy', _Hierarchy,
+                                          'Neutrino Mass Hierarchy' )                                          
         tab_Interactions = h5file.create_table(grp_options, 'Interactions', _Interactions,
                                                'Neutrino Interactions' )
 
@@ -104,7 +112,7 @@ def WriteBinning(table, binning):
     table.flush()
 
     
-def find(group, Interactions, Flavors, Enu, time):
+def find(group, Interactions, Hierarchy, Flavors, Enu, time):
     """ Returns indices of simulations matching the provided options
     
     .. param :: group : tables.Group
@@ -113,6 +121,9 @@ def find(group, Interactions, Flavors, Enu, time):
     .. param:: Interactions : asteria.interactions.Interactions
         - Enumeration of interactions used to create simulation
         
+    .. param:: Hierarchy : asteria.neutrino.Ordering
+        - Enumeration member designating neutrino mass hierarchy
+
     .. param :: Flavors : asteria.neutrino.Flavor
         - Enumeration of CCSN Model neutrino types used to create simulation
         
@@ -126,6 +137,7 @@ def find(group, Interactions, Flavors, Enu, time):
         - Index of found row in output table.
     """
     tab_interactions = group.Interactions
+    tab_hierarchy = group.Hierarchy
     tab_flavors = group.Flavors
     tab_time = group.Time
     tab_Enu  = group.Enu
@@ -140,6 +152,9 @@ def find(group, Interactions, Flavors, Enu, time):
             
     condition = '&'.join( statements )
     pass_interactions = set( row.nrow for row in tab_interactions.where(condition) )
+    
+    # Find Simulations that have the requested Hierarchy 
+    pass_hierarchy = set( row.nrow for row in tab_hierarchy.where(Hierarchy.name) )
 
     # Find Simulations that have the requested flavors
     statements = []
@@ -168,7 +183,7 @@ def find(group, Interactions, Flavors, Enu, time):
     condition = '&'.join(statements)
     pass_time = set(row.nrow for row in tab_time.where(condition))
 
-    pass_all = list(pass_time.intersection(pass_Enu, pass_flavors, pass_interactions))
+    pass_all = list(pass_time.intersection(pass_Enu, pass_flavors, pass_interactions, pass_hierarchy))
     
     if not pass_all:
         simIndex = None
@@ -180,7 +195,7 @@ def find(group, Interactions, Flavors, Enu, time):
     return simIndex
     
     
-def save(config, Interactions, Flavors, Enu, time, result, force=False):
+def save(config, Interactions, Hierarchy, Flavors, Enu, time, result, force=False):
     h5path = '/'.join([config.abs_base_path, config.IO.table.path])
     
     # Test file existence 
@@ -192,7 +207,7 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
     grp_options = h5file.root.options
     grp_data = h5file.root.data
 
-    simIndex = find(grp_options, Interactions, Flavors, Enu, time) 
+    simIndex = find(grp_options, Interactions, Hierarchy, Flavors, Enu, time) 
     print('Found ', simIndex )
     if simIndex is None:
         print('Writing new simulation to file')
@@ -201,6 +216,12 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
         WriteOption(grp_options.Flavors, Flavors)
         WriteBinning(grp_options.Enu, Enu)
         WriteBinning(grp_options.Time, time)
+        
+        row = grp_options.Hierarchy.row
+        row[Hierarchy.name] = True
+        row.append()
+        grp_options.Hierarchy.flush()
+
         # Write requested flavors
         for nu, flavor in enumerate(Flavors):
             vlarray = getattr(grp_data, flavor.name)
@@ -229,7 +250,7 @@ def save(config, Interactions, Flavors, Enu, time, result, force=False):
     h5file.close()
     
     
-def load(config, Interactions, Flavors, Enu, time):
+def load(config, Interactions, Hierarchy, Flavors, Enu, time):
     """Find a row in a table and load it.
     
     .. param:: Interactions : asteria.interactions.Interactions
@@ -256,19 +277,17 @@ def load(config, Interactions, Flavors, Enu, time):
     h5file = tables.open_file(filename=h5path, mode='r')
     grp_options = h5file.root.options
     
-    simIndex = find(grp_options, Interactions, Flavors, Enu, time)
-    
+    simIndex = find(grp_options, Interactions, Hierarchy, Flavors, Enu, time)
     if simIndex is None:
         # If no matching simulations have been found, return none, or throw error?
-        print('No matching Simulation found')
         h5file.close()
-        return None
+        raise AttributeError('No matching Simulation found')
     else:
-        t_min = grp_options.Time.read(simIndex)['start']
-        dt = grp_options.Time.read(simIndex)['step']    
-        t_max = grp_options.Time.read(simIndex)['stop']
+        t_min = grp_options.Time.read()['start'][simIndex]
+        t_max = grp_options.Time.read()['stop'][simIndex]
+        n = grp_options.Time.read()['size'][simIndex]
         
-        saved_time = np.arange(t_min, t_max + dt, dt)
+        saved_time = np.linspace(t_min, t_max, n)
         time_slice = (saved_time >= time.min()) & (saved_time <= time.max())
         
         result = np.zeros(shape=(len(Flavors), len(time)))
@@ -276,8 +295,8 @@ def load(config, Interactions, Flavors, Enu, time):
         grp_data = h5file.root.data
         for nu, flavor in enumerate(Flavors):
             tab_data = h5file.get_node(grp_data, flavor.name)
-            data = tab_data.read(simIndex)[0][time_slice]
-            result[nu] = data
+            data = tab_data.read()[simIndex]
+            result[nu] = data[time_slice]
                 
     h5file.close()
     return result

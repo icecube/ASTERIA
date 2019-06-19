@@ -239,7 +239,7 @@ class Source:
 
         return energies
         
-    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, n=1000):
+    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, flux=None, n=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
         from SN neutrino interactions.
 
@@ -273,7 +273,8 @@ class Source:
         phot = photon_spectrum.to(u.m**2).value.reshape((-1,1)) # m**2
         
         dist = self.progenitor_distance.to(u.m).value # m**2
-        flux = self.get_flux( time, flavor ) # Unitless
+        if flux is None:
+            flux = self.get_flux( time, flavor ) # Unitless
         if not flavor.is_electron:
             flux *= 2
         
