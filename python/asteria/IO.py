@@ -285,12 +285,11 @@ def load(config, Interactions, Hierarchy, Flavors, Enu, time):
     else:
         t_min = grp_options.Time.read()['start'][simIndex]
         t_max = grp_options.Time.read()['stop'][simIndex]
-        dt = grp_options.Time.read()['step'][simIndex]
+        n = grp_options.Time.read()['size'][simIndex]
         
-        saved_time = np.arange(t_min, t_max + dt, dt)
+        saved_time = np.linspace(t_min, t_max, n)
         time_slice = (saved_time >= time.min()) & (saved_time <= time.max())
         
-        data = np.zeros_like( saved_time )
         result = np.zeros(shape=(len(Flavors), len(time)))
         
         grp_data = h5file.root.data
