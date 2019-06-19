@@ -278,26 +278,26 @@ def load(config, Interactions, Hierarchy, Flavors, Enu, time):
     grp_options = h5file.root.options
     
     simIndex = find(grp_options, Interactions, Hierarchy, Flavors, Enu, time)
-    
     if simIndex is None:
         # If no matching simulations have been found, return none, or throw error?
         h5file.close()
         raise AttributeError('No matching Simulation found')
     else:
-        t_min = grp_options.Time.read(simIndex)['start']
-        dt = grp_options.Time.read(simIndex)['step']    
-        t_max = grp_options.Time.read(simIndex)['stop']
+        t_min = grp_options.Time.read()['start'][simIndex]
+        t_max = grp_options.Time.read()['stop'][simIndex]
+        dt = grp_options.Time.read()['step'][simIndex]
         
         saved_time = np.arange(t_min, t_max + dt, dt)
         time_slice = (saved_time >= time.min()) & (saved_time <= time.max())
         
+        data = np.zeros_like( saved_time )
         result = np.zeros(shape=(len(Flavors), len(time)))
         
         grp_data = h5file.root.data
         for nu, flavor in enumerate(Flavors):
             tab_data = h5file.get_node(grp_data, flavor.name)
-            data = tab_data.read(simIndex)[0][time_slice]
-            result[nu] = data
+            data = tab_data.read()[simIndex]
+            result[nu] = data[time_slice]
                 
     h5file.close()
     return result
