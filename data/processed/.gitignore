@@ -1,0 +1,3 @@
+# ignore the preprocessed simulations ASTERIA saves to this directory
+*.h5
+!.gitignore
