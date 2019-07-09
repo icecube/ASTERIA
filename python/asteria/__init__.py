@@ -12,16 +12,21 @@ from ._version import __version__
 import os
 
 base_path = os.environ['ASTERIA']
-local_path = os.path.realpath(__file__)
+src_path = os.path.realpath(__path__[0])
+test_path = os.path.join(base_path, 'python', 'asteria')
 
-# Test for environment variable ASTERIA
-if base_path not in local_path:
-    raise OSError('Environment variable ASTERIA not set properly')
+# Test environment variable ASTERIA before proceeding
+if test_path != src_path:
+    raise OSError('Environment variable ASTERIA points to {0}\n  Expected: {1}'.format(
+        base_path, os.sep.join(src_path.split(os.sep)[:-2])
+    ))
 
 # Test for existence of scratch directory
-if not os.path.isdir(base_path + '/scratch'):
-    os.mkdir(base_path + '/scratch')
+scratch_path = os.path.join(base_path, 'scratch')
+if not os.path.isdir(scratch_path):
+    os.mkdir(scratch_path)
 
 # Test for existence of processed directory
-if not os.path.isdir(base_path + '/data/processed'):
-    os.mkdir(base_path + '/data/processed')
+processed_path = os.path.join(base_path, 'data', 'processed')
+if not os.path.isdir(processed_path):
+    os.mkdir(processed_path)
