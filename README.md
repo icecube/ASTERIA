@@ -46,6 +46,15 @@ export ASTERIA=/path/to/asteria_folder
 
 will install softlinks in your python path to the source in your git checkout.
 
+## Ignored files
+Files saved in the subdirectories below will be ignored.
+
+```
+ASTERIA/scratch
+ASTERIA/data/processed
+```
+
+
 ## License
 
 [BSD License](LICENSE.rst)
