@@ -11,15 +11,9 @@ from __future__ import absolute_import
 from ._version import __version__
 import os
 
-base_path = os.environ['ASTERIA']
-src_path = os.path.realpath(__path__[0])
-test_path = os.path.join(base_path, 'python', 'asteria')
 
-# Test environment variable ASTERIA before proceeding
-if test_path != src_path:
-    raise OSError('Environment variable ASTERIA points to {0}\n  Expected: {1}'.format(
-        base_path, os.sep.join(src_path.split(os.sep)[:-2])
-    ))
+src_path = os.path.realpath(__path__[0])
+base_path = os.sep.join(src_path.split(os.sep)[:-2])
 
 # Test for existence of scratch directory
 scratch_path = os.path.join(base_path, 'scratch')
