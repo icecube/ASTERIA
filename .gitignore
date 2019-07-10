@@ -1,5 +1,9 @@
 test-results.xml
 
+# ASTERIA User areas
+scratch/*
+data/processed/*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
