@@ -79,36 +79,47 @@ class USSRMixing(object):
         t12: float
              Mixing angle
         '''
-        pmns = np.asarray( [[0.825,  0.546,  0.148],
-                            [-0.490, 0.562,  0.665],
-                            [0.280, -0.621,  0.732]])
-        self.P_nu_e = pmns[0, 1] ** 2
-        self.P_nu_e_bar = pmns[0, 0] ** 2
-        self.P_nu_x = 0.5 * (1 + self.P_nu_e)
-        self.P_nu_x_bar = 0.5 * (1 + self.P_nu_e_bar)
+        self.pmns = np.asarray( [[0.825,  0.546,  0.148],
+                                [-0.490, 0.562,  0.665],
+                                [0.280, -0.621,  0.732]])
 
-    def normal_mixing(self, nu_list):
+    def normal_mixing(self, source, flavor):
         """Performs flavor oscillations as per normal hierarchy.
 
         Parameters
         ----------
-        nu_list : ndarray
-            neutrino fluxes ordered by flavor (nu_e, nu_e_bar, nu_x, nu_x_bar)
+        flavor : asteria.neutrino.flavor
+            CCSN Neutrino flavor
+            
+        source : asteria.source
+            
 
         Returns
         -------
-        nu_new = ndarray
-            neutrino fluxes after mixing (nu_e, nu_e_bar, nu_x, nu_x_bar)
+        mixed_spectrum : function
+            Function object for neutrino energy spectrum after mixing
+            Arguments are the same as by asteria.source.energy_spectrum
         """
-
-        nu_e = self.P_nu_e*nu_list[0] + (1-self.P_nu_e)*nu_list[2]
-        nu_x = self.P_nu_x*nu_list[2] + (1-self.P_nu_x)*nu_list[0]
-        nu_e_bar = self.P_nu_e_bar*nu_list[1] + (1-self.P_nu_e_bar)*nu_list[3]
-        nu_x_bar = self.P_nu_x_bar*nu_list[3] + (1-self.P_nu_x_bar)*nu_list[1]
-        nu_new = np.asarray([nu_e, nu_e_bar, nu_x, nu_x_bar])
-        return nu_new
-
-    def inverted_mixing(self, nu_list):
+        p_surv = 0
+        if flavor.is_neutrino:
+            p_surv = self.pmns[0, 1]**2
+        else:
+            p_surv = self.pmns[0, 0]**2
+            
+        if not flavor.is_electron:
+            p_surv = 0.5 * (1 + p_surv)
+            
+        def mixed_spectrum(t, E, flavor):
+            
+            req_spectrum = source.energy_spectrum(t, E, flavor)
+            req_flux = source.get_flux(t, flavor)
+            comp_spectrum = source.energy_spectrum(t, E, flavor.oscillates_to)
+            comp_flux = source.get_flux(t, flavor.oscillates_to)
+            
+            return p_surv * req_spectrum * req_flux + (1-p_surv) * comp_spectrum * comp_flux
+        return mixed_spectrum
+    
+    def inverted_mixing(self, flavor, spectrum):
         """Performs flavor oscillations as per inverted hierarchy.
         IN THE USSR IMPLEMENTATION THIS IS THE SAME AS NORMAL"""
-        return self.normal_mixing(nu_list)
+        return self.normal_mixing(self, flavor, spectrum)
