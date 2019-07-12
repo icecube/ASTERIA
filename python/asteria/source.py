@@ -239,7 +239,7 @@ class Source:
 
         return energies
         
-    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, flux=None, n=1000):
+    def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, mixing=None, n=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
         from SN neutrino interactions.
 
@@ -273,18 +273,24 @@ class Source:
         phot = photon_spectrum.to(u.m**2).value.reshape((-1,1)) # m**2
         
         dist = self.progenitor_distance.to(u.m).value # m**2
-        if flux is None:
-            flux = self.get_flux( time, flavor ) # Unitless
-        if not flavor.is_electron:
-            flux *= 2
+        flux = self.get_flux( time, flavor ) # Unitless
         
-        print('Beginning {0} simulation....'.format(flavor._name_), end='')
+        if mixing is None:
+            nu_spectrum = self.energy_spectrum
+        else:
+            nu_spectrum = mixing( self, flavor )
+
+        
+        
+        print('Beginning {0} simulation... {1}'.format(flavor.name, ' '*(10-len(flavor.name))), end='')
         # The following two lines exploit the fact that astropy quantities will
         # always return a number when numpy size is called on them, even if it is 1.
-        E_per_V =  np.zeros( time.size ) 
+        E_per_V = np.zeros( time.size ) 
         for i_part in self.parts_by_index(time, n): # Limits memory usage
-            E_per_V[i_part] += np.trapz( self.energy_spectrum(t[i_part], Enu, flavor) * phot, Enu.value, axis=0)
-        E_per_V *= flux * H2O_in_ice / ( 4 * np.pi * dist**2)
+             E_per_V[i_part] += np.trapz( nu_spectrum(time[i_part], Enu, flavor) * phot, Enu.value, axis=0)
+        E_per_V *= H2O_in_ice / ( 4 * np.pi * dist**2)
+        if not flavor.is_electron:
+            E_per_V *= 2
         print('Completed')
     
         return E_per_V * u.MeV / u.m**3
