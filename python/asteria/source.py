@@ -276,7 +276,8 @@ class Source:
         flux = self.get_flux( time, flavor ) # Unitless
         
         if mixing is None:
-            nu_spectrum = self.energy_spectrum
+            def nu_spectrum(t, E, flavor):
+                return self.energy_spectrum(t, E, flavor) * self.get_flux(t, flavor)
         else:
             nu_spectrum = mixing( self, flavor )
 
