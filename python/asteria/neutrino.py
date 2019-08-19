@@ -80,6 +80,7 @@ class _FlavorMeta(EnumMeta):
                   'is_electron'           : cls.is_electron,
                   'is_neutrino'           : cls.is_neutrino,
                   'is_antineutrino'       : cls.is_antineutrino,
+                  'oscillates_to'         : cls.oscillates_to,
                   'requests'              : requests }
         classdict.update({ key : val for key, val in fields.items()})
         
@@ -168,6 +169,13 @@ class Flavor(Enum, metaclass=_FlavorMeta):
     @property
     def is_antineutrino(self):
         return self.value in (Flavor.nu_e_bar.value, Flavor.nu_x_bar.value)
+
+    @property
+    def oscillates_to(self):
+        if self.is_electron:
+            return Flavor.nu_x if self.is_neutrino else Flavor.nu_x_bar
+        else:
+            return Flavor.nu_e if self.is_neutrino else Flavor.nu_e_bar
 
 
 class ValueCI(object):
