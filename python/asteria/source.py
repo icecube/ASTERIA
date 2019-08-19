@@ -159,7 +159,7 @@ class Source:
         
         return flux
 			 
-    def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
+    def energy_spectrum(self, time, E, flavor=Flavor.nu_e_bar):
         """Compute the PDF of the neutrino energy distribution at time t.
 
         Parameters
@@ -179,9 +179,10 @@ class Source:
         """
         # Given t, get current average energy and pinch parameter.
         # Use simple 1D linear interpolation
+        t = time.to(u.s).value
+        Enu = E.to(u.MeV).value
         a = self.get_pinch_parameter(t, flavor)
         Ea = self.get_mean_energy(t, flavor).to(u.MeV).value
-        Enu = E.to(u.MeV).value
 
         if E[0] == 0.:
             E[0] = 1e-10  # u.MeV
