@@ -22,15 +22,12 @@ class SimpleMixing(object):
         self.s2t12 = np.sin(self.t12) ** 2
         self.c2t12 = np.cos(self.t12) ** 2
 
-    def normal_mixing(self, source, flavor):
+    def normal_mixing(self, source):
         """Generates spectrum object under normal hierarchy mixing.
         
         Parameters
         ----------
         source : asteria.source
-
-        flavor : asteria.neutrino.flavor
-            CCSN Neutrino flavor
 
         Returns
         -------
@@ -39,20 +36,19 @@ class SimpleMixing(object):
             Arguments are the same as by asteria.source.energy_spectrum
         """
 
-        coeff = [0, 0]
-
-        if flavor.is_neutrino:
-            if flavor.is_electron:
-                coeff = [0, 1]
-            else:
-                coeff = [0.5, 0.5]
-        else:
-            if flavor.is_electron:
-                coeff = [self.c2t12, self.s2t12]
-            else:
-                coeff = [1.0 - self.c2t12, 0.5 * (1.0 + self.c2t12)]
-
         def mixed_spectrum(t, E, flavor):
+
+            if flavor.is_neutrino:
+                if flavor.is_electron:
+                    coeff = [0, 1]
+                else:
+                    coeff = [0.5, 0.5]
+            else:
+                if flavor.is_electron:
+                    coeff = [self.c2t12, self.s2t12]
+                else:
+                    coeff = [1.0 - self.c2t12, 0.5 * (1.0 + self.c2t12)]
+
             req_spectrum = source.energy_spectrum(t, E, flavor)
             req_flux = source.get_flux(t, flavor)
             comp_spectrum = source.energy_spectrum(t, E, flavor.oscillates_to)
@@ -62,15 +58,12 @@ class SimpleMixing(object):
 
         return mixed_spectrum
 
-    def inverted_mixing(self, source, flavor):
+    def inverted_mixing(self, source):
         """Generates spectrum object under inverted hierarchy mixing.
         
         Parameters
         ----------
         source : asteria.source
-
-        flavor : asteria.neutrino.flavor
-            CCSN Neutrino flavor
 
         Returns
         -------
@@ -79,20 +72,19 @@ class SimpleMixing(object):
             Arguments are the same as by asteria.source.energy_spectrum
         """
 
-        coeff = [0, 0]
-
-        if flavor.is_neutrino:
-            if flavor.is_electron:
-                coeff = [self.s2t12, self.c2t12]
-            else:
-                coeff = [1.0 - self.s2t12, 0.5 * (1.0 + self.s2t12)]
-        else:
-            if flavor.is_electron:
-                coeff = [0, 1]
-            else:
-                coeff = [0.5, 0.5]
-
         def mixed_spectrum(t, E, flavor):
+
+            if flavor.is_neutrino:
+                if flavor.is_electron:
+                    coeff = [self.s2t12, self.c2t12]
+                else:
+                    coeff = [1.0 - self.s2t12, 0.5 * (1.0 + self.s2t12)]
+            else:
+                if flavor.is_electron:
+                    coeff = [0, 1]
+                else:
+                    coeff = [0.5, 0.5]
+
             req_spectrum = source.energy_spectrum(t, E, flavor)
             req_flux = source.get_flux(t, flavor)
             comp_spectrum = source.energy_spectrum(t, E, flavor.oscillates_to)
@@ -120,14 +112,11 @@ class USSRMixing(object):
                                 [-0.490, 0.562,  0.665],
                                 [0.280, -0.621,  0.732]])
 
-    def normal_mixing(self, source, flavor):
+    def normal_mixing(self, source):
         """Performs flavor oscillations as per normal hierarchy.
 
         Parameters
         ----------
-        flavor : asteria.neutrino.flavor
-            CCSN Neutrino flavor
-
         source : asteria.source
 
 
@@ -137,16 +126,15 @@ class USSRMixing(object):
             Function object for neutrino energy spectrum after mixing
             Arguments are the same as by asteria.source.energy_spectrum
         """
-        p_surv = 0
-        if flavor.is_neutrino:
-            p_surv = self.pmns[0, 1]**2
-        else:
-            p_surv = self.pmns[0, 0]**2
-            
-        if not flavor.is_electron:
-            p_surv = 0.5 * (1 + p_surv)
             
         def mixed_spectrum(t, E, flavor):
+            if flavor.is_neutrino:
+                p_surv = self.pmns[0, 1] ** 2
+            else:
+                p_surv = self.pmns[0, 0] ** 2
+
+            if not flavor.is_electron:
+                p_surv = 0.5 * (1 + p_surv)
             
             req_spectrum = source.energy_spectrum(t, E, flavor)
             req_flux = source.get_flux(t, flavor)
@@ -156,7 +144,7 @@ class USSRMixing(object):
             return p_surv * req_spectrum * req_flux + (1-p_surv) * comp_spectrum * comp_flux
         return mixed_spectrum
     
-    def inverted_mixing(self, flavor, spectrum):
+    def inverted_mixing(self, source):
         """Performs flavor oscillations as per inverted hierarchy.
         IN THE USSR IMPLEMENTATION THIS IS THE SAME AS NORMAL"""
-        return self.normal_mixing(flavor, spectrum)
+        return self.normal_mixing(source)
