@@ -279,7 +279,7 @@ class Source:
             def nu_spectrum(t, E, flavor):
                 return self.energy_spectrum(t, E, flavor) * self.get_flux(t, flavor)
         else:
-            nu_spectrum = mixing( self, flavor )
+            nu_spectrum = mixing(self, flavor)
 
         
         
