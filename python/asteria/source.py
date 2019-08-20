@@ -282,7 +282,7 @@ class Source:
         H2O_in_ice = 3.053e28 # 1 / u.m**3
                 
         t = time.to(u.s).value
-        Enu = E.to(u.MeV)
+        Enu = E.to(u.MeV).value
         if Enu[0] == 0:
             Enu[0] = 1e-10 * u.MeV
         phot = photon_spectrum.to(u.m**2).value.reshape((-1,1)) # m**2
@@ -301,7 +301,7 @@ class Source:
         # always return a number when numpy size is called on them, even if it is 1.
         E_per_V = np.zeros( time.size ) 
         for i_part in self.parts_by_index(time, n): # Limits memory usage
-             E_per_V[i_part] += np.trapz( nu_spectrum(time[i_part], Enu, flavor) * phot, Enu.value, axis=0)
+             E_per_V[i_part] += np.trapz( nu_spectrum(time[i_part], E, flavor).value * phot, Enu, axis=0)
         E_per_V *= H2O_in_ice / ( 4 * np.pi * dist**2) * np.ediff1d(t, to_end=(t[-1] - t[-2]))
         if not flavor.is_electron:
             E_per_V *= 2
