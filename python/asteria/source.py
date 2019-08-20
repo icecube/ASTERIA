@@ -148,7 +148,7 @@ class Source:
             Source number flux (unit-less, count of neutrinos).
         """      
         t = time.to(u.s).value
-        luminosity  = self.get_luminosity(t, flavor).to( u.MeV/u.s ).value
+        luminosity = self.get_luminosity(t, flavor).to(u.MeV/u.s).value
         mean_energy = self.get_mean_energy(t, flavor).value
         
         # Where the mean energy is not zero, return rate in units neutrinos
@@ -181,23 +181,28 @@ class Source:
         # Use simple 1D linear interpolation
         t = time.to(u.s).value
         Enu = E.to(u.MeV).value
+        if Enu[0] == 0.:
+            Enu[0] = 1e-10  # u.MeV
         a = self.get_pinch_parameter(t, flavor)
         Ea = self.get_mean_energy(t, flavor).to(u.MeV).value
-
-        if E[0] == 0.:
-            E[0] = 1e-10  # u.MeV
         
         if isinstance(t, (list, tuple, np.ndarray)):
+
             cut = (a > 0) & (Ea > 0)
             E_pdf = np.zeros( (Enu.size, t.size), dtype = float )
             E_pdf[:, cut] = self.v_energy_pdf( a[cut].reshape(1,-1), Ea[cut].reshape(1,-1), \
-                                               E =Enu.reshape(-1,1))
+                                               E=Enu.reshape(-1,1))
+            cut = (a < 0) & (Ea > 0)
+            E_pdf[:, cut] = self.v_energy_pdf(np.zeros_like(a[cut]).reshape(1, -1), Ea[cut].reshape(1, -1), \
+                                              E=Enu.reshape(-1, 1))
             return E_pdf
         else:
-            if a <= 0. or Ea <= 0.:
+            if Ea <= 0.:
                 return np.zeros_like(E)
-            
-            return self.energy_pdf(a, Ea, E.value).real
+            elif a <= 0.:
+                return self.energy_pdf(0, Ea, E.value).real
+            else:
+                return self.energy_pdf(a, Ea, E.value).real
 
     def sample_energies(self, t, E, n=1, flavor=Flavor.nu_e_bar):
         """Generate a random sample of neutrino energies at some time t for a
@@ -280,10 +285,8 @@ class Source:
             def nu_spectrum(t, E, flavor):
                 return self.energy_spectrum(t, E, flavor) * self.get_flux(t, flavor)
         else:
-            nu_spectrum = mixing(self, flavor)
+            nu_spectrum = mixing(self)
 
-        
-        
         print('Beginning {0} simulation... {1}'.format(flavor.name, ' '*(10-len(flavor.name))), end='')
         # The following two lines exploit the fact that astropy quantities will
         # always return a number when numpy size is called on them, even if it is 1.
