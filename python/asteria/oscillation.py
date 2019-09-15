@@ -47,7 +47,7 @@ class SimpleMixing(object):
                 if flavor.is_electron:
                     coeff = [self.c2t12, self.s2t12]
                 else:
-                    coeff = [1.0 - self.c2t12, 0.5 * (1.0 + self.c2t12)]
+                    coeff = [0.5 * (1.0 + self.c2t12), 0.5 * self.s2t12 ]
 
             req_spectrum = source.energy_spectrum(t, E, flavor)
             req_flux = source.get_flux(t, flavor)
@@ -78,7 +78,7 @@ class SimpleMixing(object):
                 if flavor.is_electron:
                     coeff = [self.s2t12, self.c2t12]
                 else:
-                    coeff = [1.0 - self.s2t12, 0.5 * (1.0 + self.s2t12)]
+                    coeff = [0.5 * (1 + self.s2t12), 0.5 * self.c2t12]
             else:
                 if flavor.is_electron:
                     coeff = [0, 1]
