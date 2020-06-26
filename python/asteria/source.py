@@ -193,7 +193,9 @@ class Source:
             E[0] = 1e-10  # u.MeV
         
         if isinstance(t, (list, tuple, np.ndarray)):
-            cut = (a > 0) & (Ea > 0)
+            # It is non-physical to have a<0 but some model files/interpolations still have this
+            a[a<0] = 0
+            cut = (a >= 0) & (Ea > 0)
             E_pdf = np.zeros( (Enu.size, t.size), dtype = float )
             E_pdf[:, cut] = self.v_energy_pdf( a[cut].reshape(1,-1), Ea[cut].reshape(1,-1), \
                                                E =Enu.reshape(-1,1))
