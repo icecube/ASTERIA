@@ -43,20 +43,32 @@ class _FlavorMeta(EnumMeta):
                - Keys with value False and keys missing from requests are added to excluded. 
                 
         """
+        if isinstance(requests, str):
+            # If string 'default' or 'all' requests, return default interactions Enum
+            if requests.lower() in {'all', 'default'}:
+                return Flavor
+            else:
+                raise RuntimeError("Unknown requests made: {0}".format(requests))
+
+        # If requests input is list, tuple or ndarray of strings, assume all elements are requested interactions
+        if isinstance(requests, (list, tuple, np.ndarray)):
+            requests = {item: True for item in requests}
+
         # Declare Meta-class _FlavorMeta for error-checking.
-        metacls = cls.__class__         
-        
+        metacls = cls.__class__
+
         # If no requests have been made, raise an error.
-        if requests is None or all( not val for val in requests.values() ):
+        if requests is None or all(not val for val in requests.values()):
             raise RuntimeError('No flavors requested. ')
-        # If an unknown flavor is requested, rais an error.    
-        elif any( key not in metacls._FlavorDict for key in requests):
+
+        # If an unknown flavor is requested, raise an error.
+        if any(key not in metacls._FlavorDict for key in requests):
             raise AttributeError('Unknown flavor(s) "{0}" Requested'.format(
-                                 '", "'.join( set(requests)-set(metacls._FlavorDict)) ))
-        # If requests does not have all boolean values, throw an error.  
-        elif not all( isinstance( val, bool) for val in requests.values() ):
-            raise ValueError('Requests must be dictionary with bool values. '+
-                             'Given: {0} for key {1}'.format(type(val), key))
+                '", "'.join(set(requests) - set(metacls._FlavorDict))))
+
+        # If requests does not have all boolean values, throw an error.
+        elif not all(isinstance(val, bool) for key, val in requests.items()):
+            raise ValueError('Requests must be dictionary with bool values.')
         # Otherwise, create a new Enum object...
         
         
@@ -66,8 +78,8 @@ class _FlavorMeta(EnumMeta):
         requests.update( missing )
         
         # Sort requests according to metacls._FlavorDict
-        requests = {key: requests[key] for key in metacls._FlavorDict }
-        
+        requests = {key: requests[key] for key in metacls._FlavorDict}
+
         # Populate an _EnumDict with fields required for Enum creation.        
         bases = (Enum, )
         classdict = _EnumDict()
