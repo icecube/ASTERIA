@@ -28,26 +28,40 @@ detector:
 
 # The source configuration is loaded by the asteria.source module.
 source:
-    name: Sukh_SFHo_z9.6
-    model: Sukhbold 9.6Msun progenitor with SFHo equation of state
+    name: Nakazato-Shen-z0.004-t_rev100ms-s13.0
+    model: Nakazato 13.0Msun progenitor with Shen equation of state, metallicity z=0.004 and shock revival time t_rev=100ms
     progenitor:
-        mass: 9.6 M_sun
+        mass: 13.0 M_sun
         # Distance model: can be FixedDistance or StellarDensity
         distance:
             model: FixedDistance
             distance: 10 kpc
             uncertainty: 0 kpc
-#        distance
-#            model: StellarDensity
-#            path: stellar/sn_radial_distrib_adams.fits
-#            add_LMC: False
-#            add_SMC: False
     table:
         format: fits
-        path: snfluxes/Sukhbold_2015/sukhbold-SFHo-z9.6.fits
+        path: spectra/nakazato-shen-z0.004-t_rev100ms-s13.0.fits
 
 # The IO configuration is loaded by the asteria.IO module.
 IO:
     table:
         format: h5
-        path: sukhbold-SFHo-z9.6.h5
+        path: processed/nakazato-shen-z0.004-t_rev100ms-s13.0.h5
+
+# The simulation configurable is loaded by the asteria.simualtionHandler module
+simulation:
+    interactions: default
+    flavors: default
+    hierarchy: normal
+    mixing:
+        scheme: adiabatic-msw
+        angle: 33.2 deg
+    energy:
+        min: 0 MeV
+        max: 100 MeV
+        step: 0.1 MeV
+        size:
+    time:
+        min: -1 s
+        max: 1 s
+        step: 1 ms
+        size:
