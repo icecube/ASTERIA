@@ -45,6 +45,19 @@ class Detector:
         self._i3_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'i3'])
         self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'dc'])
 
+        # DOM Artificial deadtime
+        self.deadtime = 0.25e-3  # s
+        # Relative efficiency of dc DOMs compared to i3 DOMs
+        self.dc_rel_eff = 1.35
+
+        # Background rate and sigma for i3 DOMs
+        self.i3_dom_bg_mu = 284.9
+        self.i3_dom_bg_sig = 26.2
+
+        # Background rate and sigma for dc DOMs
+        self.dc_dom_bg_mu = 358.9
+        self.dc_dom_bg_sig = 36.0
+
     def effvol(self, depth):
         """ Interpolate table to to get effective volumne
         Inputs:
