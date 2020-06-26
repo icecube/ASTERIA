@@ -808,8 +808,8 @@ class _InteractionsMeta(EnumMeta):
             requests = {item: True for item in requests}
 
         # Declare Meta-class _InteractionsMeta for error-checking.
-        metacls = cls.__class__         
-        
+        metacls = cls.__class__
+
         # If no requests have been made, raise an error.
         if requests is None or all( not val for val in requests.values() ):
             raise RuntimeError('No Interactions Requested. ') 
@@ -821,7 +821,7 @@ class _InteractionsMeta(EnumMeta):
         elif not all(isinstance(val, bool) for val in requests.values()):
             errordict = {key: val for key, val in requests.items()
                          if not isinstance(requests[key], bool)}
-            raise ValueError('Requests must be dictionary with bool values. '+
+            raise ValueError('Requests must be dictionary with bool values. ' +
                              'Given elements: {0}'.format(errordict))
 
         # Retrieve interactions (if any) that were missing from requests.
