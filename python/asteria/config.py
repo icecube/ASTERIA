@@ -264,10 +264,10 @@ def load_config(name, config_type=Configuration):
     with open(file_name) as f:
         next_value_is_key = False
         for token in yaml.scan(f):
-            if isinstance(
-                token,
-                (yaml.BlockSequenceStartToken, yaml.FlowSequenceStartToken)):
-                raise RuntimeError('Config sequences not implemented yet.')
+            # if isinstance(
+            #     token,
+            #     (yaml.BlockSequenceStartToken, yaml.FlowSequenceStartToken)):
+            #     raise RuntimeError('Config sequences not implemented yet.')
             if next_value_is_key:
                 if not isinstance(token, yaml.ScalarToken):
                     raise RuntimeError(
@@ -278,4 +278,22 @@ def load_config(name, config_type=Configuration):
             next_value_is_key = isinstance(token, yaml.KeyToken)
 
     with open(file_name) as f:
-        return config_type(yaml.safe_load(f))
+        conf = config_type(yaml.safe_load(f))
+        # Enforces type of data member
+        # TODO: Add warning/error checking for missing config or IO members
+        #  This includes the simulations and IO fields. They must exist even if unspecified.
+        #  - Perhaps read from default if they are missing?
+        if isinstance(conf.simulation.interactions, str):
+            temp = conf.simulation.interactions.replace(' ', '').split(',')
+            if len(temp) > 1:
+                conf.simulation.interactions = temp
+            else:
+                conf.simulation.interactions = temp[0]
+
+        if isinstance(conf.simulation.flavors, str):
+            temp = conf.simulation.flavors.replace(' ', '').split(',')
+            if len(temp) > 1:
+                conf.simulation.flavors = temp
+            else:
+                conf.simulation.flavors = temp[0]
+        return conf
