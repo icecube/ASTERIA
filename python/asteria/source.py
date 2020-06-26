@@ -64,8 +64,14 @@ class Source:
         nParts = x.size//n    
         i_part = [ np.arange( i*n, (i+1)*n ) for i in range(nParts) ]
 
+        # Generate final partition of size <n if x.size is not multiple of n
         if len(i_part)*n != x.size:
             i_part += [ np.arange( len(i_part)*n, x.size ) ]
+
+        # Ensure that last partition always has 2 or more elements
+        if len(i_part[-1]) < 2:
+            i_part[-2] = np.append(i_part[-2], i_part[-1])
+            i_part = i_part[0:-1]
         
         return i_part
         
@@ -158,7 +164,7 @@ class Source:
         flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate
         
         return flux
-			 
+
     def energy_spectrum(self, t, E, flavor=Flavor.nu_e_bar):
         """Compute the PDF of the neutrino energy distribution at time t.
 
@@ -286,7 +292,9 @@ class Source:
         print('Beginning {0} simulation... {1}'.format(flavor.name, ' '*(10-len(flavor.name))), end='')
         # The following two lines exploit the fact that astropy quantities will
         # always return a number when numpy size is called on them, even if it is 1.
-        E_per_V = np.zeros( time.size ) 
+        E_per_V = np.zeros( time.size )
+        if time.size < 2:
+            raise RuntimeError("Time array size <2, unable to compute energy per volume.")
         for i_part in self.parts_by_index(time, n): # Limits memory usage
              E_per_V[i_part] += np.trapz( nu_spectrum(time[i_part], Enu, flavor) * phot, Enu.value, axis=0)
         E_per_V *= H2O_in_ice / ( 4 * np.pi * dist**2)
