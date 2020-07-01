@@ -5,12 +5,9 @@ from .neutrino import Flavor, Ordering
 from .oscillation import SimpleMixing
 from .config import parse_quantity
 
-from abc import ABC, abstractmethod
 import warnings
 import numpy as np
 import astropy.units as u
-
-from numpy.lib import recfunctions as rfn
 
 
 class SimulationHandler:
