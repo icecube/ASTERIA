@@ -65,4 +65,4 @@ automatically generated if they are missing, but their content will be ignored b
 
 ASTERIA is free software licensed under a 3-clause BSD-style license.
 
-Copyright (c) 2017-2019, the IceCube Collaboration.
+Copyright (c) 2017-2020, the IceCube Collaboration.
