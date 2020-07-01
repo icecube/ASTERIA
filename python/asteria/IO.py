@@ -157,8 +157,17 @@ def find(group, config):
     condition = '&'.join( statements )
     pass_interactions = set( row.nrow for row in tab_interactions.where(condition))
     
-    # Find Simulations that have the requested Hierarchy 
-    pass_hierarchy = set( row.nrow for row in tab_hierarchy.where(config.simulation.hierarchy))
+    # Find Simulations that have the requested Hierarchy
+    pass_hierarchy = set()
+    if config.simulation.hierarchy is None:
+        pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('none'))
+    else:
+        if config.simulation.hierarchy.lower() in ['none', 'no']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('none'))
+        elif config.simulation.hierarchy.lower() in ['normal', 'default']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('normal'))
+        elif config.simulation.hierarchy.lower() in ['inverted']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('inverted'))
 
     # Find Simulations that have the requested flavors
     statements = []
