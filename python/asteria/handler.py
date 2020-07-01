@@ -12,11 +12,62 @@ import astropy.units as u
 
 from numpy.lib import recfunctions as rfn
 
+
 class SimulationHandler:
     """Handling object for fast MC CCSN simulations using ASTERIA
+
+    :ivar conf: Asteria Configuration object, contains model, progenitor and simulation information
+    :type conf: asteria.config.Configuration
+
+    :ivar source: Asteria Source object, contains information on progenitor, neutrino flux, and neutrino spectrum
+    :type source: asteria.source.Source
+
+    :ivar detector: Asteria Detector object, contains informtion on IceCube Detector, DOM Efficiencies, etc
+    :type detector: asteria.detector.Detector
+
+    :ivar flavors: Enum of neutrino flavors, items contain helper methods for TeX, oscillation, comparisons, etc.
+    :type flavors: asteria.neutrino._FlavorMeta
+
+    :ivar interactions: Enum of neutrino interactions, items contain methods for cross sections, lepton energy, etc.
+    :type interactions: asteria.interactions._InteractionsMeta
+
+    :ivar hierarchy: Neutrino Mass hierarchy, see Enumeration in asteria.oscillations
+    :type hierarchy: <enum 'Ordering'>
+
+    :ivar mixing: Neutrino mixing scheme, currently only adiabatic-msw is supported
+    :type mixing: method
+
+    :ivar energy: Neutrino energy array, defines energy resolution at which to perform simulation. Units MeV.
+    :type energy: numpy.ndarray of astropy.units.quantity.Quantity
+
+    :return Emin, Emax, dE: Min., Max., and step-size of energy array respectively. Units MeV.
+    :rtype Emin, Emax, dE: astropy.units.quantity.Quantity
+
+    :ivar time: Time array, defines time resolution at which to perform simulation of CCSN response. Units s.
+    :type time: numpy.ndarray of astropy.units.quantity.Quantity
+
+    :return tmin, tmax, dt: Min., Max., and step-size of time array respectively. Units s.
+    :rtype tmin, tmax, dt: astropy.units.quantity.Quantity
+
+    :return photon_spectra: Spectrum of photons produced by neutrino interactions in IceCube detector
+    :rtype photon_spectra: numpy.ndarray of astropy.units.quantity.Quantity
+
+    :return E_per_V, total_E_per_V: Photonic energy deposition per volume due to CCSN neutrinos (flavor-wise, total)
+    :rtype E_per_V, total_E_per_V: numpy.ndarray of astropy.units.quantity.Quantity
+
+    :Example Usage:
+    >>> conf = .config.load_config('../../data/config/default.yaml')
+    >>> sim = SimulationHandler(conf)
+    >>> sim.run()
+    >>> sim.E_per_V
     """
 
     def __init__(self, conf):
+        """Initializes simulation handler, performs minor error checking in input configuration
+
+        :param conf: Configuration object holding information on source, model and simulation parameters
+        :type conf: asteria.config.Configuration
+        """
         self.conf = conf
         self.source = source.initialize(conf)
         self.detector = detector.initialize(conf)
@@ -237,6 +288,15 @@ class SimulationHandler:
         return
 
     def save(self, force=False):
+        """Save Photonic energy deposition per volume scaled to a star at 1kpc
+          Scales E_per_V to a progenitor at distance 1kpc and writes it to h5 file specified by self.conf.IO.table.path.
+          This function is a wrapper for asteria.IO.save()
+
+        :param force: indicates whether or not to overwrite an existing simulation if one is found
+        :type force: bool
+        :return: None
+        :rtype: None
+        """
         E_per_V_1kpc = self.E_per_V * self.source.progenitor_distance.to(u.kpc).value**2
         IO.save(self.conf, E_per_V_1kpc, force)
 
@@ -252,8 +312,11 @@ class SimulationHandler:
 
     @property
     def conf_dict(self):
-        """Returns configuration options used to save simulations in dictionary format"""
+        """Returns configuration options used to save simulations in dictionary format
 
+        :return: conf_dict: Dictionary with keys/value matching the configuration simulation node
+        :rtype: dict
+        """
         conf_dict = dict()
         conf_dict['flavors'] = [flavor.name for flavor in self.flavors]
         conf_dict['interactions'] = [interaction.name for interaction in self.interactions]
@@ -277,8 +340,11 @@ class SimulationHandler:
         return conf_dict
 
     def print_config(self):
-        """Prints configuration options used to save simulations in yaml-compatible format"""
+        """Prints configuration options used to save simulations in yaml-compatible format
 
+        :return: None
+        :rtype: None
+        """
         for key, item in self.conf_dict.items():
             if isinstance(item, list):
                 print('{0}:'.format(key))
