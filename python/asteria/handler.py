@@ -37,31 +37,37 @@ class SimulationHandler:
             self.interactions = Interactions(conf.simulation.interactions)
             self.conf.simulation.interactions = [interaction.name for interaction in self.interactions]
 
-        # Set neutrino mixing scheme and hierarchy
-        self.mixing = None
+        # Set neutrino mass hierarchy and mixing scheme (Oscillation method from asteria.oscillation)
+        # TODO: Streamline error checking, perhaps move to ordering class. enable ordering class to take requests?
         self.hierarchy = None
-        _mixing = None
-        if conf.simulation.mixing.scheme == 'adiabatic-msw':
-            if conf.simulation.mixing.angle is None:
-                warnings.warn('No Mixing angle provided, using 33.2 deg')
-                _mixing = SimpleMixing(33.2)
-                self.conf.simulation.mixing.angle = '33.2 deg'
-            else:
-                _mixing = SimpleMixing(parse_quantity(conf.simulation.mixing.angle).to(u.deg).value)
-
-        if _mixing is None:
-            self.mixing = None
-            self.conf.simulation.mixing.scheme = 'none'
-            self.conf.simulation.mixing.angle = 'none'
+        self.mixing = None
+        if conf.simulation.hierarchy.lower() in ['none', 'no']:
             self.hierarchy = Ordering.none
             self.conf.simulation.hierarchy = Ordering.none.name
+            self.conf.simulation.mixing.scheme = 'none'
+            self.conf.simulation.mixing.angle = 'none'
         else:
-            if conf.simulation.hierarchy == 'normal':
-                self.mixing = _mixing.normal_mixing
+            _mixing = None
+            if conf.simulation.mixing.scheme is None:
+                raise RuntimeError('Hierarchy provided but missing mixing scheme.')
+            if conf.simulation.mixing.scheme.lower() in ['adiabatic-msw', 'default']:
+                self.conf.simulation.mixing.scheme = 'adiabatic-msw'
+                if conf.simulation.mixing.angle is None:
+                    warnings.warn('No Mixing angle provided, using 33.2 deg')
+                    _mixing = SimpleMixing(33.2)
+                    self.conf.simulation.mixing.angle = '33.2 deg'
+                else:
+                    _mixing = SimpleMixing(parse_quantity(conf.simulation.mixing.angle).to(u.deg).value)
+            else:
+                raise RuntimeError('Unknown mixing scheme: {0}'.format(conf.simulation.mixing.scheme))
+
+            if conf.simulation.hierarchy.lower() in ['normal', 'default']:
                 self.hierarchy = Ordering.normal
-            if conf.simulation.hierarchy == 'inverted':
-                self.mixing = _mixing.inverted_mixing
+                self.mixing = _mixing.normal_mixing
+            if conf.simulation.hierarchy.lower() in ['inverted']:
                 self.hierarchy = Ordering.inverted
+                self.mixing = _mixing.inverted_mixing
+            self.conf.simulation.hierarchy = self.hierarchy.name
 
         # TODO: Set Error checking to ensure ranges are defined
         # TODO: When writing to simulationHandler.conf, write the values for Enu and time fields as numbers not strings.
