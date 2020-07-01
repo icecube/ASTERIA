@@ -1,8 +1,10 @@
 test-results.xml
 
-# ASTERIA User areas
+# ASTERIA User areas, ignore all files in these directories other than the gitignores
 scratch/*
+!scratch/.gitignore
 data/processed/*
+!data/processed/.gitignore
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
