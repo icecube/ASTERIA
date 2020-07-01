@@ -5,8 +5,6 @@
 import numpy as np
 from enum import Enum, EnumMeta, _EnumDict
 
-from astropy.constants import c, hbar
-
 
 class Ordering(Enum):
     """Neutrino mass ordering types.
@@ -25,11 +23,11 @@ class _FlavorMeta(EnumMeta):
         Dictionary of CCSN model neutrino types.
     
     """
-    _FlavorDict = {'nu_e'      :  1,
-                   'nu_e_bar'  : -1,
-                   'nu_x'      :  2,
-                   'nu_x_bar'  : -2 }
-               
+    _FlavorDict = {'nu_e': 1,
+                   'nu_e_bar': -1,
+                   'nu_x': 2,
+                   'nu_x_bar': -2}
+
     def __call__(cls, requests=None):
         """Given a dictionary of requests for CCSN neutrino flavors, returns an
         enumeration containing the flavors.           
@@ -43,51 +41,65 @@ class _FlavorMeta(EnumMeta):
                - Keys with value False and keys missing from requests are added to excluded. 
                 
         """
+        if isinstance(requests, str):
+            # If string 'default' or 'all' requests, return default interactions Enum
+            if requests.lower() in {'all', 'default'}:
+                return Flavor
+            else:
+                raise RuntimeError("Unknown requests made: {0}".format(requests))
+
+        # If requests input is list, tuple or ndarray of strings, assume all elements are requested interactions
+        if isinstance(requests, (list, tuple, np.ndarray)):
+            requests = {item: True for item in requests}
+
         # Declare Meta-class _FlavorMeta for error-checking.
-        metacls = cls.__class__         
-        
+        metacls = cls.__class__
+
         # If no requests have been made, raise an error.
-        if requests is None or all( not val for val in requests.values() ):
+        if requests is None or all(not val for val in requests.values()):
             raise RuntimeError('No flavors requested. ')
-        # If an unknown flavor is requested, rais an error.    
-        elif any( key not in metacls._FlavorDict for key in requests):
+
+        # If an unknown flavor is requested, raise an error.
+        if any(key not in metacls._FlavorDict for key in requests):
             raise AttributeError('Unknown flavor(s) "{0}" Requested'.format(
-                                 '", "'.join( set(requests)-set(metacls._FlavorDict)) ))
-        # If requests does not have all boolean values, throw an error.  
-        elif not all( isinstance( val, bool) for val in requests.values() ):
-            raise ValueError('Requests must be dictionary with bool values. '+
-                             'Given: {0} for key {1}'.format(type(val), key))
+                '", "'.join(set(requests) - set(metacls._FlavorDict))))
+
+        # If requests does not have all boolean values, throw an error.
+        elif not all(isinstance(val, bool) for key, val in requests.items()):
+            raise ValueError('Requests must be dictionary with bool values.')
         # Otherwise, create a new Enum object...
-        
-        
+
         # Exclude any missing flavors from the enumeration members  
-        missing = {key: False for key in metacls._FlavorDict if 
-                   key not in requests }
-        requests.update( missing )
-        
+        missing = {key: False for key in metacls._FlavorDict if
+                   key not in requests}
+        requests.update(missing)
+
         # Sort requests according to metacls._FlavorDict
-        requests = {key: requests[key] for key in metacls._FlavorDict }
-        
+        requests = {key: requests[key] for key in metacls._FlavorDict}
+
         # Populate an _EnumDict with fields required for Enum creation.        
-        bases = (Enum, )
+        bases = (Enum,)
         classdict = _EnumDict()
-        fields = {'__doc__'               : cls.__doc__,
-                  '__init__'              : cls.__init__,
-                  '__module__'            : cls.__module__,
-                  '__qualname__'          : 'Flavor',
-                  '_generate_next_value_' : cls._generate_next_value_,
-                  'to_tex'                : cls.to_tex,
-                  'is_electron'           : cls.is_electron,
-                  'is_neutrino'           : cls.is_neutrino,
-                  'is_antineutrino'       : cls.is_antineutrino,
-                  'oscillates_to'         : cls.oscillates_to,
-                  'requests'              : requests }
-        classdict.update({ key : val for key, val in fields.items()})
-        
+        fields = {'__doc__': cls.__doc__,
+                  '__init__': cls.__init__,
+                  '__module__': cls.__module__,
+                  '__qualname__': 'Flavor',
+                  '__eq__': cls.__eq__,
+                  '__ne__': cls.__ne__,
+                  '__hash__': cls.__hash__,
+                  '_generate_next_value_': cls._generate_next_value_,
+                  'to_tex': cls.to_tex,
+                  'is_electron': cls.is_electron,
+                  'is_neutrino': cls.is_neutrino,
+                  'is_antineutrino': cls.is_antineutrino,
+                  'oscillates_to': cls.oscillates_to,
+                  'requests': requests}
+        classdict.update({key: val for key, val in fields.items()})
+
         # Create and return an Enum object using _FlavorMeta.__new__      
         return metacls.__new__(metacls, 'Flavor', bases, classdict)
-    
-    def __new__(metacls, cls, bases, classdict): 
+
+    def __new__(metacls, cls, bases, classdict):
         """Returns an Enum object containing CCSN neutrino flavors.
     
             .. param:: metacls : class 
@@ -102,19 +114,19 @@ class _FlavorMeta(EnumMeta):
             .. param:: classdict : _EnumDict
                 Extended dictionary object (from package enum) for creating an Enum object.                
         """
-        
+
         # Use default flavors
         if 'requests' not in classdict:
-            classdict.update( {'requests' : { key: True for key in metacls._FlavorDict }} )
-        
+            classdict.update({'requests': {key: True for key in metacls._FlavorDict}})
+
         for key, val in classdict['requests'].items():
             if val:
                 # Add a member to the enumeration.
                 classdict[key] = metacls._FlavorDict[key]
             else:
                 # DO NOT add a member to the enumeration.
-                classdict.update({ key : metacls._FlavorDict[key] })
-            
+                classdict.update({key: metacls._FlavorDict[key]})
+
         # Create and return an Enum object using Enum.__new__ method.
         return super().__new__(metacls, cls, bases, classdict)
 
@@ -149,8 +161,17 @@ class Flavor(Enum, metaclass=_FlavorMeta):
         
     See also: _FlavorMeta Meta-class, which extends the
     functionality of this object and defines its type.        
-    """        
-     
+    """
+
+    def __eq__(self, other):
+        return (self.name, self.value) == (other.name, other.value)
+
+    def __ne__(self, other):
+        return not(self == other)
+
+    def __hash__(self):
+        return hash((self.name, self.value))
+
     def to_tex(self):
         """LaTeX-comptable string representations of flavor.
         """
@@ -215,15 +236,15 @@ class ValueCI(object):
             return np.random.normal(loc=self.value, scale=self.ci_lo, size=n)
         else:
             return np.random.normal(loc=self.value, scale=self.ci_lo, size=n)
-        
+
 
 class PMNS(object):
 
     def __init__(self):
         pass
 
-
-#class Oscillation(object):
+#
+# class Oscillation(object):
 #
 #    def __init__(self, theta12, theta23, theta13, deltaCP,
 #                 deltaM2_21, deltaM2_32):

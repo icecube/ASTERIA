@@ -792,38 +792,49 @@ class _InteractionsMeta(EnumMeta):
            .. param :: cls : Interactions
               Called object. (Similar to 'self' keyword)
             
-           .. param :: requests : dict 
+           .. param :: requests : dict, (list, tuple, ndarray of str), or str
               Dictionary of requested interactions
                - Keys with value True are initialized as enumeration members                
         """
+        if isinstance(requests, str):
+            # If string 'default' or 'all' requests, return default interactions Enum
+            if requests.lower() in {'all', 'default'}:
+                return Interactions
+            else:
+                raise RuntimeError("Unknown requests made: {0}".format(requests))
+
+        # If requests input is list, tuple or ndarray of strings, assume all elements are requested interactions
+        if isinstance(requests, (list, tuple, np.ndarray)):
+            requests = {item: True for item in requests}
+
         # Declare Meta-class _InteractionsMeta for error-checking.
-        metacls = cls.__class__         
-        
+        metacls = cls.__class__
+
         # If no requests have been made, raise an error.
         if requests is None or all( not val for val in requests.values() ):
             raise RuntimeError('No Interactions Requested. ') 
         # If an unknown interaction is requested, raise an error.
         elif any( key not in metacls._InteractionDict for key in requests):
             raise AttributeError('Unknown interaction(s) "{0}" Requested'.format(
-                                 '", "'.join( set(requests)-set(metacls._InteractionDict)) ))
-         # If requests does not have all boolean values, throw an error  .  
-        elif not all( isinstance( val, bool) for val in requests.values() ):
-            errordict = {key: val for key, val in requests.items 
+                                 '", "'.join(set(requests)-set(metacls._InteractionDict))))
+        # If requests does not have all boolean values, throw an error  .
+        elif not all(isinstance(val, bool) for val in requests.values()):
+            errordict = {key: val for key, val in requests.items()
                          if not isinstance(requests[key], bool)}
-            raise ValueError('Requests must be dictionary with bool values. '+
+            raise ValueError('Requests must be dictionary with bool values. ' +
                              'Given elements: {0}'.format(errordict))
+
+        # Retrieve interactions (if any) that were missing from requests.
+        missing = {key: False for key in metacls._InteractionDict if
+                   key not in requests}
+        requests.update(missing)
+
         # If both implementations of Inverse Beta Decay are requested, throw an error.
-        elif requests['InvBetaTab'] and requests['InvBetaPar']:
+        if requests['InvBetaTab'] and requests['InvBetaPar']:
             raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
                                'only one instance of IBD is allowed.')
         # Otherwise, create a new Enum object...
-        
-        
-        # Retrieve interactions (if any) that were missing from requests.
-        missing = {key: False for key in metacls._InteractionDict if 
-                   key not in requests }
-        requests.update( missing )
-        
+
         # Sort requests according to metacls._InteractionDict
         requests = {key: requests[key] for key in metacls._InteractionDict }
         

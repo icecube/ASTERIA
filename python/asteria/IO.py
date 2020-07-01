@@ -1,7 +1,10 @@
 from os.path import isfile, isdir, dirname
 from .neutrino import Flavor
+from .interactions import Interactions
+from .config import parse_quantity
 
 import numpy as np
+import astropy.units as u
 import tables
 
 
@@ -103,16 +106,17 @@ def WriteOption(table, option):
 
     
 def WriteBinning(table, binning):
+    # binning is config.simulation.energy or config.simulation.time
     bins = table.row
-    bins['start'] = binning.min()
-    bins['stop'] = binning.max()
+    bins['start'] = parse_quantity(binning.min).value
+    bins['stop'] = parse_quantity(binning.min).value
+    bins['step'] = parse_quantity(binning.step).value
     bins['size'] = binning.size
-    bins['step'] = (binning.max() - binning.min())/(binning.size-1)
     bins.append()
     table.flush()
 
     
-def find(group, Interactions, Hierarchy, Flavors, Enu, time):
+def find(group, config):
     """ Returns indices of simulations matching the provided options
     
     .. param :: group : tables.Group
@@ -140,49 +144,60 @@ def find(group, Interactions, Hierarchy, Flavors, Enu, time):
     tab_hierarchy = group.Hierarchy
     tab_flavors = group.Flavors
     tab_time = group.Time
-    tab_Enu  = group.Enu
+    tab_Enu = group.Enu
     
     # Find Simulations that have the requested Interactions 
     statements = []
-    for key,val in Interactions.requests.items():
+    for key, val in Interactions(config.simulation.interactions).requests.items():
         if val:
             statements.append('('+ key + ')')
         else:
             statements.append('~(' + key + ')')
             
     condition = '&'.join( statements )
-    pass_interactions = set( row.nrow for row in tab_interactions.where(condition) )
+    pass_interactions = set( row.nrow for row in tab_interactions.where(condition))
     
-    # Find Simulations that have the requested Hierarchy 
-    pass_hierarchy = set( row.nrow for row in tab_hierarchy.where(Hierarchy.name) )
+    # Find Simulations that have the requested Hierarchy
+    pass_hierarchy = set()
+    if config.simulation.hierarchy is None:
+        pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('none'))
+    else:
+        if config.simulation.hierarchy.lower() in ['none', 'no']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('none'))
+        elif config.simulation.hierarchy.lower() in ['normal', 'default']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('normal'))
+        elif config.simulation.hierarchy.lower() in ['inverted']:
+            pass_hierarchy = set(row.nrow for row in tab_hierarchy.where('inverted'))
 
     # Find Simulations that have the requested flavors
     statements = []
-    for key,val in Flavors.requests.items():
+    for key, val in Flavor(config.simulation.flavors).requests.items():
         if val:
             statements.append( '('+ key + ')' )
         else:
             statements.append(' ~( ' + key + ')')
             
-    condition = '&'.join( statements )
-    pass_flavors  = set( row.nrow for row in tab_flavors.where(condition) )
+    condition = '&'.join(statements)
+    pass_flavors = set(row.nrow for row in tab_flavors.where(condition))
 
     # Find Simulations that have the requested neutrino Energy binning.
+    # Grab energy configuration form configuration object. At time of writing, these quantities still have astropy
+    #  units, so conversion is necessary. This same issue applies to time as well
+    # TODO: Find a better way to handle Units
     statements = []
-    statements.append('(start == {0})'.format(Enu.min()))
-    statements.append('(stop == {0})'.format(Enu.max()))
-    statements.append('(step == {0})'.format((Enu.max() - Enu.min())/(Enu.size-1)))
+    statements.append('(start == {0})'.format(parse_quantity(config.simulation.energy.min).to(u.MeV).value))
+    statements.append('(stop == {0})'.format(parse_quantity(config.simulation.energy.max).to(u.MeV).value))
+    statements.append('(step == {0})'.format(parse_quantity(config.simulation.energy.step).to(u.MeV).value))
     condition = '&'.join(statements)
     pass_Enu = set(row.nrow for row in tab_Enu.where(condition))
 
     # Find Simulations that have the requested time binning.
     statements = []
-    statements.append('(start <= {0})'.format(time.min()))
-    statements.append('(stop >= {0})'.format(time.max()))
-    statements.append('(step == {0})'.format((time.max() - time.min())/(time.size-1)))
+    statements.append('(start <= {0})'.format(parse_quantity(config.simulation.time.min).to(u.s).value))
+    statements.append('(stop >= {0})'.format(parse_quantity(config.simulation.time.max).to(u.s).value))
+    statements.append('(step == {0})'.format(parse_quantity(config.simulation.time.step).to(u.s).value))
     condition = '&'.join(statements)
     pass_time = set(row.nrow for row in tab_time.where(condition))
-
     pass_all = list(pass_time.intersection(pass_Enu, pass_flavors, pass_interactions, pass_hierarchy))
     
     if not pass_all:
@@ -195,7 +210,7 @@ def find(group, Interactions, Hierarchy, Flavors, Enu, time):
     return simIndex
     
     
-def save(config, Interactions, Hierarchy, Flavors, Enu, time, result, force=False):
+def save(config, result, force=False):
     h5path = '/'.join([config.abs_base_path, config.IO.table.path])
 
     if not isdir(dirname(h5path)):
@@ -210,30 +225,46 @@ def save(config, Interactions, Hierarchy, Flavors, Enu, time, result, force=Fals
     grp_options = h5file.root.options
     grp_data = h5file.root.data
 
-    simIndex = find(grp_options, Interactions, Hierarchy, Flavors, Enu, time) 
+    simIndex = find(grp_options, config)
     print('Found ', simIndex )
     if simIndex is None:
         print('Writing new simulation to file')
         # Write simulation options
-        WriteOption(grp_options.Interactions, Interactions)
-        WriteOption(grp_options.Flavors, Flavors)
-        WriteBinning(grp_options.Enu, Enu)
-        WriteBinning(grp_options.Time, time)
+        WriteOption(grp_options.Interactions, Interactions(config.simulation.interactions))
+        WriteOption(grp_options.Flavors, Flavor(config.simulation.flavors))
+
+        # binning is config.simulation.energy or config.simulation.time
+        bins = grp_options.Enu.row
+        bins['start'] = parse_quantity(config.simulation.energy.min).to(u.MeV).value
+        bins['stop'] = parse_quantity(config.simulation.energy.max).to(u.MeV).value
+        bins['step'] = parse_quantity(config.simulation.energy.step).to(u.MeV).value
+        bins['size'] = config.simulation.energy.size
+        bins.append()
+        grp_options.Enu.flush()
+
+        # binning is config.simulation.energy or config.simulation.time
+        bins = grp_options.Time.row
+        bins['start'] = parse_quantity(config.simulation.time.min).to(u.s).value
+        bins['stop'] = parse_quantity(config.simulation.time.max).to(u.s).value
+        bins['step'] = parse_quantity(config.simulation.time.step).to(u.s).value
+        bins['size'] = config.simulation.time.size
+        bins.append()
+        grp_options.Time.flush()
         
         row = grp_options.Hierarchy.row
-        row[Hierarchy.name] = True
+        row[config.simulation.hierarchy] = True
         row.append()
         grp_options.Hierarchy.flush()
 
         # Write requested flavors
-        for nu, flavor in enumerate(Flavors):
+        for nu, flavor in enumerate(Flavor(config.simulation.flavors)):
             vlarray = getattr(grp_data, flavor.name)
             vlarray.append(result[nu])
         # Write non-requested flavors
-        for key, val in Flavors.requests.items():
+        for key, val in Flavor(config.simulation.flavors).requests.items():
             if not val:
                 vlarray = getattr(grp_data, key)
-                vlarray.append(np.empty(time.size))
+                vlarray.append(np.empty(config.simulation.time.size))
     else:
         # If simulation already exists, but no force flag, throw error
         if not force:
@@ -242,18 +273,18 @@ def save(config, Interactions, Hierarchy, Flavors, Enu, time, result, force=Fals
         # If simulation already exists and force flag is on, overwrite the data
         else:
             print('Deleted existing simulation, Rewriting.')                
-            for nu, flavor in enumerate(Flavors):
+            for nu, flavor in enumerate(Flavor(config.simulation.flavors)):
                 vlarray = getattr(grp_data, flavor.name)
                 vlarray[simIndex] = result[nu]
-            for key, val in Flavors.requests.items():
+            for key, val in Flavor(config.simulation.flavors).requests.items():
                 if not val:
                     vlarray = getattr(grp_data, key)
-                    vlarray.append(np.empty(time.size))     
+                    vlarray.append(np.empty(config.simulation.time.size))
                 
     h5file.close()
     
     
-def load(config, Interactions, Hierarchy, Flavors, Enu, time):
+def load(config):
     """Find a row in a table and load it.
     
     .. param:: Interactions : asteria.interactions.Interactions
@@ -280,7 +311,7 @@ def load(config, Interactions, Hierarchy, Flavors, Enu, time):
     h5file = tables.open_file(filename=h5path, mode='r')
     grp_options = h5file.root.options
     
-    simIndex = find(grp_options, Interactions, Hierarchy, Flavors, Enu, time)
+    simIndex = find(grp_options, config)
     if simIndex is None:
         # If no matching simulations have been found, return none, or throw error?
         h5file.close()
@@ -291,12 +322,13 @@ def load(config, Interactions, Hierarchy, Flavors, Enu, time):
         n = grp_options.Time.read()['size'][simIndex]
         
         saved_time = np.linspace(t_min, t_max, n)
-        time_slice = (saved_time >= time.min()) & (saved_time <= time.max())
-        
-        result = np.zeros(shape=(len(Flavors), len(time)))
+        _tmin = parse_quantity(config.simulation.time.min).to(u.s).value
+        _tmax = parse_quantity(config.simulation.time.max).to(u.s).value
+        time_slice = (saved_time >= _tmin) & (saved_time <= _tmax)
+        result = np.zeros(shape=(len(config.simulation.flavors), config.simulation.time.size))
         
         grp_data = h5file.root.data
-        for nu, flavor in enumerate(Flavors):
+        for nu, flavor in enumerate(Flavor(config.simulation.flavors)):
             tab_data = h5file.get_node(grp_data, flavor.name)
             data = tab_data.read()[simIndex]
             result[nu] = data[time_slice]

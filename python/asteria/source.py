@@ -64,9 +64,15 @@ class Source:
         nParts = x.size//n    
         i_part = [ np.arange( i*n, (i+1)*n ) for i in range(nParts) ]
 
+        # Generate final partition of size <n if x.size is not multiple of n
         if len(i_part)*n != x.size:
             i_part += [ np.arange( len(i_part)*n, x.size ) ]
-        
+
+        # Ensure that last partition always has 2 or more elements
+        if len(i_part[-1]) < 2:
+            i_part[-2] = np.append(i_part[-2], i_part[-1])
+            i_part = i_part[0:-1]
+
         return i_part
         
     def get_time(self):
@@ -102,7 +108,7 @@ class Source:
 
         Parameters
         ----------
-        
+
         t : float
             Time relative to core bounce.
         flavor : :class:`asteria.neutrino.Flavor`
@@ -119,7 +125,7 @@ class Source:
         """Return source pinching paramter alpha at time t for a given flavor.
         Parameters
         ----------
-        
+
         t : float
             Time relative to core bounce.
         flavor : :class:`asteria.neutrino.Flavor`
@@ -136,7 +142,7 @@ class Source:
 
         Parameters
         ----------
-        
+
         t : float
             Time relative to core bounce (units seconds).
         flavor : :class:`asteria.neutrino.Flavor`
@@ -146,7 +152,7 @@ class Source:
         -------
         flux : float
             Source number flux (unit-less, count of neutrinos).
-        """      
+        """
         t = time.to(u.s).value
         luminosity = self.get_luminosity(t, flavor).to(u.MeV/u.s).value
         mean_energy = self.get_mean_energy(t, flavor).value
@@ -161,7 +167,7 @@ class Source:
                 flux = 0
 
         return flux / u.s
-        
+
         # Where the mean energy is not zero, return rate in units neutrinos
         # per second, elsewhere, returns zero.
         # flux = np.ediff1d(t, to_end=(t[-1] - t[-2])) * rate
@@ -194,10 +200,11 @@ class Source:
             Enu[0] = 1e-10  # u.MeV
         a = self.get_pinch_parameter(t, flavor)
         Ea = self.get_mean_energy(t, flavor).to(u.MeV).value
-        
-        if isinstance(t, (list, tuple, np.ndarray)):
 
-            cut = (a > 0) & (Ea > 0)
+        if isinstance(t, (list, tuple, np.ndarray)):
+            # It is non-physical to have a<0 but some model files/interpolations still have this
+            a[a<0] = 0
+            cut = (a >= 0) & (Ea > 0)
             E_pdf = np.zeros( (Enu.size, t.size), dtype = float )
             E_pdf[:, cut] = self.v_energy_pdf( a[cut].reshape(1,-1), Ea[cut].reshape(1,-1), \
                                                E=Enu.reshape(-1,1))
@@ -253,7 +260,7 @@ class Source:
         energies[cut] = en
 
         return energies
-        
+
     def photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, mixing=None, n=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
         from SN neutrino interactions.
@@ -262,7 +269,7 @@ class Source:
         ----------
 
         time : float (units s)
-            Time relative to core bounce.            
+            Time relative to core bounce.
         E : `numpy.ndarray`
             Sorted grid of neutrino energies
         flavor : :class:`asteria.neutrino.Flavor`
@@ -280,16 +287,16 @@ class Source:
             Energy per m**3 of ice deposited  by neutrinos of requested flavor
         """
         H2O_in_ice = 3.053e28 # 1 / u.m**3
-                
+
         t = time.to(u.s).value
         Enu = E.to(u.MeV).value
         if Enu[0] == 0:
             Enu[0] = 1e-10 * u.MeV
         phot = photon_spectrum.to(u.m**2).value.reshape((-1,1)) # m**2
-        
+
         dist = self.progenitor_distance.to(u.m).value # m**2
         flux = self.get_flux( time, flavor ) # s**-1
-        
+
         if mixing is None:
             def nu_spectrum(t, E, flavor):
                 return self.energy_spectrum(t, E, flavor) * self.get_flux(t, flavor)
@@ -299,14 +306,16 @@ class Source:
         print('Beginning {0} simulation... {1}'.format(flavor.name, ' '*(10-len(flavor.name))), end='')
         # The following two lines exploit the fact that astropy quantities will
         # always return a number when numpy size is called on them, even if it is 1.
-        E_per_V = np.zeros( time.size ) 
+        E_per_V = np.zeros( time.size )
+        if time.size < 2:
+            raise RuntimeError("Time array size <2, unable to compute energy per volume.")
         for i_part in self.parts_by_index(time, n): # Limits memory usage
              E_per_V[i_part] += np.trapz( nu_spectrum(time[i_part], E, flavor).value * phot, Enu, axis=0)
         E_per_V *= H2O_in_ice / ( 4 * np.pi * dist**2) * np.ediff1d(t, to_end=(t[-1] - t[-2]))
         if not flavor.is_electron:
             E_per_V *= 2
         print('Completed')
-    
+
         return E_per_V * u.MeV / u.m**3
 
 
@@ -347,14 +356,14 @@ def initialize(config):
             elif fl == 'NU_X_BAR':
                 L = sn_data_table['L_NU_X'].to('erg/s')
                 E = sn_data_table['E_NU_X'].to('MeV')
-                alpha = sn_data_table['ALPHA_NU_X'] 
-            
+                alpha = sn_data_table['ALPHA_NU_X']
+
             else:
-                raise KeyError("""'{0}'""".format(fl)) 
-                
-            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False )
-            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False )
-            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )  
+                raise KeyError("""'{0}'""".format(fl))
+
+            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False)
+            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False)
+            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )
     elif config.source.table.format.lower() == 'ascii':
         # ASCII will be supported! Promise, promise.
         raise ValueError('Unsupported format: "ASCII"')
