@@ -77,8 +77,11 @@ class SimulationHandler:
         _Emax = parse_quantity(conf.simulation.energy.max).to(u.eV).value
         _dE = parse_quantity(conf.simulation.energy.step).to(u.eV).value
         # Defining energy range in this way ensures uniform arange step size
-        self.Enu = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV * u.eV.to(u.MeV)
-        self.conf.simulation.energy.size = self.Enu.size
+        self.energy = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV * u.eV.to(u.MeV)
+        self._Emin = _Emin * u.MeV * u.eV.to(u.MeV)
+        self._Emax = _Emax * u.MeV * u.eV.to(u.MeV)
+        self._dE = _dE * u.MeV * u.eV.to(u.MeV)
+        self.conf.simulation.energy.size = self.energy.size
 
         # Set simulation time range
         _tmin = parse_quantity(conf.simulation.time.min).to(u.ns).value
@@ -86,10 +89,67 @@ class SimulationHandler:
         _dt = parse_quantity(conf.simulation.time.step).to(u.ns).value
         # Defining time range in this way ensures uniform arange step size
         self.time = np.arange(_tmin, _tmax + _dt, _dt) * u.s * u.ns.to(u.s)
+        self._tmin = _tmin * u.s * u.ns.to(u.s)
+        self._tmax = _tmax * u.s * u.ns.to(u.s)
+        self. _dt = _dt * u.s * u.ns.to(u.s)
         self.conf.simulation.time.size = self.time.size
+
         self._photon_spectra = None
         self._E_per_V = None
 
+    @property
+    def tmin(self):
+        """Supernova model time minimum, converted to s
+
+        :return: tmin
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._tmin
+
+    @property
+    def tmax(self):
+        """Supernova model time maximum, converted to s
+
+        :return: tmax
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._tmax
+
+    @property
+    def dt(self):
+        """Supernova model time step-size, converted to s
+
+        :return: dt
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._dt
+
+    @property
+    def Emin(self):
+        """Neutrino energy minimum, converted to MeV
+
+        :return: Emin
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._Emin
+
+    @property
+    def Emax(self):
+        """Neutrino energy maximum, converted to MeV
+
+        :return: Emax
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._Emax
+
+    @property
+    def dE(self):
+        """Neutrino energy step-size, converted to MeV
+
+        :return: dE
+        :rtype: astropy.units.quantity.Quantity
+        """
+        return self._dE
 
     @property
     def photon_spectra(self):
