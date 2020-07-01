@@ -164,12 +164,17 @@ class SimulationHandler:
         return self._E_per_V
 
     def compute_photon_spectra(self):
-        photon_spectra = np.zeros(shape=(len(self.flavors), self.Enu.size))
+        """Computes the spectrum of photons produced by neutrino interactions in the IceCube Detector
+            Data are stored in SimulationHandler.photon_spectra
+        :return: None
+        :rtype: None
+        """
+        photon_spectra = np.zeros(shape=(len(self.flavors), self.energy.size))
 
         for nu, flavor in enumerate(self.flavors):
             for interaction in Interactions:
-                xs = interaction.cross_section(flavor, self.Enu).to(u.m ** 2).value
-                E_lep = interaction.mean_lepton_energy(flavor, self.Enu).value
+                xs = interaction.cross_section(flavor, self.energy).to(u.m ** 2).value
+                E_lep = interaction.mean_lepton_energy(flavor, self.energy).value
                 photon_scaling_factor = interaction.photon_scaling_factor(flavor).value
                 photon_spectra[nu] += xs * E_lep * photon_scaling_factor
 
@@ -180,7 +185,9 @@ class SimulationHandler:
         E_per_V = np.zeros(shape=(len(self.flavors), self.time.size))
 
         for nu, (flavor, photon_spectrum) in enumerate(zip(self.flavors, self.photon_spectra)):
-            E_per_V[nu] = self.source.photonic_energy_per_vol(self.time, self.Enu, flavor, photon_spectrum, self.mixing)
+            E_per_V[nu] = self.source.photonic_energy_per_vol(self.time, self.energy, flavor, photon_spectrum, self.mixing)
+
+        self._E_per_V = E_per_V * u.MeV / u.m**3
 
         self._E_per_V = E_per_V
 
