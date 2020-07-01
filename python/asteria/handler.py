@@ -189,12 +189,32 @@ class SimulationHandler:
 
         self._E_per_V = E_per_V * u.MeV / u.m**3
 
-        self._E_per_V = E_per_V
+    def run(self, load_simulation=True):
+        """Simulates the photonic energy per volume in the IceCube Detector or loads an existing simulation
 
-    def save(self, force_save=False):
-        E_per_V_1kpc = self.E_per_V * self.source.progenitor_distance.to(u.kpc).value ** 2
+        :param load_simulation: indicates whether or not to attempt to load an existing simulation
+        :type load_simulation: bool
+        :return: None
+        :rtype: None
+        """
+        if load_simulation:
+            try:
+                self.load()
+                print('Simulation Loaded.')
+                # If load simulation is successful, generate photon spectra so data member is accessible
+                self.compute_photon_spectra()
+                return
+            except (FileNotFoundError, AttributeError) as e:
+                print(e)
 
-        IO.save(self.conf, E_per_V_1kpc, force_save)
+        print('Running Simulation...')
+        self.compute_photon_spectra()
+        self.compute_energy_per_volume()
+        return
+
+    def save(self, force=False):
+        E_per_V_1kpc = self.E_per_V * self.source.progenitor_distance.to(u.kpc).value**2
+        IO.save(self.conf, E_per_V_1kpc, force)
 
     def load(self):
         try:
