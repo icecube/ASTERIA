@@ -50,8 +50,12 @@ IO:
 # The simulation configurable is loaded by the asteria.simualtionHandler module
 simulation:
     interactions: default
-    flavors: default
-    hierarchy: normal
+    flavors:
+        - nu_e
+        - nu_e_bar
+        - nu_x
+        - nu_x_bar
+    hierarchy: default
     mixing:
         scheme: adiabatic-msw
         angle: 33.2 deg
