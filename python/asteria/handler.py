@@ -225,3 +225,44 @@ class SimulationHandler:
         # TypeError is included due to conf node values, FileNotFoundError and AttributeError indicate missing file/sim.
         except (FileNotFoundError, AttributeError, TypeError) as e:
             print(e)
+
+    @property
+    def conf_dict(self):
+        """Returns configuration options used to save simulations in dictionary format"""
+
+        conf_dict = dict()
+        conf_dict['flavors'] = [flavor.name for flavor in self.flavors]
+        conf_dict['interactions'] = [interaction.name for interaction in self.interactions]
+        conf_dict['hierarchy'] = self.hierarchy.name
+        conf_dict['mixing'] = {
+            'scheme': self.conf.simulation.mixing.scheme,
+            'angle': self.conf.simulation.mixing.angle
+        }
+        conf_dict['energy'] = {
+            'min': self.conf.simulation.energy.min,
+            'max': self.conf.simulation.energy.max,
+            'step': self.conf.simulation.energy.step,
+            'size': self.conf.simulation.energy.size,
+        }
+        conf_dict['time'] = {
+            'min': self.conf.simulation.time.min,
+            'max': self.conf.simulation.time.max,
+            'step': self.conf.simulation.time.step,
+            'size': self.conf.simulation.time.size,
+        }
+        return conf_dict
+
+    def print_config(self):
+        """Prints configuration options used to save simulations in yaml-compatible format"""
+
+        for key, item in self.conf_dict.items():
+            if isinstance(item, list):
+                print('{0}:'.format(key))
+                for subitem in item:
+                    print('    - {0}'.format(subitem))
+            elif isinstance(item, dict):
+                print('{0}:'.format(key))
+                for subkey, subitem in item.items():
+                    print('    {0}: {1}'.format(subkey, subitem))
+            else:
+                print('{0}: {1}'.format(key, item))
