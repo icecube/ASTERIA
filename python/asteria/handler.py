@@ -153,15 +153,34 @@ class SimulationHandler:
 
     @property
     def photon_spectra(self):
+        """Spectrum of photons produced each neutrino flavor's interactions in the IceCube Detector
+
+        :return: photon_spectra
+        :rtype: numpy.ndarray of astropy.units.quantity.Quantity
+        """
         if self._photon_spectra is None:
             raise RuntimeError("photon_spectra has not been computed yet, please run compute_photon_spectra(...)!")
         return self._photon_spectra
 
     @property
     def E_per_V(self):
+        """Photonic energy deposition per volume for each flavor of neutrinos
+
+        :return: E_per_V
+        :rtype: numpy.ndarray of astropy.units.quantity.Quantity
+        """
         if self._E_per_V is None:
             raise RuntimeError("E_per_V has not been computed yet, please run compute_energy_per_volume(...)!")
         return self._E_per_V
+
+    @property
+    def total_E_per_V(self):
+        """Total photonic energy deposition per volume, summed across all flavors of neutrinos
+
+        :return: total_E_per_V
+        :rtype: numpy.ndarray of astropy.units.quantity.Quantity
+        """
+        return np.sum(self._E_per_V, axis=0)
 
     def compute_photon_spectra(self):
         """Computes the spectrum of photons produced by neutrino interactions in the IceCube Detector
@@ -182,6 +201,11 @@ class SimulationHandler:
         self._photon_spectra = photon_spectra
 
     def compute_energy_per_volume(self):
+        """Computes the photonic energy per volume in the IceCube Detector for each flavor of neutrino
+            Data are stored in SimulationHandler.E_per_V
+        :return: None
+        :rtype: None
+        """
         E_per_V = np.zeros(shape=(len(self.flavors), self.time.size))
 
         for nu, (flavor, photon_spectrum) in enumerate(zip(self.flavors, self.photon_spectra)):
