@@ -220,7 +220,8 @@ class SimulationHandler:
         try:
             E_per_V = IO.load(self.conf)
             E_per_V /= self.source.progenitor_distance.to(u.kpc).value ** 2
-            self._E_per_V = E_per_V
+            self._E_per_V = E_per_V * u.MeV / u.m**3
 
+        # TypeError is included due to conf node values, FileNotFoundError and AttributeError indicate missing file/sim.
         except (FileNotFoundError, AttributeError, TypeError) as e:
             print(e)
