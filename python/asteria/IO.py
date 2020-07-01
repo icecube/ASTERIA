@@ -1,4 +1,4 @@
-from os.path import isfile
+from os.path import isfile, isdir, dirname
 from .neutrino import Flavor
 from .interactions import Interactions
 from .config import parse_quantity
@@ -203,7 +203,10 @@ def find(group, config):
     
 def save(config, result, force=False):
     h5path = '/'.join([config.abs_base_path, config.IO.table.path])
-    
+
+    if not isdir(dirname(h5path)):
+        raise NotADirectoryError('Directory {0} not found, aborting.'.format(dirname(h5path)))
+
     # Test file existence 
     if not isfile(h5path):
         print('Creating file: {}'.format(h5path))
