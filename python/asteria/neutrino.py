@@ -84,6 +84,9 @@ class _FlavorMeta(EnumMeta):
                   '__init__': cls.__init__,
                   '__module__': cls.__module__,
                   '__qualname__': 'Flavor',
+                  '__eq__': cls.__eq__,
+                  '__ne__': cls.__ne__,
+                  '__hash__': cls.__hash__,
                   '_generate_next_value_': cls._generate_next_value_,
                   'to_tex': cls.to_tex,
                   'is_electron': cls.is_electron,
@@ -159,6 +162,15 @@ class Flavor(Enum, metaclass=_FlavorMeta):
     See also: _FlavorMeta Meta-class, which extends the
     functionality of this object and defines its type.        
     """
+
+    def __eq__(self, other):
+        return (self.name, self.value) == (other.name, other.value)
+
+    def __ne__(self, other):
+        return not(self == other)
+
+    def __hash__(self):
+        return hash((self.name, self.value))
 
     def to_tex(self):
         """LaTeX-comptable string representations of flavor.
