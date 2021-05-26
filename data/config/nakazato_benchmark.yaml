@@ -28,10 +28,10 @@ detector:
 
 # The source configuration is loaded by the asteria.source module.
 source:
-    name: Nakazato-Shen-z0.02-t_rev300ms-s20.0
-    model: Nakazato 20.0Msun progenitor with Shen equation of state, metallicity z=0.02 and shock revival time t_rev=300ms
+    name: Nakazato-Shen-z0.02-t_rev300ms-s13.0
+    model: Nakazato 13.0Msun progenitor with Shen equation of state, metallicity z=0.02 and shock revival time t_rev=300ms
     progenitor:
-        mass: 20.0 M_sun
+        mass: 13.0 M_sun
         # Distance model: can be FixedDistance or StellarDensity
         distance:
             model: FixedDistance
@@ -39,13 +39,13 @@ source:
             uncertainty: 0 kpc
     table:
         format: fits
-        path: spectra/nakazato-shen-z0.02-t_rev300ms-s20.0.fits
-
+        path: spectra/nakazato-shen-z0.02-t_rev300ms-s13.0.fits
+        
 # The IO configuration is loaded by the asteria.IO module.
 IO:
     table:
         format: h5
-        path: processed/nakazato-shen-z0.02-t_rev300ms-s20.0.h5
+        path: processed/nakazato-shen-z0.02-t_rev300ms-s13.0.h5
 
 # The simulation configurable is loaded by the asteria.simualtionHandler module
 simulation:
@@ -65,3 +65,4 @@ simulation:
         max: 7.5 s
         step: 1 ms
         size: 10001
+
