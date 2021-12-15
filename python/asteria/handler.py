@@ -1,7 +1,8 @@
 
 from . import config, source, detector, IO
 from .interactions import Interactions
-from .neutrino import Flavor, Ordering
+from snewpy.neutrino import Flavor
+from .neutrino import Ordering
 from .oscillation import SimpleMixing
 from .config import parse_quantity
 

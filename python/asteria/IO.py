@@ -1,5 +1,5 @@
 from os.path import isfile, isdir, dirname
-from .neutrino import Flavor
+from snewpy.neutrino import Flavor
 from .interactions import Interactions
 from .config import parse_quantity
 

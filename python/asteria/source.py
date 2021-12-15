@@ -9,7 +9,7 @@ of the neutrinos at any given time.
 
 from __future__ import print_function, division
 
-from .neutrino import Flavor
+from snewpy.neutrino import Flavor
 from .stellardist import FixedDistance, StellarDensity
 from .config import parse_quantity
 
@@ -85,7 +85,7 @@ class Source:
         """
         return self.time
     
-    def get_luminosity(self, t, flavor=Flavor.nu_e_bar):
+    def get_luminosity(self, t, flavor=Flavor.NU_E_BAR):
         """Return source luminosity at time t for a given flavor.
 
         Parameters
@@ -103,7 +103,7 @@ class Source:
         """
         return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
 
-    def get_mean_energy(self, t, flavor=Flavor.nu_e_bar):
+    def get_mean_energy(self, t, flavor=Flavor.NU_E_BAR):
         """Return source mean energy at time t for a given flavor.
 
         Parameters
@@ -121,7 +121,7 @@ class Source:
         """
         return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
 
-    def get_pinch_parameter(self, t, flavor=Flavor.nu_e_bar):
+    def get_pinch_parameter(self, t, flavor=Flavor.NU_E_BAR):
         """Return source pinching paramter alpha at time t for a given flavor.
         Parameters
         ----------
@@ -137,7 +137,7 @@ class Source:
         """
         return np.nan_to_num(self.pinch[flavor](t))
 
-    def get_flux(self, time, flavor=Flavor.nu_e_bar):
+    def get_flux(self, time, flavor=Flavor.NU_E_BAR):
         """Return source flux at time t for a given flavor.
 
         Parameters
@@ -174,7 +174,7 @@ class Source:
         #
         # return flux
 
-    def energy_spectrum(self, time, E, flavor=Flavor.nu_e_bar):
+    def energy_spectrum(self, time, E, flavor=Flavor.NU_E_BAR):
         """Compute the PDF of the neutrino energy distribution at time t.
 
         Parameters
@@ -220,7 +220,7 @@ class Source:
             else:
                 return self.energy_pdf(a, Ea, E.value).real
 
-    def sample_energies(self, t, E, n=1, flavor=Flavor.nu_e_bar):
+    def sample_energies(self, t, E, n=1, flavor=Flavor.NU_E_BAR):
         """Generate a random sample of neutrino energies at some time t for a
         particular neutrino flavor. The energies are generated via inverse
         transform sampling of the CDF of the neutrino energy distribution.

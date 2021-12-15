@@ -11,7 +11,7 @@ import astropy.units as u
 import astropy.constants as c
 from scipy import interpolate
 
-from .neutrino import Flavor
+from snewpy.neutrino import Flavor
 
 
 class Interaction(ABC):
@@ -22,7 +22,7 @@ class Interaction(ABC):
         self.Mp = (c.m_p * c.c ** 2).to('MeV').value
         self.Me = (c.m_e * c.c ** 2).to('MeV').value
 
-        # Weak mixing angle... for large momentum transfer?
+        # Weak mixing angle.
         self.sinw2 = 0.23122
 
         # Cherenkov threshold energy [MeV]
@@ -175,7 +175,7 @@ class InvBetaPar(Interaction):
         :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
-        if flavor != Flavor.nu_e_bar:
+        if flavor != Flavor.NU_E_BAR:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
                 return np.zeros(len(e_nu), dtype=float) * u.cm**2
             return 0. * u.cm**2
@@ -217,7 +217,7 @@ class InvBetaPar(Interaction):
         :returns: mean energy of the emitted lepton.
         """
         # Only works for electron antineutrinos
-        if flavor != Flavor.nu_e_bar:
+        if flavor != Flavor.NU_E_BAR:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
                 return np.zeros(len(e_nu), dtype=float) * u.MeV
             return 0. * u.MeV
@@ -239,7 +239,7 @@ class InvBetaPar(Interaction):
             return 0. * u.MeV
             
     def photon_scaling_factor(self, flavor):
-        if flavor is not Flavor.nu_e_bar:
+        if flavor is not Flavor.NU_E_BAR:
             return self.photons_per_lepton_MeV
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
@@ -294,7 +294,7 @@ class InvBetaTab(Interaction):
         :returns: Inverse beta cross section.
         """
         # Only works for electron antineutrinos
-        if flavor != Flavor.nu_e_bar:
+        if flavor != Flavor.NU_E_BAR:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
                 return np.zeros(len(e_nu), dtype=float) * u.cm**2
             return 0. * u.cm**2
@@ -326,7 +326,7 @@ class InvBetaTab(Interaction):
         :returns: Mean lepton energy after the interaction.
         """
         # Only works for electron antineutrinos
-        if flavor != Flavor.nu_e_bar:
+        if flavor != Flavor.NU_E_BAR:
             if isinstance(e_nu, (list, tuple, np.ndarray)):
                 return np.zeros(len(e_nu), dtype=float) * u.MeV
             return 0. * u.MeV
@@ -345,7 +345,7 @@ class InvBetaTab(Interaction):
             return 0. * u.MeV
             
     def photon_scaling_factor(self, flavor):
-        if flavor is not Flavor.nu_e_bar:
+        if flavor is not Flavor.NU_E_BAR:
             return self.photons_per_lepton_MeV
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
@@ -513,7 +513,7 @@ class Oxygen16CC(Interaction):
                 return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
 
-        if flavor == Flavor.nu_e:
+        if flavor == Flavor.NU_E:
             if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut = Enu >= self.Eth_nu
                 xs = np.zeros_like(Enu)
@@ -526,7 +526,7 @@ class Oxygen16CC(Interaction):
                 else:
                     xs = self._xsfunc(Enu, (4.73e-40, 0.25, 15., 6.))
 
-        elif flavor == Flavor.nu_e_bar:
+        elif flavor == Flavor.NU_E_BAR:
             if isinstance(Enu, (list, tuple, np.ndarray)):
                 cut1 = np.logical_and(Enu >= self.Eth_nubar, Enu < 42.3293)
                 cut2 = Enu >= 42.3293
@@ -555,7 +555,7 @@ class Oxygen16CC(Interaction):
         return xs * u.cm**2
         
     def photon_scaling_factor(self, flavor):
-        if flavor is not Flavor.nu_e_bar:
+        if flavor is not Flavor.NU_E_BAR:
             return self.photons_per_lepton_MeV
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
@@ -576,7 +576,7 @@ class Oxygen16CC(Interaction):
             return 0. * u.MeV
 
         # Compute correct minimum energy
-        if flavor == Flavor.nu_e:
+        if flavor == Flavor.NU_E:
             e_thr = self.Eth_nu + self.e_ckov
         else:
             e_thr = self.Eth_nubar + self.e_ckov
@@ -714,7 +714,7 @@ class Oxygen18(Interaction):
         Enu = e_nu.to('MeV').value
         
         # Only electron neutrinos interact with O18!
-        if flavor != Flavor.nu_e:
+        if flavor != Flavor.NU_E:
             if isinstance(Enu, (list, tuple, np.ndarray)):
                 return np.zeros_like(Enu) * u.cm**2
             return 0. * u.cm**2
@@ -748,7 +748,7 @@ class Oxygen18(Interaction):
         Enu = e_nu.to('MeV').value
         
         # Only electron neutrinos interact with O18!
-        if flavor != Flavor.nu_e:
+        if flavor != Flavor.NU_E:
             if isinstance(Enu, (list, tuple, np.ndarray)):
                 return np.zeros_like(Enu) * u.MeV
             return 0. * u.MeV
@@ -765,7 +765,7 @@ class Oxygen18(Interaction):
         return lep * u.MeV
         
     def photon_scaling_factor(self, flavor):
-        if flavor is not Flavor.nu_e_bar:
+        if flavor is not Flavor.NU_E_BAR:
             return self.photons_per_lepton_MeV
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
