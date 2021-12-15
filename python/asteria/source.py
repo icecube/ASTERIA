@@ -9,7 +9,7 @@ of the neutrinos at any given time.
 
 from __future__ import print_function, division
 
-from .neutrino import Flavor
+from snewpy.neutrino import Flavor
 from .stellardist import FixedDistance, StellarDensity
 from .config import parse_quantity
 
