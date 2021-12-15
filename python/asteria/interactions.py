@@ -22,7 +22,7 @@ class Interaction(ABC):
         self.Mp = (c.m_p * c.c ** 2).to('MeV').value
         self.Me = (c.m_e * c.c ** 2).to('MeV').value
 
-        # Weak mixing angle... for large momentum transfer?
+        # Weak mixing angle.
         self.sinw2 = 0.23122
 
         # Cherenkov threshold energy [MeV]
