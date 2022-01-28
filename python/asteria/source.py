@@ -71,51 +71,52 @@ def init_model(modelname, modelfile, *args):
     return getattr(sys.modules[__name__], modelname)(modfile)
 
 
-#from snewpy.neutrino import Flavor
-#from .stellardist import FixedDistance, StellarDensity
-#from .config import parse_quantity
+# from snewpy.neutrino import Flavor
+from .stellardist import FixedDistance, StellarDensity
+from .config import parse_quantity
 #
-#from astropy import units as u
-#from astropy.table import Table
+# from astropy import units as u
+# from astropy.table import Table
 #
-#from abc import ABC, abstractmethod
+# from abc import ABC, abstractmethod
 #
-#import numpy as np
-#from scipy.special import loggamma, gdtr
-#from scipy.interpolate import PchipInterpolator
+# import numpy as np
+from scipy.special import loggamma, gdtr
+from scipy.interpolate import PchipInterpolator
 #
 #
-#class Source:
-#    
-#    def __init__(self, name, 
-#                 spectral_model, progenitor_mass, progenitor_distance,
-#                 time={}, luminosity={}, mean_energy={}, pinch={}):
-#
-#        self.name = name
-#        self.model = spectral_model
-#        self.progenitor_mass = progenitor_mass
-#        self.progenitor_distance = progenitor_distance
-#        self.time = time
-#        self.luminosity = luminosity
-#        self.mean_energy = mean_energy
-#        self.pinch = pinch
-#
-#        # Energy PDF function is assumed to be like a gamma function,
-#        # parameterized by mean energy and pinch parameter alpha. True for
-#        # nearly all CCSN models.
-#        self.energy_pdf = lambda a, Ea, E: \
-#            np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) + a * np.log(E) - \
-#                   (1 + a) * np.log(Ea) - (1 + a) * (E / Ea))
-#                   
-#        self.v_energy_pdf = np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)' )
-#
-#        # Energy CDF, useful for random energy sampling.
-#        self.energy_cdf = lambda a, Ea, E: \
-#            gdtr(1., a + 1., (a + 1.) * (E / Ea))
-#
-#    def parts_by_index(self, x, n): 
-#        """Returns a list of size-n numpy arrays containing indices for the 
-#        elements of x, and one size-m array ( with m<n ) if there are remaining 
+class Source:
+
+    def __init__(self, name=None, spectral_model=None, progenitor_mass=None, progenitor_distance=None, time=None,
+                 luminosity=None, mean_energy=None, pinch=None):
+        if any(p is None for p in (name, spectral_model, progenitor_mass, progenitor_distance,
+                                   time, luminosity, mean_energy, pinch)):
+            raise ValueError('Missing required arguments to initialize source')
+        self.name = name
+        self.model = spectral_model
+        self.progenitor_mass = progenitor_mass
+        self.progenitor_distance = progenitor_distance
+        self.time = time
+        self.luminosity = luminosity
+        self.mean_energy = mean_energy
+        self.pinch = pinch
+
+        # Energy PDF function is assumed to be like a gamma function,
+        # parameterized by mean energy and pinch parameter alpha. True for
+        # nearly all CCSN models.
+        self.energy_pdf = lambda a, Ea, E: \
+            np.exp((1 + a) * np.log(1 + a) - loggamma(1 + a) + a * np.log(E) - \
+                   (1 + a) * np.log(Ea) - (1 + a) * (E / Ea))
+
+        self.v_energy_pdf = np.vectorize(self.energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)')
+
+        # Energy CDF, useful for random energy sampling.
+        self.energy_cdf = lambda a, Ea, E: \
+            gdtr(1., a + 1., (a + 1.) * (E / Ea))
+
+#    def parts_by_index(self, x, n):
+#        """Returns a list of size-n numpy arrays containing indices for the
+#        elements of x, and one size-m array ( with m<n ) if there are remaining
 #        elements of x.
 #
 #        Returns
@@ -123,7 +124,7 @@ def init_model(modelname, modelfile, *args):
 #        i_part : list
 #            List of index partitions (partitions are numpy array).
 #        """
-#        nParts = x.size//n    
+#        nParts = x.size//n
 #        i_part = [ np.arange( i*n, (i+1)*n ) for i in range(nParts) ]
 #
 #        # Generate final partition of size <n if x.size is not multiple of n
@@ -136,53 +137,54 @@ def init_model(modelname, modelfile, *args):
 #            i_part = i_part[0:-1]
 #
 #        return i_part
-#        
-#    def get_time(self):
-#        """Return source time as numpy array.
 #
-#        Returns
-#        -------
-#        time : float
-#            Source time profile (units of s).
-#        """
-#        return self.time
-#    
-#    def get_luminosity(self, t, flavor=Flavor.NU_E_BAR):
-#        """Return source luminosity at time t for a given flavor.
-#
-#        Parameters
-#        ----------
-#        
-#        t : float
-#            Time relative to core bounce.
-#        flavor : :class:`asteria.neutrino.Flavor`
-#            Neutrino flavor.
-#
-#        Returns
-#        -------
-#        luminosity : float
-#            Source luminosity (units of power).
-#        """
-#        return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
-#
-#    def get_mean_energy(self, t, flavor=Flavor.NU_E_BAR):
-#        """Return source mean energy at time t for a given flavor.
-#
-#        Parameters
-#        ----------
-#
-#        t : float
-#            Time relative to core bounce.
-#        flavor : :class:`asteria.neutrino.Flavor`
-#            Neutrino flavor.
-#
-#        Returns
-#        -------
-#        mean_energy : float
-#            Source mean energy (units of energy).
-#        """
-#        return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
-#
+
+    def get_time(self):
+        """Return source time as numpy array.
+
+        Returns
+        -------
+        time : float
+            Source time profile (units of s).
+        """
+        return self.time
+
+    def get_luminosity(self, t, flavor=Flavor.NU_E_BAR):
+        """Return source luminosity at time t for a given flavor.
+
+        Parameters
+        ----------
+
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+
+        Returns
+        -------
+        luminosity : float
+            Source luminosity (units of power).
+        """
+        return np.nan_to_num(self.luminosity[flavor](t)) * (u.erg / u.s)
+
+    def get_mean_energy(self, t, flavor=Flavor.NU_E_BAR):
+        """Return source mean energy at time t for a given flavor.
+
+        Parameters
+        ----------
+
+        t : float
+            Time relative to core bounce.
+        flavor : :class:`asteria.neutrino.Flavor`
+            Neutrino flavor.
+
+        Returns
+        -------
+        mean_energy : float
+            Source mean energy (units of energy).
+        """
+        return np.nan_to_num(self.mean_energy[flavor](t)) * u.MeV
+
 #    def get_pinch_parameter(self, t, flavor=Flavor.NU_E_BAR):
 #        """Return source pinching paramter alpha at time t for a given flavor.
 #        Parameters
@@ -381,80 +383,82 @@ def init_model(modelname, modelfile, *args):
 #        return E_per_V * u.MeV / u.m**3
 #
 #
-#def initialize(config):
-#    """Initialize a Source model from configuration parameters.
-#
-#    Parameters
-#    ----------
-#
-#    config : :class:`asteria.config.Configuration`
-#        Configuration parameters used to create a Source.
-#
-#    Returns
-#    -------
-#    Source
-#        An initialized source model.
-#    """
-#    # Dictionary of L, <E>, and alpha versus time, keyed by neutrino flavor.
-#    luminosity, mean_energy, pinch = {}, {}, {}
-#
-#    if config.source.table.format.lower() == 'fits':
-#        # Open FITS file, which contains a luminosity table and a pinching
-#        # parameter (alpha) and mean energy table.
-#        fitsfile = '/'.join([config.abs_base_path, config.source.table.path])
-#        sn_data_table = Table.read(fitsfile)
-#
-#        time = sn_data_table['TIME'].to('s')
-#
-#        # Loop over all flavors in the table:
-#        for flavor in Flavor:
-#            fl = flavor.name.upper()
-#            if any( fl in col for col in sn_data_table.keys() ):
-#
-#                L = sn_data_table['L_{:s}'.format(fl)].to('erg/s')
-#                E = sn_data_table['E_{:s}'.format(fl)].to('MeV')
-#                alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
-#
-#            elif fl == 'NU_X_BAR':
-#                L = sn_data_table['L_NU_X'].to('erg/s')
-#                E = sn_data_table['E_NU_X'].to('MeV')
-#                alpha = sn_data_table['ALPHA_NU_X']
-#
-#            else:
-#                raise KeyError("""'{0}'""".format(fl))
-#
-#            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False)
-#            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False)
-#            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False )
-#    elif config.source.table.format.lower() == 'ascii':
-#        # ASCII will be supported! Promise, promise.
-#        raise ValueError('Unsupported format: "ASCII"')
-#    else:
-#        raise ValueError('Unknown format {}'.format(config.source.table.format))
-#
-#    # Set up the distance model.
-#    distance_model = None
-#    dmtype = config.source.progenitor.distance.model
-#    if dmtype == 'FixedDistance':
-#        # FixedDistance model.
-#        r  = parse_quantity(config.source.progenitor.distance.distance)
-#        dr = parse_quantity(config.source.progenitor.distance.uncertainty)
-#        distance_model = FixedDistance(r, dr)
-#    elif dmtype == 'StellarDensity':
-#        # StellarDensity model, with options to add LMC and SMC.
-#        fitsfile = '/'.join([config.abs_base_path,
-#                             config.source.progenitor.distance.path])
-#        lmc = parse_quantity(config.source.progenitor.distance.add_LMC)
-#        smc = parse_quantity(config.source.progenitor.distance.add_SMC)
-#        distance_model = StellarDensity(fitsfile, lmc, smc)
-#    else:
-#        raise ValueError('Unrecognized distance_model: {}'.format(dmtype))
-#
-#    return Source(config.source.name,
-#                  config.source.model,
-#                  parse_quantity(config.source.progenitor.mass),
-#                  distance_model.distance(),
-#                  time,
-#                  luminosity,
-#                  mean_energy,
-#                  pinch)
+
+
+def initialize(config):
+    """Initialize a Source model from configuration parameters.
+
+    Parameters
+    ----------
+
+    config : :class:`asteria.config.Configuration`
+       Configuration parameters used to create a Source.
+
+    Returns
+    -------
+    Source
+       An initialized source model.
+    """
+    # Dictionary of L, <E>, and alpha versus time, keyed by neutrino flavor.
+    luminosity, mean_energy, pinch = {}, {}, {}
+
+    if config.source.table.format.lower() == 'fits':
+        # Open FITS file, which contains a luminosity table and a pinching
+        # parameter (alpha) and mean energy table.
+        fitsfile = '/'.join([config.abs_base_path, config.source.table.path])
+        sn_data_table = Table.read(fitsfile)
+
+        time = sn_data_table['TIME'].to('s')
+
+        # Loop over all flavors in the table:
+        for flavor in Flavor:
+            fl = flavor.name.upper()
+            if any(fl in col for col in sn_data_table.keys()):
+
+                L = sn_data_table['L_{:s}'.format(fl)].to('erg/s')
+                E = sn_data_table['E_{:s}'.format(fl)].to('MeV')
+                alpha = sn_data_table['ALPHA_{:s}'.format(fl)]
+
+            elif fl == 'NU_X_BAR':
+                L = sn_data_table['L_NU_X'].to('erg/s')
+                E = sn_data_table['E_NU_X'].to('MeV')
+                alpha = sn_data_table['ALPHA_NU_X']
+
+            else:
+                raise KeyError("""'{0}'""".format(fl))
+
+            luminosity[flavor] = PchipInterpolator(time, L, extrapolate=False)
+            mean_energy[flavor] = PchipInterpolator(time, E, extrapolate=False)
+            pinch[flavor] = PchipInterpolator(time, alpha, extrapolate=False)
+    elif config.source.table.format.lower() == 'ascii':
+        # ASCII will be supported! Promise, promise.
+        raise ValueError('Unsupported format: "ASCII"')
+    else:
+        raise ValueError('Unknown format {}'.format(config.source.table.format))
+
+    # Set up the distance model.
+    distance_model = None
+    dmtype = config.source.progenitor.distance.model
+    if dmtype == 'FixedDistance':
+        # FixedDistance model.
+        r = parse_quantity(config.source.progenitor.distance.distance)
+        dr = parse_quantity(config.source.progenitor.distance.uncertainty)
+        distance_model = FixedDistance(r, dr)
+    elif dmtype == 'StellarDensity':
+        # StellarDensity model, with options to add LMC and SMC.
+        fitsfile = '/'.join([config.abs_base_path,
+                             config.source.progenitor.distance.path])
+        lmc = parse_quantity(config.source.progenitor.distance.add_LMC)
+        smc = parse_quantity(config.source.progenitor.distance.add_SMC)
+        distance_model = StellarDensity(fitsfile, lmc, smc)
+    else:
+        raise ValueError('Unrecognized distance_model: {}'.format(dmtype))
+
+    return Source(config.source.name,
+                  config.source.model,
+                  parse_quantity(config.source.progenitor.mass),
+                  distance_model.distance(),
+                  time,
+                  luminosity,
+                  mean_energy,
+                  pinch)
