@@ -19,7 +19,7 @@ if __name__ == "__main__":
                         choices=['normal', 'inverted', 'None'],
                         help='Neutrino hierarchy')
     parser.add_argument('-c', '--config_file', dest='config_file', type=str,
-                        default='config_file.ini',
+#                         default='config_file.ini',
                         help='Provide config file name')
     parser.add_argument('-s', '--scheme', dest='scheme', type=str, default='adiabatic-msw',
                         choices=['all', 'adiabatic-msw'],
@@ -42,17 +42,18 @@ if __name__ == "__main__":
     print(f"Arguments from terminal:\n {args})")
     result = {}
     if args['config_file'] is None:
-    # Example: python test_arg_parse.py -d fixed -i all -f All
+    # Example: python test_arg_parse.py -d 10 -i all -f all
         config = configparser.ConfigParser()
-        config.read('new_config.ini')
-        default = config['DEFAULT']
-        mixing = config['MIXING']
-        energy = config['ENERGY']
-        time = config['TIME']
-        result.update(default)
-        result.update(mixing)
-        result.update(energy)
-        result.update(time)
+        with open('new_config.ini') as f:
+            config.read_file(f)
+            default = config['DEFAULT']
+            mixing = config['MIXING']
+            energy = config['ENERGY']
+            time = config['TIME']
+            result.update(default)
+            result.update(mixing)
+            result.update(energy)
+            result.update(time)
     else:
     # Example: python test_arg_parse.py -c ./test_config.ini
         config_file = args['config_file']
