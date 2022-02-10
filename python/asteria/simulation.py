@@ -10,12 +10,13 @@ of the neutrinos at any given time.
 from __future__ import print_function, division
 
 from astropy import units as u
-from snewpy.neutrino import Flavor
+from snewpy.neutrino import Flavor, MassHierarchy
+from snewpy import flavor_transformation as ft
 
 import numpy as np
+
 from .interactions import Interactions
 from .source import Source
-from .util import energy_pdf, parts_by_index
 
 
 class Simulation:
@@ -57,11 +58,24 @@ class Simulation:
                 self.flavors = Flavor
             else:
                 self.flavors = flavors
-            self.hierarch = hierarchy
+
+            self.hierarchy = hierarchy
+            if self.hierarchy:
+                self.hierarchy = getattr(MassHierarchy, hierarchy.upper())
+            else:
+                self.hierarchy = MassHierarchy.NORMAL
+
             self.mixing_scheme = mixing_scheme
             self.mixing_angle = mixing_angle
-            self.interactions = interactions
+            if mixing_scheme:
+                self._mixing = getattr(ft, mixing_scheme)(mh=self.hierarchy)
+            else:
+                self._mixing = ft.NoTransformation()
 
+            self.interactions = interactions
+            self._E_per_V = None
+            self._total_E_per_V = None
+            self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
         elif config is not None:
@@ -95,7 +109,7 @@ class Simulation:
             raise NotImplementedError('Simulation loading is not currently implemented')
 
         self.compute_photon_spectra()
-        self.compute_energy_per_volume()
+        self.compute_energy_per_vol()
         return
 
     def compute_photon_spectra(self):
@@ -104,48 +118,58 @@ class Simulation:
         :return: None
         :rtype: None
         """
-        photon_spectra = np.zeros(shape=(len(self.flavors), self.energy.size))
+        self._photon_spectra = {}
 
-        for nu, flavor in enumerate(self.flavors):
-            for interaction in Interactions:
+        for flavor in self.flavors:
+            result = np.zeros(self.energy.size)
+            for interaction in self.interactions:
                 xs = interaction.cross_section(flavor, self.energy).to(u.m ** 2).value
                 E_lep = interaction.mean_lepton_energy(flavor, self.energy).value
                 photon_scaling_factor = interaction.photon_scaling_factor(flavor).value
-                photon_spectra[nu] += xs * E_lep * photon_scaling_factor
+                result += xs * E_lep * photon_scaling_factor
+            self._photon_spectra.update({flavor: result * (u.m * u.m)})
 
-        photon_spectra *= u.m ** 2
-        self._photon_spectra = photon_spectra
+    def get_combined_spectrum(self, t, E, flavor, mixing):
+        # TODO: Check that this function still works when p_surv and pc_osc are arrays
+        # TODO: Simplify after adding neutrino oscillates_to property to SNEWPY
+        # The cflavor "complementary flavor" is the flavor that the provided argument `flavor` oscillates to/from
+        if flavor.is_neutrino:
+            if flavor.is_electron:
+                coeffs = mixing.prob_ee(t, E), mixing.prob_xe(t, E)
+                cflavor = Flavor.NU_X
+            else:
+                coeffs = mixing.prob_xx(t, E), mixing.prob_ex(t, E)
+                cflavor = Flavor.NU_E
+        else:
+            if flavor.is_electron:
+                coeffs = mixing.prob_eebar(t, E), mixing.prob_xebar(t, E)
+                cflavor = Flavor.NU_X_BAR
+            else:
+                coeffs = mixing.prob_xxbar(t, E), mixing.prob_exbar(t, E)
+                cflavor = Flavor.NU_E_BAR
 
-    def compute_energy_per_volume(self):
-        """Computes the photonic energy per volume in the IceCube Detector for each flavor of neutrino
-            Data are stored in SimulationHandler.E_per_V
-        :return: None
-        :rtype: None
-        """
-        self.E_per_V = {}
+        nu_spectrum = np.zeros(shape=(t.size, E.size))
+        for coeff, _flavor in zip(coeffs, (flavor, cflavor)):
+            alpha = self.source.alpha(t, _flavor)
+            meanE = self.source.meanE(t, _flavor).to(u.MeV).value
 
-        for flavor, photon_spectrum in zip(self.flavors, self._photon_spectra):
-            self.E_per_V.update({flavor: self._photonic_energy_per_vol(self.time, self.energy, flavor, photon_spectrum,
-                                                                       self.mixing_scheme)})
+            alpha[alpha < 0] = 0
+            cut = (alpha >= 0) & (meanE > 0)
 
+            flux = self.source.flux(t[cut], _flavor).value.reshape(-1, 1)
+            nu_spectrum[cut] += coeff * self.source.energy_pdf(t[cut], E, _flavor) * flux
 
-    def _photonic_energy_per_vol(self, time, E, flavor, photon_spectrum, mixing=None, limit=1000):
+        photon_spectrum = self._photon_spectra[flavor].to(u.m ** 2).value.reshape(1, -1)
+        return nu_spectrum * photon_spectrum
+
+    def compute_energy_per_vol(self, *, part_size=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
         from SN neutrino interactions.
 
         Parameters
         ----------
 
-        time : float (units s)
-           Time relative to core bounce.
-        E : `numpy.ndarray`
-           Sorted grid of neutrino energies
-        flavor : :class:`asteria.neutrino.Flavor`
-           Neutrino flavor.
-        photon_spectrum : `numpy.ndarray` (Units vary, m**2)
-           Grid of the product of lepton cross section with lepton mean energy
-           and lepton path length per MeV, sorted according to parameter E
-        n : int
+        part_size : int
            Maximum number of time steps to compute at once. A temporary numpy array
            of size n x time.size is created and can be very memory inefficient.
 
@@ -154,47 +178,43 @@ class Simulation:
         E_per_V
            Energy per m**3 of ice deposited  by neutrinos of requested flavor
         """
+        if self.time.size < 2:
+            raise ValueError("Time array size <2, unable to compute energy per volume.")
+
         H2O_in_ice = 3.053e28  # 1 / u.m**3
-
-        t = time.to(u.s).value
-        Enu = E.to(u.MeV).value
-        if Enu[0] == 0:
-            Enu[0] = 1e-10 * u.MeV
-        phot = photon_spectrum.to(u.m ** 2).value.reshape((-1, 1))  # m**2
-
         dist = self.distance.to(u.m).value  # m**2
 
-        if mixing is None:
-            def nu_spectrum(t, _E, flavor):
-                _a = self.source.alpha(t, flavor)
-                _Ea = self.source.meanE(t, flavor).to(u.MeV).value
-                return energy_pdf(a=_a, Ea=_Ea, E=_E) * self.source.flux(t, flavor)
-        else:
-            raise NotImplementedError("Oscillation scenerios are currently unimplemented")
+        self._E_per_V = {}
+        self._total_E_per_V = np.zeros(self.time.size)
 
-        print('Beginning {0} simulation... {1}'.format(flavor.name, ' ' * (10 - len(flavor.name))), end='')
-        # The following two lines exploit the fact that astropy quantities will
-        # always return a number when numpy size is called on them, even if it is 1.
-        if time.size < 2:
-            raise RuntimeError("Time array size <2, unable to compute energy per volume.")
+        for flavor in self.flavors:
+            print(f'Starting {flavor.name} simulation... {" "*(10-len(flavor.name))}', end='')
 
-        # Perform core calculation on partitions in E to regulate memory usage in vectorized function
-        result = np.zeros(time.size)
-        for i_part in parts_by_index(time, limit):  # Limits memory usage
-            result[i_part] += np.trapz( nu_spectrum(time[i_part], Enu, flavor).value * phot, Enu, axis=0)
-        # idx = 0
-        # if limit < E.size:
-        #     idc_split = np.arange(E.size, step=limit)
-        #     for idx in idc_split[:-1]:
-        #         _E = Enu[idx:idx + limit]
-        #         _phot = phot[idx:idx + limit]
-        #         result[:, idx:idx + limit] = np.trapz(nu_spectrum(t=t, E=_E, flavor=flavor).value * _phot, _E, axis=0)
-        #
-        # _E = Enu[idx:]
-        # _phot = phot[idx:]
-        # result[:, idx:idx + limit] = np.trapz(nu_spectrum(t=t, E=_E, flavor=flavor).value * _phot, _E, axis=0)
-        result *= H2O_in_ice / (4 * np.pi * dist ** 2) * np.ediff1d(t, to_end=(t[-1] - t[-2]))
-        if not flavor.is_electron:
-            result *= 2
-        print('Completed')
-        return result * (u.MeV / u.m / u.m / u.m)
+            # Perform core calculation on partitions in E to regulate memory usage in vectorized function
+            result = np.zeros(self.time.size)
+            idx = 0
+            if part_size < self.time.size:
+                while idx + part_size < self.time.size:
+                    spectrum = self.get_combined_spectrum(self.time[idx:idx + part_size], self.energy, flavor,
+                                                          self._mixing)
+                    result[idx:idx + part_size] = np.trapz(spectrum, self.energy.value, axis=1)
+                    idx += part_size
+            spectrum = self.get_combined_spectrum(self.time[idx:], self.energy, flavor, self._mixing)
+            result[idx:] = np.trapz(spectrum, self.energy.value, axis=1)
+            # Add distance, density and time-binning scaling factors
+            result *= H2O_in_ice / (4 * np.pi * dist ** 2) * np.ediff1d(self.time,
+                                                                        to_end=(self.time[-1] - self.time[-2])).value
+            if not flavor.is_electron:
+                result *= 2
+            self._E_per_V.update({flavor: result * (u.MeV / u.m / u.m / u.m)})
+            self._total_E_per_V += result
+            print('DONE')
+        self._total_E_per_V *= (u.MeV / u.m / u.m / u.m)
+
+    @property
+    def E_per_V(self):
+        return self._E_per_V if self._E_per_V else None
+
+    @property
+    def total_E_per_V(self):
+        return self._total_E_per_V if self._total_E_per_V else None
