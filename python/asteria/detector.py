@@ -21,7 +21,7 @@ class Detector:
         # Read in and sort effective volume table
         effvol = np.genfromtxt(effvol_table)
         self._effvol_table = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
-                                    meta={'Name': 'Effetive_Volume'})
+                                    meta={'Name': 'Effective_Volume'})
         self._effvol_table.sort('z')
 
         # Read in doms table from file
@@ -40,6 +40,8 @@ class Detector:
                                  names=['str', 'i', 'x', 'y', 'z', 'effvol', 'type'],
                                  dtype=['f4', 'f4', 'f8', 'f8', 'f8', 'f8', 'S2'],
                                  meta={'Name': 'DomsTable'})
+        self.n_i3_doms = np.sum(self._doms_table['type'] == 'i3')
+        self.n_dc_doms = np.sum(self._doms_table['type'] == 'dc')
 
         # Total effective volumne:
         self._i3_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'i3'])
@@ -57,6 +59,14 @@ class Detector:
         # Background rate and sigma for dc DOMs
         self.dc_dom_bg_mu = 358.9
         self.dc_dom_bg_sig = 36.0
+
+    @property
+    def i3_effvol(self):
+        return self._i3_effvol
+
+    @property
+    def dc_effvol(self):
+        return self._dc_effvol
 
     def effvol(self, depth):
         """ Interpolate table to to get effective volumne
@@ -88,36 +98,6 @@ class Detector:
             return self._doms_table[self._doms_table['type'] == d_type]
         else:
             raise ValueError('Type must be either "dc" or "i3".')
-
-    def detector_signals(self, E_photon, i3_dt_frac, dc_dt_frac):
-        """ Compute the signals at the detector
-        Inputs:
-        + E_photon: float, list, tuple, ndarray
-            Deposited photonic energy
-        + i3_dt_frac: float
-            Detector deadtime fraction for normal doms
-        + dc_dt_frac:
-            Detector deadtime fraction for DeepCore doms
-        Outputs:
-        + detector_signals: float, list, tuple, ndarray
-            Signal at the detector """
-        return E_photon*(self._i3_effvol*i3_dt_frac + self._dc_effvol*dc_dt_frac)
-
-    def detector_hits(self, E_photon, i3_dt_frac, dc_dt_frac):
-        """ Compute the total hits at the detector
-        Inputs:
-        + E_photon: float, list, tuple, ndarray
-            Deposited photonic energy
-        + i3_dt_frac: float
-            Detector deadtime fraction for normal doms
-        + dc_dt_frac:
-            Detector deadtime fraction for DeepCore doms
-        Outputs:
-        + detector_hits: float, list, tuple, ndarray
-            Total hits at the detector """
-        signals = self.detector_signals(E_photon, i3_dt_frac, dc_dt_frac)
-        # Possion-flutuated
-        return np.random.poisson(signals)
 
 
 def initialize(config):

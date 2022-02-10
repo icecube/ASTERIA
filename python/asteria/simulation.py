@@ -14,16 +14,18 @@ from snewpy.neutrino import Flavor, MassHierarchy
 from snewpy import flavor_transformation as ft
 
 import numpy as np
+import os
 
 from .interactions import Interactions
 from .source import Source
+from .detector import Detector
 
 
 class Simulation:
 
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
-                 dE=None, t=None, tmin=None, tmax=None, dt=None):
+                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, effvolfile=None):
         self.param = {}
         if model and not config:
 
@@ -44,16 +46,18 @@ class Simulation:
             elif not t and None not in (tmin, tmax, dt):
                 _tmin = tmin.to(u.ms).value
                 _tmax = tmax.to(u.ms).value
-                _dt = dt.to(u.ms).value
-                t = np.arange(_tmin, _tmax + _dt, _dt) * u.ms
+                _dt = dt.to(u.ms)
+                t = np.arange(_tmin, _tmax + _dt.value, _dt.value) * u.ms
                 t = t.to(u.s)
             else:
                 t = np.arange(-1, 1, 0.001) * u.s
+                _dt = 1 * u.ms
 
             self.source = Source(model['name'], **model['param'])
             self.distance = distance
             self.energy = E
             self.time = t
+            self._sim_dt = _dt
             if flavors is None:
                 self.flavors = Flavor
             else:
@@ -68,7 +72,10 @@ class Simulation:
             self.mixing_scheme = mixing_scheme
             self.mixing_angle = mixing_angle
             if mixing_scheme:
-                self._mixing = getattr(ft, mixing_scheme)(mh=self.hierarchy)
+                if mixing_scheme == 'NoTransformation':
+                    self._mixing = getattr(ft, mixing_scheme)()
+                else:
+                    self._mixing = getattr(ft, mixing_scheme)(mh=self.hierarchy)
             else:
                 self._mixing = ft.NoTransformation()
 
@@ -77,6 +84,20 @@ class Simulation:
             self._total_E_per_V = None
             self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
+
+            if not geomfile:
+                self._geomfile = os.path.join(os.environ['ASTERIA'],
+                                              'data/detector/Icecube_geometry.20110102.complete.txt')
+            else:
+                self._geomfile = geomfile
+
+            if not effvolfile:
+                self._effvolfile = os.path.join(os.environ['ASTERIA'],
+                                                'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+            else:
+                self._effvolfile = effvolfile
+
+            self.detector = Detector(self._geomfile, self._effvolfile)
 
         elif config is not None:
             raise NotImplementedError('Setup from config file is not currently implemented')
@@ -218,3 +239,68 @@ class Simulation:
     @property
     def total_E_per_V(self):
         return self._total_E_per_V if self._total_E_per_V else None
+
+    def avg_dom_signal(self, flavor):
+        effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
+        return effvol * self._E_per_V[flavor]
+
+    def detector_signal(self, dt=2*u.ms, flavor=None):
+        """ Compute signal rates observed by detector
+        Parameters
+        ----------
+        dt : Quantity
+            Time binning for hit rates (must be a multiple of base dt used for simulation)
+        flavor: snewpy.neutrino.Flavor
+            Flavor for which to report signal, if None is provided, all-flavor signal is reported
+        Notes
+        -----
+        "Signal" is defined to be the expected average hit rate in a bin
+        """
+
+        _dt = dt.to(u.s).value
+        _t = self.time.to(u.s).value
+        rebinfactor = int(_dt/self._sim_dt.to(u.s).value)
+        total_E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._total_E_per_V.value,
+                                                                                  part_size=rebinfactor)])
+
+        deadtime = self.detector.deadtime
+        i3_effvol = self.detector.i3_effvol
+        dc_effvol = self.detector.dc_effvol
+        dc_rel_eff = self.detector.dc_rel_eff
+        eps_i3 = 0.87 / (1 + deadtime * total_E_per_V_binned / _dt)
+        eps_dc = 0.87 / (1 + deadtime * total_E_per_V_binned * dc_rel_eff / _dt)
+        time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)])
+        if flavor:
+            E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
+                                                                                part_size=rebinfactor)])
+            return time_binned * u.s, E_per_V_binned*(i3_effvol*eps_i3 + dc_effvol*eps_dc)
+        else:
+            return time_binned * u.s, total_E_per_V_binned*(i3_effvol*eps_i3 + dc_effvol*eps_dc)
+
+    def detector_hits(self,  dt=2 * u.ms, flavor=None):
+        """ Compute hit rates observed by detector
+        Parameters
+        ----------
+        dt : Quantity
+            Time binning for hit rates (must be a multiple of base dt used for simulation)
+        flavor: snewpy.neutrino.Flavor
+            Flavor for which to report signal, if None is provided, all-flavor signal is reported
+        """
+        time_binned, signal = self.detector_signal(dt=dt, flavor=flavor)
+        # Possion-flutuated
+        return time_binned, np.random.poisson(signal)
+
+
+def _get_partitions(*args, part_size=1000):
+    if len(args) > 1:
+        if not all(len(x) == len(args[0]) for x in args):
+            raise ValueError(f'Inputs must have same size, given sizes ({", ".join((str(len(x)) for x in args))})')
+    total_size = len(args[0])
+    if part_size > total_size:
+        yield tuple(x for x in args) if len(args) > 1 else args[0]
+    else:
+        idx = 0
+        while idx + part_size < total_size:
+            yield tuple(x[idx:idx + part_size] for x in args) if len(args) > 1 else args[0][idx:idx + part_size]
+            idx += part_size
+        yield tuple(x[idx:] for x in args) if len(args) > 1 else args[0][idx:]
