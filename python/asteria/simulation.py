@@ -209,7 +209,7 @@ class Simulation:
         self._total_E_per_V = np.zeros(self.time.size)
 
         for flavor in self.flavors:
-            print(f'Starting {flavor.name} simulation... {" "*(10-len(flavor.name))}', end='')
+            print(f'Starting {flavor.name} simulation... {" " * (10 - len(flavor.name))}', end='')
 
             # Perform core calculation on partitions in E to regulate memory usage in vectorized function
             result = np.zeros(self.time.size)
@@ -244,7 +244,7 @@ class Simulation:
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
         return effvol * self._E_per_V[flavor]
 
-    def detector_signal(self, dt=2*u.ms, flavor=None):
+    def detector_signal(self, dt=2 * u.ms, flavor=None, subdetector=None):
         """ Compute signal rates observed by detector
         Parameters
         ----------
@@ -259,13 +259,14 @@ class Simulation:
 
         _dt = dt.to(u.s).value
         _t = self.time.to(u.s).value
-        rebinfactor = int(_dt/self._sim_dt.to(u.s).value)
+        rebinfactor = int(_dt / self._sim_dt.to(u.s).value)
         total_E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._total_E_per_V.value,
                                                                                   part_size=rebinfactor)])
-
         deadtime = self.detector.deadtime
-        i3_effvol = self.detector.i3_effvol
-        dc_effvol = self.detector.dc_effvol
+
+        i3_effvol = self.detector.i3_effvol if subdetector != 'dc' else 0
+        dc_effvol = self.detector.dc_effvol if subdetector != 'i3' else 0
+
         dc_rel_eff = self.detector.dc_rel_eff
         eps_i3 = 0.87 / (1 + deadtime * total_E_per_V_binned / _dt)
         eps_dc = 0.87 / (1 + deadtime * total_E_per_V_binned * dc_rel_eff / _dt)
@@ -273,11 +274,11 @@ class Simulation:
         if flavor:
             E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
                                                                                 part_size=rebinfactor)])
-            return time_binned * u.s, E_per_V_binned*(i3_effvol*eps_i3 + dc_effvol*eps_dc)
+            return time_binned * u.s, E_per_V_binned * (i3_effvol * eps_i3 + dc_effvol * eps_dc)
         else:
-            return time_binned * u.s, total_E_per_V_binned*(i3_effvol*eps_i3 + dc_effvol*eps_dc)
+            return time_binned * u.s, total_E_per_V_binned * (i3_effvol * eps_i3 + dc_effvol * eps_dc)
 
-    def detector_hits(self,  dt=2 * u.ms, flavor=None):
+    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None,):
         """ Compute hit rates observed by detector
         Parameters
         ----------
@@ -285,10 +286,54 @@ class Simulation:
             Time binning for hit rates (must be a multiple of base dt used for simulation)
         flavor: snewpy.neutrino.Flavor
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
+        subdetector: None or str
+            IceCube subdetector, must be None (Full Detector), 'i3' (IC80) or 'dc' (DeepCore)
         """
-        time_binned, signal = self.detector_signal(dt=dt, flavor=flavor)
-        # Possion-flutuated
+        time_binned, signal = self.detector_signal(dt, flavor, subdetector)
+        # Possion-fluctuated
         return time_binned, np.random.poisson(signal)
+
+    def detector_significance(self, dt=0.5 * u.s, *, by_subdetector=False):
+        i3_dom_bg_var = self.detector.i3_dom_bg_sig ** 2 * dt.to(u.s).value
+        dc_dom_bg_var = self.detector.dc_dom_bg_sig ** 2 * dt.to(u.s).value
+
+        if by_subdetector:  # Use definition of delta_mu(_var) from SNDAQ
+            time_binned, i3_hits_binned = self.detector_hits(dt, subdetector='i3')
+            _, dc_hits_binned = self.detector_hits(dt, subdetector='dc')
+
+            var_dmu = 1 / (self.detector.n_i3_doms / i3_dom_bg_var + self.detector.n_dc_doms / dc_dom_bg_var)
+            dmu = var_dmu * (i3_hits_binned/i3_dom_bg_var + dc_hits_binned/dc_dom_bg_var)
+
+            signi_binned = dmu/np.sqrt(var_dmu)
+            return time_binned, signi_binned
+        else:  # Use simple calculation from USSR
+            detector_bg_var = (self.detector.n_i3_doms*i3_dom_bg_var + self.detector.n_dc_doms*dc_dom_bg_var)
+
+            time_binned, hits_binned = self.detector_hits(dt)
+            signi_binned = hits_binned/np.sqrt(detector_bg_var)
+        return time_binned, signi_binned
+
+    def trigger_significance(self, dt=0.5 * u.s, *, by_subdetector=False):
+        return self.detector_significance(dt=dt, by_subdetector=by_subdetector)[1].max()
+
+    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, by_subdetector=False):
+        # TODO: This is a bit awkward, by adding distance scaling elsewhere, the conditional scaling here may be removed
+        current_dist = self.distance.to(u.kpc).value
+
+        if current_dist != distance.to(u.kpc).value:
+            total_E_per_V = self._total_E_per_V
+            self._total_E_per_V = self._total_E_per_V.value * (current_dist/distance.to(u.kpc).value)**2 * \
+                                  (u.MeV / u.m / u.m / u.m)
+
+            sample = np.array([self.trigger_significance(dt, by_subdetector=by_subdetector)
+                               for _ in range(sample_size)])
+            self._total_E_per_V = total_E_per_V
+        else:
+            sample = np.array([self.trigger_significance(dt, by_subdetector=by_subdetector)
+                               for _ in range(sample_size)])
+        return sample
+
+
 
 
 def _get_partitions(*args, part_size=1000):
