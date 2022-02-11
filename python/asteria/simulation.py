@@ -103,7 +103,7 @@ class Simulation:
         elif config is not None:
             with open(config) as f:
                 configuration = configparser.ConfigParser()
-                configuration.read_file(config)
+                configuration.read_file(f)
                 default = configuration['DEFAULT']
                 model = configuration['MODEL']
                 mixing = configuration['MIXING']
@@ -126,7 +126,7 @@ class Simulation:
                     t = np.arange(f * _tmin, f * _tmax + _dt, _dt) * u.ms
                 else:
                     t = np.arange(-1000, 1000, 1) * u.ms
-
+                    
 #                 self.source = Source(model[default['model']], **model['param'])
                 self.model = {'name': model['name'],
                               'param': {
@@ -135,6 +135,7 @@ class Simulation:
                                   'metallicity': model['metallicity'],
                                   'eos': model['eos']}
                               }
+#                 self.source = Source(model['name'], **model['param'])
                 self.distance = default['distance'] * u.kpc
                 self.energy = E
                 self.time = t
