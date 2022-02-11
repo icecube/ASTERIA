@@ -46,3 +46,21 @@ IO:
     table:
         format: h5
         path: processed/nakazato-LS220-BH-z0.004-s30.0.h5
+# The simulation configurable is loaded by the asteria.simualtionHandler module
+simulation:
+    interactions: default
+    flavors: nu_e, nu_e_bar, nu_x, nu_x_bar
+    hierarchy: default
+    mixing:
+        scheme: adiabatic-msw
+        angle: 33.2 deg
+    energy:
+        min: 0 MeV
+        max: 100 MeV
+        step: 0.1 MeV
+        size: 10001
+    time:
+        min: -1 s
+        max: 1 s
+        step: 1 ms
+        size: 2001
