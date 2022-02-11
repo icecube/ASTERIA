@@ -156,17 +156,17 @@ class Simulation:
         # The cflavor "complementary flavor" is the flavor that the provided argument `flavor` oscillates to/from
         if flavor.is_neutrino:
             if flavor.is_electron:
-                coeffs = mixing.prob_ee(t, E), mixing.prob_xe(t, E)
+                coeffs = mixing.prob_ee(t, E), mixing.prob_ex(t, E)
                 cflavor = Flavor.NU_X
             else:
-                coeffs = mixing.prob_xx(t, E), mixing.prob_ex(t, E)
+                coeffs = mixing.prob_xx(t, E), mixing.prob_xe(t, E)
                 cflavor = Flavor.NU_E
         else:
             if flavor.is_electron:
-                coeffs = mixing.prob_eebar(t, E), mixing.prob_xebar(t, E)
+                coeffs = mixing.prob_eebar(t, E), mixing.prob_exbar(t, E)
                 cflavor = Flavor.NU_X_BAR
             else:
-                coeffs = mixing.prob_xxbar(t, E), mixing.prob_exbar(t, E)
+                coeffs = mixing.prob_xxbar(t, E), mixing.prob_xebar(t, E)
                 cflavor = Flavor.NU_E_BAR
 
         nu_spectrum = np.zeros(shape=(t.size, E.size))
