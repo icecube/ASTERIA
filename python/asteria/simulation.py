@@ -13,6 +13,7 @@ from astropy import units as u
 from snewpy.neutrino import Flavor
 
 import numpy as np
+import configparser
 from .interactions import Interactions
 from .source import Source
 from .util import energy_pdf, parts_by_index
@@ -65,7 +66,56 @@ class Simulation:
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
         elif config is not None:
-            raise NotImplementedError('Setup from config file is not currently implemented')
+            with open(config) as f:
+                configuration = configparser.ConfigParser()
+                configuration.read_file(config)
+                default = configuration['DEFAULT']
+                model = configuration['MODEL']
+                mixing = configuration['MIXING']
+                energy = configuration['ENERGY']
+                time = configuration['TIME']
+                
+                if 'min' and 'max' and 'step' in configuration['ENERGY'].keys():
+                    _Emin = float(energy['min'])
+                    _Emax = float(energy['max'])
+                    _dE = float(energy['step'])
+                    E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
+                else:
+                    E = np.arange(0, 100, 1) * u.MeV
+                    
+                if 'min' and 'max' and 'step' in configuration['TIME'].keys():
+                    _tmin = float(time['min'])
+                    _tmax = float(time['max'])
+                    _dt = float(time['step'])
+                    f = u.s.to(u.ms)
+                    t = np.arange(f * _tmin, f * _tmax + _dt, _dt) * u.ms
+                else:
+                    t = np.arange(-1000, 1000, 1) * u.ms
+                    
+#                 self.source = Source(model[default['model']], **model['param'])
+                self.model = {'name': model['name'],
+                              'param': {
+                                  'progenitor_mass': model['progenitor_mass'] * u.Msun,
+                                  'revival_time': model['revival_time'] * u.ms,
+                                  'metallicity': model['metallicity'],
+                                  'eos': model['eos']}
+                              }
+                self.distance = default['distance'] * u.kpc
+                self.energy = E
+                self.time = t
+                if default['flavors'] is None:
+                    self.flavors = Flavor
+                else:
+                    self.flavors = default['flavors']
+                self.hierarch = default['hierarchy']
+                self.mixing_scheme = mixing['scheme']
+                self.mixing_angle = float(mixing['angle'])
+                self.interactions = default['interactions']
+
+                self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
+                
+                self.__init__(**self.param)
+            
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')
 
