@@ -151,6 +151,20 @@ class Simulation:
                 self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
                 self.__init__(**self.param)
+                
+                if not geomfile:
+                    self._geomfile = os.path.join(os.environ['ASTERIA'],
+                                                  'data/detector/Icecube_geometry.20110102.complete.txt')
+                else:
+                    self._geomfile = geomfile
+
+                if not effvolfile:
+                    self._effvolfile = os.path.join(os.environ['ASTERIA'],
+                                                    'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+                else:
+                    self._effvolfile = effvolfile
+
+                self.detector = Detector(self._geomfile, self._effvolfile)
 
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')
