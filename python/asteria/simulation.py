@@ -56,7 +56,7 @@ class Simulation:
                 t = np.arange(-1, 1, 0.001) * u.s
                 _dt = 1 * u.ms
 
-            self.source = Source(model['name'], **model['param'])
+            self.source = Source(model['name'], model['param'])
             self.distance = distance
             self.energy = E
             self.time = t
