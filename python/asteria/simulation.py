@@ -38,7 +38,7 @@ class Simulation:
                 _Emax = Emax.to(u.MeV).value
                 _dE = dE.to(u.MeV).value
                 E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
-            else:
+            elif not E:
                 E = np.arange(0, 100, 1) * u.MeV
 
             if not t and None in (tmin, tmax, dt):
@@ -50,11 +50,13 @@ class Simulation:
                 _dt = dt.to(u.ms)
                 t = np.arange(_tmin, _tmax + _dt.value, _dt.value) * u.ms
                 t = t.to(u.s)
+            elif t:
+                _dt = np.ediff1d(t)[0]
             else:
                 t = np.arange(-1, 1, 0.001) * u.s
                 _dt = 1 * u.ms
 
-            self.source = Source(model['name'], **model['param'])
+            self.source = Source(model['name'], model['param'])
             self.distance = distance
             self.energy = E
             self.time = t
@@ -64,11 +66,10 @@ class Simulation:
             else:
                 self.flavors = flavors
 
-            self.hierarchy = hierarchy
-            if self.hierarchy:
-                self.hierarchy = getattr(MassHierarchy, hierarchy.upper())
-            else:
+            if not hierarchy or hierarchy.upper() == 'DEFAULT':
                 self.hierarchy = MassHierarchy.NORMAL
+            else:
+                self.hierarchy = getattr(MassHierarchy, hierarchy.upper())
 
             self.mixing_scheme = mixing_scheme
             self.mixing_angle = mixing_angle
@@ -76,6 +77,7 @@ class Simulation:
                 if mixing_scheme == 'NoTransformation':
                     self._mixing = getattr(ft, mixing_scheme)()
                 else:
+                    # TODO: Improve mixing name checking, this argument is case sensitive
                     self._mixing = getattr(ft, mixing_scheme)(mh=self.hierarchy)
             else:
                 self._mixing = ft.NoTransformation()
@@ -104,7 +106,7 @@ class Simulation:
             with open(config) as f:
                 configuration = configparser.ConfigParser()
                 configuration.read_file(f)
-                default = configuration['DEFAULT']
+                basic = configuration['BASIC']
                 model = configuration['MODEL']
                 mixing = configuration['MIXING']
                 energy = configuration['ENERGY']
@@ -114,43 +116,66 @@ class Simulation:
                     _Emin = float(energy['min'])
                     _Emax = float(energy['max'])
                     _dE = float(energy['step'])
-                    E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
+                    energy = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
                 else:
-                    E = np.arange(0, 100, 1) * u.MeV
+                    energy = np.arange(0, 100, 1) * u.MeV
 
                 if 'min' and 'max' and 'step' in configuration['TIME'].keys():
                     _tmin = float(time['min'])
                     _tmax = float(time['max'])
                     _dt = float(time['step'])
                     f = u.s.to(u.ms)
-                    t = np.arange(f * _tmin, f * _tmax + _dt, _dt) * u.ms
+                    time = np.arange(f * _tmin, f * _tmax + _dt, _dt) * u.ms
                 else:
-                    t = np.arange(-1000, 1000, 1) * u.ms
-                    
+                    time = np.arange(-1000, 1000, 1) * u.ms
+                time = time.to(u.s)
 #                 self.source = Source(model[default['model']], **model['param'])
-                self.model = {'name': model['name'],
-                              'param': {
-                                  'progenitor_mass': model['progenitor_mass'] * u.Msun,
-                                  'revival_time': model['revival_time'] * u.ms,
-                                  'metallicity': model['metallicity'],
-                                  'eos': model['eos']}
-                              }
+                model_dict = {'name': model['name'],
+                              'param': {}}
+                for key, param in model.items():
+                    if key != 'name':
+                        _param = param.split()
+                        if len(_param) > 1:
+                            value = _param[0]
+                            unit = u.Unit(_param[1])
+                        else:
+                            value = _param[0]
+                            unit = None
+                        if value.replace('.', '', 1).isnumeric():  # Replace allws detection of floats like '0.004'
+                            value = float(value) if not float(value).is_integer() else int(value)
+                            value *= unit if unit is not None else 1
+                        model_dict['param'].update({key: value})
+
 #                 self.source = Source(model['name'], **model['param'])
-                self.distance = default['distance'] * u.kpc
-                self.energy = E
-                self.time = t
-                if default['flavors'] is None:
-                    self.flavors = Flavor
+                dist = float(basic['distance']) * u.kpc
+
+                if basic['flavors'] and basic['flavors'].upper() not in ('DEFAULT', 'ALL'):
+                    flavors = basic['flavors']  # TODO Add str-to-flavor parser
                 else:
-                    self.flavors = default['flavors']
-                self.hierarch = default['hierarchy']
-                self.mixing_scheme = mixing['scheme']
-                self.mixing_angle = float(mixing['angle'])
-                self.interactions = default['interactions']
+                    flavors = Flavor
 
-                self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
+                if basic['interactions'] and basic['interactions'].upper() not in ('DEFAULT', 'ALL'):
+                    interactions = basic['interactions']  # TODO Add str-to-interactions parser
+                else:
+                    interactions = Interactions
 
+                self._create_paramdict(model_dict, dist, flavors, basic['hierarchy'], interactions, mixing['scheme'],
+                                       float(mixing['angle']), energy, time)
                 self.__init__(**self.param)
+                
+                if not geomfile:
+                    self._geomfile = os.path.join(os.environ['ASTERIA'],
+                                                  'data/detector/Icecube_geometry.20110102.complete.txt')
+                else:
+                    self._geomfile = geomfile
+
+                if not effvolfile:
+                    self._effvolfile = os.path.join(os.environ['ASTERIA'],
+                                                    'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+                else:
+                    self._effvolfile = effvolfile
+
+                self.detector = Detector(self._geomfile, self._effvolfile)
 
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')
@@ -160,8 +185,8 @@ class Simulation:
         self.param.update({
             'model': model,
             'distance': distance,
-            'energy': E,
-            'time': t,
+            'E': E,
+            't': t,
             'flavors': flavors,
             'hierarchy': hierarchy,
             'mixing_scheme': mixing_scheme,
