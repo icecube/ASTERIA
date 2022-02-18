@@ -8,15 +8,19 @@ See either of these two resources:
 - https://github.com/SNEWS2/snewpy
 """
 
-from snewpy.models.registry import init_model as init_snewpy_model
+from snewpy.models.registry import init_model as init_snewpy_model_from_param
 from snewpy.neutrino import Flavor
+from snewpy import model_path
 from scipy.interpolate import PchipInterpolator
 from numbers import Number
 from scipy.special import loggamma, gdtr
+import os
 
 import astropy.units as u
 import numpy as np
+import snewpy.models as snewpy_models
 
+from .util import lookup_dict as _fname_lookup_dict
 #
 # def _get_modelpath(modelname, modelfile):
 #     """Utility function to get the path to the model flux file.
@@ -74,10 +78,28 @@ import numpy as np
 #     return getattr(sys.modules[__name__], modelname)(modfile)
 
 
+def init_snewpy_model(model, model_params):
+    try:
+        fname = _fname_lookup_dict[model](**model_params)
+    except KeyError:
+        raise NotImplementedError(f'Unknown Model Requested, Allowed models are {tuple(_fname_lookup_dict.keys())}')
+    # This is necessary to enable ASTERIA to use other SNEWPY models using the source_dec21
+    if model == 'OConnor_2013':
+        mass, EOS = fname  # In this instance fname is actually a tuple of params. Yes, this is problematic.
+        return init_snewpy_model_from_param(model_name=model, base=os.path.join(model_path, f'{model}/'),
+                                            mass=mass, eos=EOS)
+    return init_snewpy_model_from_param(model_name=model, filename=os.path.join(model_path, model, fname))
+
+
 class Source:
 
-    def __init__(self, model, **model_params):
-        self.model = init_snewpy_model(model, **model_params)
+    def __init__(self, model, model_params=None):
+        if model_params is None:
+            model_params = {}
+        if model == 'Nakazato_2013':
+            self.model = init_snewpy_model_from_param(model, **model_params)
+        else:
+            self.model = init_snewpy_model(model, model_params)
         self._interp_lum = {}
         self._interp_meanE = {}
         self._interp_pinch = {}
@@ -195,7 +217,7 @@ class Source:
             _a = self.alpha(t, flavor)
             _Ea = self.meanE(t, flavor).to(u.MeV).value
 
-            _a[_a<0] = 0
+            _a[_a < 0] = 0
             # Vectorized function can lead to unregulated memory usage, better to define it only when needed
             _vec_energy_pdf = np.vectorize(self._energy_pdf, excluded=['E'], signature='(1,n),(1,n)->(m,n)')
             return _vec_energy_pdf(a=_a.reshape(1, -1), Ea=_Ea.reshape(1, -1), E=_E.reshape(-1, 1)).T
@@ -205,7 +227,6 @@ class Source:
             return self._energy_pdf(_a, _Ea, E)
         else:
             raise ValueError(f'Invalid argument types, argument `t` must be numbers or np.ndarray, Given ({type(t)})')
-
 
 # class Source:
 #
