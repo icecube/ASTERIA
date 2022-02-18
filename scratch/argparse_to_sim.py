@@ -21,8 +21,6 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--config_file', dest='config_file', type=str,
                         help='Provide config file name')
     parser.add_argument('-m', '--model', dest='model', type=dict, 
-#                         default={'name': 'Nakazato_2013', 'progenitor_mass': 13, 
-#                                  'revival_time': 300, 'metallicity': 0.004, 'eos': 'shen'}, 
                         help='Dict of model parameters: {\'name\': , \'progenitor_mass\': , \'revival_time\': , \'metallicity\': , \'eos\': }')
     parser.add_argument('-s', '--scheme', dest='scheme', type=str, default='adiabatic-msw',
                         choices=['all', 'adiabatic-msw'],
