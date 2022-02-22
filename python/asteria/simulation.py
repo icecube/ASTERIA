@@ -340,19 +340,25 @@ class Simulation:
                                                                                   part_size=rebinfactor)])
         deadtime = self.detector.deadtime
 
-        i3_effvol = self.detector.i3_effvol if subdetector != 'dc' else 0
-        dc_effvol = self.detector.dc_effvol if subdetector != 'i3' else 0
+        i3_dom_effvol = self.detector.i3_dom_effvol if subdetector != 'dc' else 0
+        dc_dom_effvol = self.detector.dc_dom_effvol if subdetector != 'i3' else 0
 
-        dc_rel_eff = self.detector.dc_rel_eff
-        eps_i3 = 0.87 / (1 + deadtime * total_E_per_V_binned / _dt)
-        eps_dc = 0.87 / (1 + deadtime * total_E_per_V_binned * dc_rel_eff / _dt)
+        i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
+        dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
+
+        i3_dom_signal = i3_dom_effvol * total_E_per_V_binned
+        dc_dom_signal = dc_dom_effvol * total_E_per_V_binned
+
+        eps_i3 = 0.87 / (1 + deadtime * i3_dom_signal)
+        eps_dc = 0.87 / (1 + deadtime * dc_dom_signal)  # dc effective vol already includes relative efficiency
+
         time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)])
-        if flavor:
+        if flavor is not None:
             E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
                                                                                 part_size=rebinfactor)])
-            return time_binned * u.s, E_per_V_binned * (i3_effvol * eps_i3 + dc_effvol * eps_dc)
+            return time_binned * u.s, E_per_V_binned * (i3_total_effvol * eps_i3 + dc_total_effvol * eps_dc)
         else:
-            return time_binned * u.s, total_E_per_V_binned * (i3_effvol * eps_i3 + dc_effvol * eps_dc)
+            return time_binned * u.s, total_E_per_V_binned * (i3_total_effvol * eps_i3 + dc_total_effvol * eps_dc)
 
     def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None,):
         """ Compute hit rates observed by detector
@@ -408,8 +414,6 @@ class Simulation:
             sample = np.array([self.trigger_significance(dt, by_subdetector=by_subdetector)
                                for _ in range(sample_size)])
         return sample
-
-
 
 
 def _get_partitions(*args, part_size=1000):

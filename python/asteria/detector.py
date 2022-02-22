@@ -43,7 +43,7 @@ class Detector:
         self.n_i3_doms = np.sum(self._doms_table['type'] == 'i3')
         self.n_dc_doms = np.sum(self._doms_table['type'] == 'dc')
 
-        # Total effective volumne:
+        # Total effective volume:
         self._i3_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'i3'])
         self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'dc'])
 
@@ -61,12 +61,20 @@ class Detector:
         self.dc_dom_bg_sig = 36.0
 
     @property
-    def i3_effvol(self):
+    def i3_total_effvol(self):
         return self._i3_effvol
 
     @property
-    def dc_effvol(self):
+    def dc_total_effvol(self):
         return self._dc_effvol
+
+    @property
+    def i3_dom_effvol(self):
+        return self.i3_total_effvol / self.n_i3_doms
+
+    @property
+    def dc_dom_effvol(self):
+        return self.dc_total_effvol / self.n_dc_doms
 
     def effvol(self, depth):
         """ Interpolate table to to get effective volumne
