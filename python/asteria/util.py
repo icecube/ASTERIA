@@ -8,7 +8,7 @@ def get_sukhbold_2015_fname(eos, progenitor_mass, **kwargs):
 
     if progenitor_mass.value == 9.6:
         fname = f'sukhbold-{eos}-z{progenitor_mass.value:3.1f}.fits'
-    elif progenitor_mass == 27.0:
+    elif progenitor_mass.value == 27.0:
         fname = f'sukhbold-{eos}-s{progenitor_mass.value:3.1f}.fits'
     else:
         raise ValueError('Invalid value for model argument `progenitor_mass`, expected (9.6, 27.0) Msun, '
@@ -81,7 +81,7 @@ def get_warren_2020_fname(progenitor_mass, turb_mixing, **kwargs):
     if progenitor_mass.value in np.arange(9.25, 13., 0.25) or progenitor_mass.value in np.arange(13., 30.1, 0.1) or \
             progenitor_mass.value == 90.:
         fname = f'stir_a{turb_mixing:3.2f}/stir_multimessenger_a{turb_mixing:3.2f}_m{progenitor_mass.value:.2f}.h5'
-    elif progenitor_mass in (31, 32, 33, 34, 35, 40, 45, 50, 55, 60, 70, 80, 100, 120):
+    elif progenitor_mass.value in (31, 32, 33, 34, 35, 40, 45, 50, 55, 60, 70, 80, 100, 120):
         fname = f'stir_a{turb_mixing:3.2f}/stir_multimessenger_a{turb_mixing:3.2f}_m{progenitor_mass.value:d}.h5'
     else:
 
@@ -90,7 +90,7 @@ def get_warren_2020_fname(progenitor_mass, turb_mixing, **kwargs):
     return fname
 
 
-def get_kuroda_2020_fname(rot_vel=0 * (u.rad / u.s), mag_field_exponent=0, **kwargs):
+def get_kuroda_2020_fname(rot_vel, mag_field_exponent, **kwargs):
     if rot_vel.value not in (0, 1):
         raise ValueError(f'Invalid value for model argument `rot_vel`, expected (0, 1) rad / s, given {rot_vel}')
     if mag_field_exponent not in (0, 12, 13):
