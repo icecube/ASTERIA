@@ -3,8 +3,6 @@
 
 from __future__ import print_function, division
 
-from .config import parse_quantity
-
 from astropy import units as u
 from astropy.table import Table
 
@@ -52,7 +50,7 @@ class Detector:
         # Relative efficiency of dc DOMs compared to i3 DOMs
         self.dc_rel_eff = 1.35
 
-        # Background rate and sigma for i3 DOMs
+        # Background rate and sigma for i3 DOMs (hits / s)
         self.i3_dom_bg_mu = 284.9
         self.i3_dom_bg_sig = 26.2
 
@@ -60,6 +58,15 @@ class Detector:
         self.dc_dom_bg_mu = 358.9
         self.dc_dom_bg_sig = 36.0
 
+    def i3_bg(self, dt=0.5*u.ms, size=1):
+        return np.sum(np.random.normal(loc=self.i3_dom_bg_mu * dt.to(u.s).value,
+                                       scale=np.sqrt(self.i3_dom_bg_sig**2 * dt.to(u.s).value),
+                                       size=(size, self.n_i3_doms)), axis=1)
+
+    def dc_bg(self, dt=0.5*u.ms, size=1):
+        return np.sum(np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value,
+                                       scale=np.sqrt(self.dc_dom_bg_sig ** 2 * dt.to(u.s).value),
+                                       size=(size, self.n_dc_doms)), axis=1)
     @property
     def i3_total_effvol(self):
         return self._i3_effvol
@@ -90,20 +97,22 @@ class Detector:
         # Avoid 0-dimensional array
         return float(vol)
 
+    @property
     def effvol_table(self):
-        """ Return a copy of the effective volumne table """
+        """ Return a copy of the effective volume table """
         return self._effvol_table
 
-    def doms_table(self, d_type=None):
+    @property
+    def doms_table(self, dom_type=None):
         """ Return a copy of the doms table given type
         Inputs:
         + type: str (default=None)
             If None, return full table. Else return the doms with the input type.
             Type must be "dc" or "i3". """
-        if d_type is None:
+        if dom_type is None:
             return self._doms_table
-        elif d_type == 'dc' or d_type == 'i3':
-            return self._doms_table[self._doms_table['type'] == d_type]
+        elif dom_type == 'dc' or dom_type == 'i3':
+            return self._doms_table[self._doms_table['type'] == dom_type]
         else:
             raise ValueError('Type must be either "dc" or "i3".')
 
