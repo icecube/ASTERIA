@@ -61,6 +61,7 @@ class Simulation:
             self.energy = E
             self.time = t
             self._sim_dt = _dt
+            self._res_dt = 2 * u.ms  # TODO: Add config/arg option for this
             if flavors is None:
                 self.flavors = Flavor
             else:
@@ -101,6 +102,12 @@ class Simulation:
                 self._effvolfile = effvolfile
 
             self.detector = Detector(self._geomfile, self._effvolfile)
+            self._eps_i3 = None
+            self._eps_dc = None
+            self._time_binned = None
+            self._E_per_V_binned = None
+            self._total_E_per_V_binned = None
+            self._result_ready = False
 
         elif config is not None:
             with open(config) as f:
@@ -129,7 +136,7 @@ class Simulation:
                 else:
                     time = np.arange(-1000, 1000, 1) * u.ms
                 time = time.to(u.s)
-#                 self.source = Source(model[default['model']], **model['param'])
+                # self.source = Source(model[default['model']], **model['param'])
                 model_dict = {'name': model['name'],
                               'param': {}}
                 for key, param in model.items():
@@ -146,7 +153,7 @@ class Simulation:
                             value *= unit if unit is not None else 1
                         model_dict['param'].update({key: value})
 
-#                 self.source = Source(model['name'], **model['param'])
+                #                 self.source = Source(model['name'], **model['param'])
                 dist = float(basic['distance']) * u.kpc
 
                 if basic['flavors'] and basic['flavors'].upper() not in ('DEFAULT', 'ALL'):
@@ -162,7 +169,7 @@ class Simulation:
                 self._create_paramdict(model_dict, dist, flavors, basic['hierarchy'], interactions, mixing['scheme'],
                                        float(mixing['angle']), energy, time)
                 self.__init__(**self.param)
-                
+
                 if not geomfile:
                     self._geomfile = os.path.join(os.environ['ASTERIA'],
                                                   'data/detector/Icecube_geometry.20110102.complete.txt')
@@ -288,6 +295,7 @@ class Simulation:
             print(f'Starting {flavor.name} simulation... {" " * (10 - len(flavor.name))}', end='')
 
             # Perform core calculation on partitions in E to regulate memory usage in vectorized function
+            # Maximum usage is expected to be ~8MB
             result = np.zeros(self.time.size)
             idx = 0
             if part_size < self.time.size:
@@ -299,8 +307,8 @@ class Simulation:
             spectrum = self.get_combined_spectrum(self.time[idx:], self.energy, flavor, self._mixing)
             result[idx:] = np.trapz(spectrum, self.energy.value, axis=1)
             # Add distance, density and time-binning scaling factors
-            result *= H2O_in_ice / (4 * np.pi * dist ** 2) * np.ediff1d(self.time,
-                                                                        to_end=(self.time[-1] - self.time[-2])).value
+            result *= H2O_in_ice / (4 * np.pi * dist**2) * np.ediff1d(self.time,
+                                                                      to_end=(self.time[-1] - self.time[-2])).value
             if not flavor.is_electron:
                 result *= 2
             self._E_per_V.update({flavor: result * (u.MeV / u.m / u.m / u.m)})
