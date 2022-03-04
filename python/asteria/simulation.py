@@ -419,35 +419,15 @@ class Simulation:
         -----
         "Signal" is defined to be the expected average hit rate in a bin
         """
-
-        _dt = dt.to(u.s).value
-        _t = self.time.to(u.s).value
-        rebinfactor = int(_dt / self._sim_dt.to(u.s).value)
-        total_E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._total_E_per_V.value,
-                                                                                  part_size=rebinfactor)])
-        deadtime = self.detector.deadtime
-
-        i3_dom_effvol = self.detector.i3_dom_effvol if subdetector != 'dc' else 0
-        dc_dom_effvol = self.detector.dc_dom_effvol if subdetector != 'i3' else 0
+        self.rebin_result(dt)
 
         i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
         dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
+        E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
-        i3_dom_signal = i3_dom_effvol * total_E_per_V_binned
-        dc_dom_signal = dc_dom_effvol * total_E_per_V_binned
+        return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
-        eps_i3 = 0.87 / (1 + deadtime * i3_dom_signal)
-        eps_dc = 0.87 / (1 + deadtime * dc_dom_signal)  # dc effective vol already includes relative efficiency
-
-        time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)])
-        if flavor is not None:
-            E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
-                                                                                part_size=rebinfactor)])
-            return time_binned * u.s, E_per_V_binned * (i3_total_effvol * eps_i3 + dc_total_effvol * eps_dc)
-        else:
-            return time_binned * u.s, total_E_per_V_binned * (i3_total_effvol * eps_i3 + dc_total_effvol * eps_dc)
-
-    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None,):
+    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None):
         """ Compute hit rates observed by detector
         Parameters
         ----------
@@ -459,48 +439,84 @@ class Simulation:
             IceCube subdetector, must be None (Full Detector), 'i3' (IC80) or 'dc' (DeepCore)
         """
         time_binned, signal = self.detector_signal(dt, flavor, subdetector)
-        # Possion-fluctuated
         return time_binned, np.random.poisson(signal)
 
-    def detector_significance(self, dt=0.5 * u.s, *, by_subdetector=False):
-        i3_dom_bg_var = self.detector.i3_dom_bg_sig ** 2 * dt.to(u.s).value
-        dc_dom_bg_var = self.detector.dc_dom_bg_sig ** 2 * dt.to(u.s).value
+    def detector_significance(self, dt=0.5*u.s, *, method=None):
+        self.rebin_result(dt)
 
-        if by_subdetector:  # Use definition of delta_mu(_var) from SNDAQ
-            time_binned, i3_hits_binned = self.detector_hits(dt, subdetector='i3')
-            _, dc_hits_binned = self.detector_hits(dt, subdetector='dc')
-
-            var_dmu = 1 / (self.detector.n_i3_doms / i3_dom_bg_var + self.detector.n_dc_doms / dc_dom_bg_var)
-            dmu = var_dmu * (i3_hits_binned/i3_dom_bg_var + dc_hits_binned/dc_dom_bg_var)
-
-            signi_binned = dmu/np.sqrt(var_dmu)
-            return time_binned, signi_binned
+        if method == 'subdetector':  # Use definition of delta_mu(_var) from SNDAQ
+            return self._subdetector_significance(dt)
+        elif method == 'dom':  # Scale response based on EffVol of each DOM
+            return self._domwise_significance(dt)
         else:  # Use simple calculation from USSR
-            detector_bg_var = (self.detector.n_i3_doms*i3_dom_bg_var + self.detector.n_dc_doms*dc_dom_bg_var)
+            return self._simple_significance(dt)
 
-            time_binned, hits_binned = self.detector_hits(dt)
-            signi_binned = hits_binned/np.sqrt(detector_bg_var)
-        return time_binned, signi_binned
+    def _simple_significance(self, dt=0.5*u.ms):
+        _dt = dt.to(u.s).value
+        i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
+        dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
 
-    def trigger_significance(self, dt=0.5 * u.s, *, by_subdetector=False):
-        return self.detector_significance(dt=dt, by_subdetector=by_subdetector)[1].max()
+        detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_var + self.detector.n_dc_doms * dc_dom_bg_var)
+        time, hits = self.detector_hits(dt)
+        signi = hits / np.sqrt(detector_bg_var)
+        return time, signi
 
-    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, by_subdetector=False):
-        # TODO: This is a bit awkward, by adding distance scaling elsewhere, the conditional scaling here may be removed
-        current_dist = self.distance.to(u.kpc).value
+    def _domwise_significance(self, dt=0.5*u.ms):
+        _dt = dt.to(u.s).value
+        signi = np.zeros(self._time_binned.size)
 
-        if current_dist != distance.to(u.kpc).value:
-            total_E_per_V = self._total_E_per_V
-            self._total_E_per_V = self._total_E_per_V.value * (current_dist/distance.to(u.kpc).value)**2 * \
-                                  (u.MeV / u.m / u.m / u.m)
+        effvol = self.detector.doms_table['effvol']
+        mask_dc = self.detector.doms_table['type'] == 'dc'
 
-            sample = np.array([self.trigger_significance(dt, by_subdetector=by_subdetector)
-                               for _ in range(sample_size)])
-            self._total_E_per_V = total_E_per_V
-        else:
-            sample = np.array([self.trigger_significance(dt, by_subdetector=by_subdetector)
-                               for _ in range(sample_size)])
-        return sample
+        rel_eff = np.where(mask_dc, self.detector.dc_rel_eff, 1.)
+        bg_mu = np.where(mask_dc, self.detector.dc_dom_bg_mu, self.detector.i3_dom_bg_mu) * _dt
+        bg_sig = np.where(mask_dc, self.detector.dc_dom_bg_sig, self.detector.i3_dom_bg_sig) * np.sqrt(_dt)
+
+        # Restrict memory usage here, maximum usage is expected to be ~10MB
+        # TODO: Figure out runtime benchmark and increase part_size if necessary
+        idc = np.arange(self.total_E_per_V_binned.size)
+        eps = self._compute_deadtime_efficiency(dom_effvol=effvol)  # (m,n)
+
+        for E_per_V_part, idc_part in _get_partitions(self.total_E_per_V_binned, idc, part_size=250):
+            # Notes for numpy broadcasting, dim(E_per_V_part) = m, dim(effvol) = n. Aligned dims must match
+            signal = E_per_V_part.value.reshape(-1, 1) * eps * effvol.reshape(1, -1)  # (m,n)=(m,1)*(m,n)*(1,n)
+            hits = np.random.poisson(signal, size=signal.shape)  # (m,n)
+            bg = np.random.normal(loc=bg_mu, scale=bg_sig, size=signal.shape)  # (m,n)
+            rate = hits + bg  # (m,n)=(m,n)+(m,n)
+
+            var_dmu = 1/np.sum((rel_eff**2 / bg_sig**2))  # float = sum((n,)/(n,))
+            # (m,) = float*sum( ((m,n)-(m,n)) / (1,n), axis=1 )
+            dmu = var_dmu * np.sum((rate - bg_mu) / bg_sig.reshape(1, - 1)**2, axis=1)
+            signi[idc_part] = dmu / np.sqrt(var_dmu)
+        return self._time_binned, signi
+
+    def _subdetector_significance(self, dt=0.5*u.ms):
+        _dt = dt.to(u.s).value
+        i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
+        dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
+
+        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3')
+        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc')
+
+        i3_bg = self.detector.i3_bg(dt=dt, size=i3_hits.size)
+        dc_bg = self.detector.dc_bg(dt=dt, size=dc_hits.size)
+        i3_rate = i3_hits + i3_bg
+        dc_rate = dc_hits + dc_bg
+
+        # TODO: Decide whether if the background lightcurve should be saved to a data member as part of this or any
+        #  similar operation
+        var_dmu = 1 / ((self.detector.n_i3_doms / i3_dom_bg_var) +
+                       (self.detector.n_dc_doms * self.detector.dc_rel_eff**2 / dc_dom_bg_var))
+        dmu = var_dmu * ((i3_rate - i3_bg.mean()) / i3_dom_bg_var + (dc_rate - dc_bg.mean()) / dc_dom_bg_var)
+        signi = dmu / np.sqrt(var_dmu)
+        return time, signi
+
+    def trigger_significance(self, dt=0.5*u.s, *, method=None):
+        return self.detector_significance(dt=dt, method=method)[1].max()
+
+    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, method=None):
+        self.scale_result(distance)
+        return np.array([self.trigger_significance(dt, method=method) for _ in range(sample_size)])
 
 
 def _get_partitions(*args, part_size=1000):
