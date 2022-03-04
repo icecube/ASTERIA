@@ -315,6 +315,7 @@ class Simulation:
             self._total_E_per_V += result
             print('DONE')
         self._total_E_per_V *= (u.MeV / u.m / u.m / u.m)
+        self.rebin_result(dt=self._res_dt, force_rebin=True)
 
     @property
     def E_per_V(self):
@@ -328,7 +329,85 @@ class Simulation:
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
         return effvol * self._E_per_V[flavor]
 
-    def detector_signal(self, dt=2 * u.ms, flavor=None, subdetector=None):
+    def rebin_result(self, dt, *, force_rebin=False):
+        if self._E_per_V is None or self._total_E_per_V is None:
+            raise RuntimeError("Simulation has not been executed yet, please use Simulation.run()")
+
+        _dt = dt.to(u.s).value
+        if _dt != self._res_dt.to(u.s).value or force_rebin:
+            _t = self.time.to(u.s).value
+            rebinfactor = int(_dt / self._sim_dt.to(u.s).value)  # TODO: Check behavior for case _res_dt % _sim_dt != 0
+
+            self._time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)]) * u.s
+
+            self._E_per_V_binned = {}
+            self._total_E_per_V_binned = np.zeros_like(self._time_binned.value)
+
+            for flavor in self.flavors:
+                E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
+                                                                                    part_size=rebinfactor)])
+                self._E_per_V_binned[flavor] = E_per_V_binned * (u.MeV / u.m / u.m / u.m)
+                self._total_E_per_V_binned += E_per_V_binned
+            self._total_E_per_V_binned *= (u.MeV / u.m / u.m / u.m)
+            self._res_dt = _dt * u.s
+            self._eps_i3 = self._compute_deadtime_efficiency(domtype='i3')
+            self._eps_dc = self._compute_deadtime_efficiency(domtype='dc')
+
+    def scale_result(self, distance, force_rescale=False):
+        if self._E_per_V is None or self._total_E_per_V is None:
+            raise RuntimeError("Simulation has not been executed yet, please use Simulation.run()")
+
+        new_dist = distance.to(u.kpc).value
+        current_dist = self.distance.to(u.kpc).value
+
+        if new_dist != current_dist or force_rescale:
+            scaling_factor = (current_dist / new_dist) ** 2
+            for flavor in self.flavors:
+                self._E_per_V[flavor] *= scaling_factor
+                self._E_per_V_binned[flavor] *= scaling_factor
+            self._total_E_per_V *= scaling_factor
+            self._total_E_per_V_binned *= scaling_factor
+            self.rebin_result(dt=self._res_dt, force_rebin=True)
+            self.distance = new_dist * u.kpc
+
+    def _compute_deadtime_efficiency(self, domtype='i3', *, dom_effvol=None):
+        if dom_effvol is None:  # If dom_effvol is provided, domtype argument is unused
+            if domtype == 'i3':
+                dom_effvol = self.detector.i3_dom_effvol
+            elif domtype == 'dc':
+                dom_effvol = self.detector.dc_dom_effvol  # dc effective vol already includes relative efficiency
+            else:
+                raise ValueError(f"Unknown domtype: {domtype}, expected ('i3', 'dc')")
+
+        if isinstance(dom_effvol, np.ndarray):
+            # Ensures proper np broadcasting
+            dom_signal = self.total_E_per_V_binned.value.reshape(-1, 1) * dom_effvol.reshape(1, -1)
+        else:
+            dom_signal = dom_effvol * self.total_E_per_V_binned.value
+        scaling_factor = 1/self._res_dt.to(u.s).value
+        return 0.87 / (1 + self.detector.deadtime * dom_signal * scaling_factor)
+
+    @property
+    def eps_i3(self):
+        return self._eps_i3
+
+    @property
+    def eps_dc(self):
+        return self._eps_dc
+
+    @property
+    def total_E_per_V_binned(self):
+        return self._total_E_per_V_binned
+
+    @property
+    def E_per_V_binned(self):
+        return self._E_per_V_binned
+
+    @property
+    def time_binned(self):
+        return self._time_binned
+
+    def detector_signal(self, dt=None, flavor=None, subdetector=None):
         """ Compute signal rates observed by detector
         Parameters
         ----------
