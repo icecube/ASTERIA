@@ -12,8 +12,12 @@ try:
 except ModuleNotFoundError:
     from .util import init_model as init_snewpy_model_from_param
 
+try:
+    from snewpy import model_path
+except ImportError:
+    from .util import model_path
+
 from snewpy.neutrino import Flavor
-from snewpy import model_path
 from scipy.interpolate import PchipInterpolator
 from numbers import Number
 from scipy.special import loggamma, gdtr

@@ -4,7 +4,15 @@ import astropy.units as u
 
 from astropy.units.quantity import Quantity
 from astropy.units import UnitTypeError, get_physical_type
-from snewpy import model_path, get_models
+from astropy.config.paths import get_cache_dir
+from snewpy import get_models
+import os
+
+try:
+    from snewpy import model_path
+except ImportError:
+    model_path = os.path.join(get_cache_dir(), 'snewpy/models')
+
 import logging
 from snewpy.models import ccsn, presn
 
