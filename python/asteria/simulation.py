@@ -23,7 +23,8 @@ from .detector import Detector
 
 
 class Simulation:
-
+    """ Top-level class for performing ASTERIA's core simulation routine, and handler for the resulting outputs
+    """
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
                  dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, effvolfile=None):
@@ -234,6 +235,24 @@ class Simulation:
             self._photon_spectra.update({flavor: result * (u.m * u.m)})
 
     def get_combined_spectrum(self, t, E, flavor, mixing):
+        """Returns mixed neutrino spectrum as a function of time and energy arising from flavor oscillations
+
+        Parameters
+        ----------
+        t : astropy.quantity.Quantity
+            Array of times used to perform calculation
+        E : astropy.quantity.Quantity
+            Array of energies used to perform calculation
+        flavor : snewpy.neutrino.Flavor
+            Neutrino flavor used to perform calcuation, informs selection of oscillation probability
+        mixing : snewpy.flavor_transformation.FlavorTransformation
+            Mixing scheme used to perform calcuation
+
+        Returns
+        -------
+        spectrum : np.ndarray
+            Mixed neutrino spectrum as a 2D array with dim (time, energy)
+        """
         # TODO: Check that this function still works when p_surv and pc_osc are arrays
         # TODO: Simplify after adding neutrino oscillates_to property to SNEWPY
         # The cflavor "complementary flavor" is the flavor that the provided argument `flavor` oscillates to/from
@@ -319,10 +338,26 @@ class Simulation:
 
     @property
     def E_per_V(self):
+        """Returns dictionary of flavor-wise photonic energy per volume if simulation has been run.
+        If simulation has not been run, then this property returns None.
+
+        Returns
+        -------
+        E_per_V : dict or None
+            Dictionary of flavor-wise photonic energy deposition as a function of time
+        """
         return self._E_per_V if self._E_per_V else None
 
     @property
     def total_E_per_V(self):
+        """Returns all-flavor photonic energy per volume if simulation has been run.
+        If simulation has not been run, then this property returns None.
+
+        Returns
+        -------
+        total_E_per_V : astropy.quantity.Quantity or None
+            All-flavor photonic energy deposition as a function of time
+        """
         return self._total_E_per_V if self._total_E_per_V else None
 
     def avg_dom_signal(self, flavor):
@@ -330,6 +365,20 @@ class Simulation:
         return effvol * self._E_per_V[flavor]
 
     def rebin_result(self, dt, *, force_rebin=False):
+        """Rebins the simulation results to a new time binning.
+
+        Parameters
+        ----------
+        dt : astropy.quantity.Quantity
+            New time binning, must be a multiple of the base binning used for the simulation.
+        force_rebin : bool
+            If True, perform the rebin operation, regardless of other circumstances.
+            If False, only perform rebin if argument `dt` differs with current binning stored in `self._res_dt`
+
+        Returns
+        -------
+        None
+        """
         if self._E_per_V is None or self._total_E_per_V is None:
             raise RuntimeError("Simulation has not been executed yet, please use Simulation.run()")
 
@@ -354,6 +403,20 @@ class Simulation:
             self._eps_dc = self._compute_deadtime_efficiency(domtype='dc')
 
     def scale_result(self, distance, force_rescale=False):
+        """Rescales the simulation results to a progenitor distance.
+
+        Parameters
+        ----------
+        distance : astropy.quantity.Quantity
+            New progenitor, must be a multiple of the base binning used for the simulation.
+        force_rebin : bool
+            If True, perform the rebin operation, regardless of other circumstances.
+            If False, only perform rebin if argument `dt` differs with current binning stored in `self._res_dt`
+
+        Returns
+        -------
+        None
+        """
         if self._E_per_V is None or self._total_E_per_V is None:
             raise RuntimeError("Simulation has not been executed yet, please use Simulation.run()")
 
