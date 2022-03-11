@@ -360,9 +360,38 @@ class Simulation:
         """
         return self._total_E_per_V if self._total_E_per_V else None
 
-    def avg_dom_signal(self, flavor):
+    def avg_dom_signal(self, dt=None, flavor=None):
+        """Simple estimation of average signal observed by a single DOM as a function of time
+
+        Parameters
+        ----------
+        dt : astropy.quantity.Quantity or None
+            Time binning used to report signal (e.g. 2 ms).
+            If None is provided, this will return the avg signal in the binning used for the simulation
+        flavor : snewpy.neutrino.Flavor or None
+            Neutrino flavor for which signal is calculated.
+            If None is provided, this will return the avg signal from all flavors.
+
+        Returns
+        -------
+        signal : np.ndarray
+            Expected signal increase from a single DOM
+
+        """
+        if dt is not None:
+            self.rebin_result(dt)
+            if flavor is None:
+                E_per_V = self._total_E_per_V_binned
+            else:
+                E_per_V = self._E_per_V_binned
+        else:
+            if flavor is None:
+                E_per_V = self._total_E_per_V
+            else:
+                E_per_V = self._E_per_V
+
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
-        return effvol * self._E_per_V[flavor]
+        return effvol * E_per_V
 
     def rebin_result(self, dt, *, force_rebin=False):
         """Rebins the simulation results to a new time binning.
