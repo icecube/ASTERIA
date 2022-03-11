@@ -7,8 +7,11 @@ See either of these two resources:
 - snewpy.readthedocs.io
 - https://github.com/SNEWS2/snewpy
 """
+try:
+    from snewpy.models.registry import init_model as init_snewpy_model_from_param
+except ModuleNotFoundError:
+    from .util import init_model as init_snewpy_model_from_param
 
-from snewpy.models.registry import init_model as init_snewpy_model_from_param
 from snewpy.neutrino import Flavor
 from snewpy import model_path
 from scipy.interpolate import PchipInterpolator
