@@ -154,7 +154,7 @@ class Simulation:
                             value *= unit if unit is not None else 1
                         model_dict['param'].update({key: value})
 
-                #                 self.source = Source(model['name'], **model['param'])
+                # self.source = Source(model['name'], **model['param'])
                 dist = float(basic['distance']) * u.kpc
 
                 if basic['flavors'] and basic['flavors'].upper() not in ('DEFAULT', 'ALL'):
@@ -338,30 +338,21 @@ class Simulation:
 
     @property
     def E_per_V(self):
-        """Returns dictionary of flavor-wise photonic energy per volume if simulation has been run.
-        If simulation has not been run, then this property returns None.
-
-        Returns
-        -------
-        E_per_V : dict or None
-            Dictionary of flavor-wise photonic energy deposition as a function of time
+        """Returns dictionary of photonic energy deposition vs time for each neutrino flavor.
+        This property will return None if this Simulation instance has not yet been run.
         """
         return self._E_per_V if self._E_per_V else None
 
     @property
     def total_E_per_V(self):
-        """Returns all-flavor photonic energy per volume if simulation has been run.
-        If simulation has not been run, then this property returns None.
-
-        Returns
-        -------
-        total_E_per_V : astropy.quantity.Quantity or None
-            All-flavor photonic energy deposition as a function of time
+        """Returns all-flavor photonic energy deposition vs time for each neutrino flavor.
+        This property will return None if this Simulation instance has not yet been run.
         """
         return self._total_E_per_V if self._total_E_per_V else None
 
     def avg_dom_signal(self, dt=None, flavor=None):
-        """Simple estimation of average signal observed by a single DOM as a function of time
+        """Returns estimated signal in one DOM, computed using avg DOM effective volume
+        This property will return None if this Simulation instance has not yet been run.
 
         Parameters
         ----------
@@ -374,9 +365,8 @@ class Simulation:
 
         Returns
         -------
-        signal : np.ndarray
-            Expected signal increase from a single DOM
-
+        avg_signal : numpy.ndarray
+            Average signal observed in one DOM as a function of time
         """
         if dt is not None:
             self.rebin_result(dt)
@@ -438,7 +428,7 @@ class Simulation:
         ----------
         distance : astropy.quantity.Quantity
             New progenitor, must be a multiple of the base binning used for the simulation.
-        force_rebin : bool
+        force_rescale : bool
             If True, perform the rebin operation, regardless of other circumstances.
             If False, only perform rebin if argument `dt` differs with current binning stored in `self._res_dt`
 
@@ -463,6 +453,28 @@ class Simulation:
             self.distance = new_dist * u.kpc
 
     def _compute_deadtime_efficiency(self, domtype='i3', *, dom_effvol=None):
+        """Compute DOM deadtime efficiency factor (arises from 250 us artificial deadtime).
+        From A&A 535, A109 (2011) [https://doi.org/10.1051/0004-6361/201117810]
+
+        Parameters
+        ----------
+        domtype : str
+            Type of IceCube DOM 'i3' is IC80 DOM, 'dc' is DeepCore DOM from the Simulation.detector member
+            This argument is ignored if a specific DOM effective volume is provided.
+        dom_effvol : float or np.ndarray, optional
+            DOM effective volume measured in MeV / m**3 (but not stored with astropy units).
+            This may either a float (for a single DOM) or an array of float (for a table of DOMs)
+
+        Returns
+        -------
+        eps : float or np.ndarray
+            DOM deadtime efficiency
+
+        Notes
+        -----
+        This deadtime factor is calculated using the rate observed in 1s bins (hz), but the results stored
+        in class members are not scaled to 1s after this function hass been run.
+        """
         if dom_effvol is None:  # If dom_effvol is provided, domtype argument is unused
             if domtype == 'i3':
                 dom_effvol = self.detector.i3_dom_effvol
@@ -481,6 +493,8 @@ class Simulation:
 
     @property
     def eps_i3(self):
+        """Deadtime efficiency for IC80 DOMs
+        """
         return self._eps_i3
 
     @property
@@ -500,13 +514,20 @@ class Simulation:
         return self._time_binned
 
     def detector_signal(self, dt=None, flavor=None, subdetector=None):
-        """ Compute signal rates observed by detector
+        """Compute signal rates observed by detector
+
         Parameters
         ----------
         dt : Quantity
             Time binning for hit rates (must be a multiple of base dt used for simulation)
         flavor: snewpy.neutrino.Flavor
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
+
+        Returns
+        -------
+        signal : numpy.ndarray
+            Signal observed by the IceCube detector (or subdetector)
+
         Notes
         -----
         "Signal" is defined to be the expected average hit rate in a bin
@@ -520,7 +541,8 @@ class Simulation:
         return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
     def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None):
-        """ Compute hit rates observed by detector
+        """Compute hit rates observed by detector
+
         Parameters
         ----------
         dt : Quantity
@@ -529,13 +551,29 @@ class Simulation:
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
         subdetector: None or str
             IceCube subdetector, must be None (Full Detector), 'i3' (IC80) or 'dc' (DeepCore)
+
+        Returns
+        -------
+        hits : np.ndarray
+            Hits observed by the IceCube detector (or subdetector) as a function of time
         """
         time_binned, signal = self.detector_signal(dt, flavor, subdetector)
         return time_binned, np.random.poisson(signal)
 
     def detector_significance(self, dt=0.5*u.s, *, method=None):
-        self.rebin_result(dt)
+        """Returns SN triggering test statistic xi for the current neutrino lightcurve.
 
+        Parameters
+        ----------
+        dt : Quantity
+            Time binning for hit rates (must be a multiple of base dt used for simulation)
+        method :
+
+        Returns
+        -------
+
+        """
+        self.rebin_result(dt)
         if method == 'subdetector':  # Use definition of delta_mu(_var) from SNDAQ
             return self._subdetector_significance(dt)
         elif method == 'dom':  # Scale response based on EffVol of each DOM
