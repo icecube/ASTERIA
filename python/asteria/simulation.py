@@ -373,12 +373,12 @@ class Simulation:
             if flavor is None:
                 E_per_V = self._total_E_per_V_binned
             else:
-                E_per_V = self._E_per_V_binned
+                E_per_V = self._E_per_V_binned[flavor]
         else:
             if flavor is None:
                 E_per_V = self._total_E_per_V
             else:
-                E_per_V = self._E_per_V
+                E_per_V = self._E_per_V[flavor]
 
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
         return effvol * E_per_V
