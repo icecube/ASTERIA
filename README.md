@@ -64,5 +64,3 @@ automatically generated if they are missing, but their content will be ignored b
 [BSD License](LICENSE.rst)
 
 ASTERIA is free software licensed under a 3-clause BSD-style license.
-
-Copyright (c) 2017-2020, the IceCube Collaboration.
