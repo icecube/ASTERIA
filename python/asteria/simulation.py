@@ -15,6 +15,7 @@ from snewpy import flavor_transformation as ft
 
 import numpy as np
 import configparser
+import warnings
 import os
 
 from .interactions import Interactions
@@ -63,6 +64,7 @@ class Simulation:
             self.time = t
             self._sim_dt = _dt
             self._res_dt = 2 * u.ms  # TODO: Add config/arg option for this
+            self._res_offset = 0 * u.s  # TODO: Add config/arg option for this
             if flavors is None:
                 self.flavors = Flavor
             else:
@@ -383,13 +385,15 @@ class Simulation:
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
         return effvol * E_per_V
 
-    def rebin_result(self, dt, *, force_rebin=False):
+    def rebin_result(self, dt, *, offset=0 * u.s, force_rebin=False):
         """Rebins the simulation results to a new time binning.
 
         Parameters
         ----------
         dt : astropy.quantity.Quantity
             New time binning, must be a multiple of the base binning used for the simulation.
+        offset : astropy.quantity.Quantity
+            Offset to apply to rebinned result in units s (or compatible)
         force_rebin : bool
             If True, perform the rebin operation, regardless of other circumstances.
             If False, only perform rebin if argument `dt` differs with current binning stored in `self._res_dt`
@@ -402,9 +406,22 @@ class Simulation:
             raise RuntimeError("Simulation has not been executed yet, please use Simulation.run()")
 
         _dt = dt.to(u.s).value
-        if _dt != self._res_dt.to(u.s).value or force_rebin:
+        _offset = int(offset.to(u.us).value + 0.5)  # This is a guard against floating point errors
+        is_same_rebin = _dt == self._res_dt.to(u.s).value and _offset == int(self._res_offset.to(u.us).value + 0.5)
+        if not is_same_rebin or force_rebin:
+            if _offset != 0:
+                if _offset % int(self._sim_dt.to(u.us).value):
+                    warnings.warn(f"Requested offset ({offset}) is not divisible by simulation binsize "
+                                  f"{self._sim_dt}, offset will not be applied.")
+                    _offset = 0
+                if _offset > self.time[-1].to(u.us).value or _offset < self.time[0].to(u.us).value:
+                    warnings.warn(f"Requested offset ({offset}) will shift signal onset beyond simulation time "
+                                  f"[{self.time[0].to(u.s)}, {self.time[-1].to(u.s)}], offset will not be applied")
+                    _offset = 0
+
             _t = self.time.to(u.s).value
             rebinfactor = int(_dt / self._sim_dt.to(u.s).value)  # TODO: Check behavior for case _res_dt % _sim_dt != 0
+            offset_bins = int(_offset / self._sim_dt.to(u.us).value)
 
             self._time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)]) * u.s
 
@@ -412,12 +429,18 @@ class Simulation:
             self._total_E_per_V_binned = np.zeros_like(self._time_binned.value)
 
             for flavor in self.flavors:
-                E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(self._E_per_V[flavor].value,
-                                                                                    part_size=rebinfactor)])
+                E_per_V = np.roll(self._E_per_V[flavor].value, offset_bins)
+                if offset_bins < 0:
+                    E_per_V[offset_bins:] = 0
+                elif offset_bins > 0:
+                    E_per_V[:offset_bins] = 0
+
+                E_per_V_binned = np.array([np.sum(part) for part in _get_partitions(E_per_V, part_size=rebinfactor)])
                 self._E_per_V_binned[flavor] = E_per_V_binned * (u.MeV / u.m / u.m / u.m)
                 self._total_E_per_V_binned += E_per_V_binned
             self._total_E_per_V_binned *= (u.MeV / u.m / u.m / u.m)
             self._res_dt = _dt * u.s
+            self._res_offset = _offset * u.us.to(u.s) * u.s
             self._eps_i3 = self._compute_deadtime_efficiency(domtype='i3')
             self._eps_dc = self._compute_deadtime_efficiency(domtype='dc')
 
@@ -449,7 +472,7 @@ class Simulation:
                 self._E_per_V_binned[flavor] *= scaling_factor
             self._total_E_per_V *= scaling_factor
             self._total_E_per_V_binned *= scaling_factor
-            self.rebin_result(dt=self._res_dt, force_rebin=True)
+            self.rebin_result(dt=self._res_dt, offset=self._res_offset, force_rebin=True)
             self.distance = new_dist * u.kpc
 
     def _compute_deadtime_efficiency(self, domtype='i3', *, dom_effvol=None):
@@ -513,7 +536,7 @@ class Simulation:
     def time_binned(self):
         return self._time_binned
 
-    def detector_signal(self, dt=None, flavor=None, subdetector=None):
+    def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0 * u.s):
         """Compute signal rates observed by detector
 
         Parameters
@@ -522,6 +545,10 @@ class Simulation:
             Time binning for hit rates (must be a multiple of base dt used for simulation)
         flavor: snewpy.neutrino.Flavor
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
+        subdetector : None or str
+            IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, None for IC86
+        offset : astropy.quantity.Quantity
+            Offset to apply to rebinned result in units s (or compatible)
 
         Returns
         -------
@@ -532,15 +559,16 @@ class Simulation:
         -----
         "Signal" is defined to be the expected average hit rate in a bin
         """
-        self.rebin_result(dt)
+        self.rebin_result(dt, offset=offset)
 
         i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
         dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
         E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
-        return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
+        # return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
+        return self.time_binned, E_per_V * (i3_total_effvol + dc_total_effvol)
 
-    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None):
+    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None, offset=0 * u.s):
         """Compute hit rates observed by detector
 
         Parameters
@@ -557,10 +585,10 @@ class Simulation:
         hits : np.ndarray
             Hits observed by the IceCube detector (or subdetector) as a function of time
         """
-        time_binned, signal = self.detector_signal(dt, flavor, subdetector)
+        time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
         return time_binned, np.random.poisson(signal)
 
-    def detector_significance(self, dt=0.5*u.s, *, method=None):
+    def detector_significance(self, dt=0.5*u.s, *, method=None, offset=True):
         """Returns SN triggering test statistic xi for the current neutrino lightcurve.
 
         Parameters
@@ -573,25 +601,36 @@ class Simulation:
         -------
 
         """
-        self.rebin_result(dt)
-        if method == 'subdetector':  # Use definition of delta_mu(_var) from SNDAQ
-            return self._subdetector_significance(dt)
+        if isinstance(offset, u.Quantity):
+            _offset = offset.to(u.s).value
+        elif isinstance(offset, bool):
+            if offset:
+                _offset = np.random.randint(0, dt.to(u.ms)) * u.ms
+            else:
+                _offset = 0 * u.s
+        else:
+            raise ValueError(f"Invalid value for argument offset: {offset} ({type(offset)}),"
+                             " must be astropy.units.quantity or bool")
+
+        self.rebin_result(dt, offset=_offset)
+        if method == 'subdetector':  # Use definition of dmu (and dmu_var) from SNDAQ
+            return self._subdetector_significance(dt, _offset)
         elif method == 'dom':  # Scale response based on EffVol of each DOM
             return self._domwise_significance(dt)
         else:  # Use simple calculation from USSR
-            return self._simple_significance(dt)
+            return self._simple_significance(dt, _offset)
 
-    def _simple_significance(self, dt=0.5*u.ms):
+    def _simple_significance(self, dt=0.5*u.s, offset=0 * u.s):
         _dt = dt.to(u.s).value
         i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
         dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
 
         detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_var + self.detector.n_dc_doms * dc_dom_bg_var)
-        time, hits = self.detector_hits(dt)
+        time, hits = self.detector_hits(dt, offset=offset)
         signi = hits / np.sqrt(detector_bg_var)
         return time, signi
 
-    def _domwise_significance(self, dt=0.5*u.ms):
+    def _domwise_significance(self, dt=0.5*u.s):
         _dt = dt.to(u.s).value
         signi = np.zeros(self._time_binned.size)
 
@@ -620,13 +659,13 @@ class Simulation:
             signi[idc_part] = dmu / np.sqrt(var_dmu)
         return self._time_binned, signi
 
-    def _subdetector_significance(self, dt=0.5*u.ms):
+    def _subdetector_significance(self, dt=0.5*u.s, offset=0*u.s):
         _dt = dt.to(u.s).value
         i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
         dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
 
-        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3')
-        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc')
+        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3', offset=offset)
+        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc', offset=offset)
 
         i3_bg = self.detector.i3_bg(dt=dt, size=i3_hits.size)
         dc_bg = self.detector.dc_bg(dt=dt, size=dc_hits.size)
@@ -641,12 +680,14 @@ class Simulation:
         signi = dmu / np.sqrt(var_dmu)
         return time, signi
 
-    def trigger_significance(self, dt=0.5*u.s, *, method=None):
-        return self.detector_significance(dt=dt, method=method)[1].max()
+    def trigger_significance(self, dt=0.5*u.s, *, method=None, offset=True):
+        return self.detector_significance(dt=dt, method=method, offset=offset)[1].max()
 
-    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, method=None):
+    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, method=None, offset=True, seed=None):
+        if seed:
+            np.random.seed(seed)
         self.scale_result(distance)
-        return np.array([self.trigger_significance(dt, method=method) for _ in range(sample_size)])
+        return np.array([self.trigger_significance(dt, method=method, offset=offset) for _ in range(sample_size)])
 
 
 def _get_partitions(*args, part_size=1000):
