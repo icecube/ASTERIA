@@ -350,6 +350,7 @@ class Simulation:
         """Returns all-flavor photonic energy deposition vs time for each neutrino flavor.
         This property will return None if this Simulation instance has not yet been run.
         """
+        # TODO: Compound statement is redundant, member is None at init and then changed only after running
         return self._total_E_per_V if self._total_E_per_V else None
 
     def avg_dom_signal(self, dt=None, flavor=None):
@@ -370,20 +371,20 @@ class Simulation:
         avg_signal : numpy.ndarray
             Average signal observed in one DOM as a function of time
         """
-        if dt is not None:
-            self.rebin_result(dt)
+        if not dt:
             if flavor is None:
                 E_per_V = self._total_E_per_V_binned
             else:
                 E_per_V = self._E_per_V_binned[flavor]
         else:
+            self.rebin_result(dt)
             if flavor is None:
                 E_per_V = self._total_E_per_V
             else:
                 E_per_V = self._E_per_V[flavor]
 
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
-        return effvol * E_per_V
+        return effvol * E_per_V * (self.eps_dc + self.eps_i3)/2
 
     def rebin_result(self, dt, *, offset=0 * u.s, force_rebin=False):
         """Rebins the simulation results to a new time binning.
@@ -496,7 +497,7 @@ class Simulation:
         Notes
         -----
         This deadtime factor is calculated using the rate observed in 1s bins (hz), but the results stored
-        in class members are not scaled to 1s after this function hass been run.
+        in class members are not scaled to 1s after this function has been run.
         """
         if dom_effvol is None:  # If dom_effvol is provided, domtype argument is unused
             if domtype == 'i3':
@@ -510,8 +511,14 @@ class Simulation:
             # Ensures proper np broadcasting
             dom_signal = self.total_E_per_V_binned.value.reshape(-1, 1) * dom_effvol.reshape(1, -1)
         else:
+            # In SNDAQ this is calculated **with** poisson randomness
             dom_signal = dom_effvol * self.total_E_per_V_binned.value
-        scaling_factor = 1/self._res_dt.to(u.s).value
+
+        # TODO: Adjust this scaling based on the determined "proper" method for computing deadtime
+        #   eps_dt = 0.87 / (1+ 250us * true_sn_rate) -- is true_sn_rate the rate in 500ms bins, 1s bins, etc?
+        #   SNDAQ always using 500ms
+        # Convert scaling factor as if it is a 0.5s bin
+        scaling_factor = 0.5/self._res_dt.to(u.s).value
         return 0.87 / (1 + self.detector.deadtime * dom_signal * scaling_factor)
 
     @property
@@ -565,8 +572,7 @@ class Simulation:
         dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
         E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
-        # return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
-        return self.time_binned, E_per_V * (i3_total_effvol + dc_total_effvol)
+        return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
     def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None, offset=0 * u.s):
         """Compute hit rates observed by detector
@@ -595,10 +601,24 @@ class Simulation:
         ----------
         dt : Quantity
             Time binning for hit rates (must be a multiple of base dt used for simulation)
-        method :
+        method : string or None
+            Method for computing significance, default is None. Available values are...
+            - None: Use simple method based on average DOM Effective volume
+            - 'subdetector': compute using effective volume of IC80 & DeepCore separately
+            - 'dom': compute using effective volume of each DOM individually
+        offset : Bool or Quantity
+            Random offset applied to trigger time (self.time~=0) before rebinning. The following cases are available
+            - True : Apply a random offset within [0, 0.5s) based on SNDAQ base analysis binning
+            - False : Do not apply any offset.
+            - offset : An Astropy quantity, apply a fixed offset to the trigger time (positive means onset is later)
+            Note : This argument is motivated by uncertainty on the placement of an SN trigger as it arrives
+            The onset of the neutrino signal will not necessarily coincide with a bin edge in online searches, as
+            is assumed for the `offset=False` case.
 
         Returns
         -------
+        Significance : np.ndarray
+            SN trigger test statistic as a function of time.
 
         """
         if isinstance(offset, u.Quantity):
@@ -626,7 +646,7 @@ class Simulation:
         dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
 
         detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_var + self.detector.n_dc_doms * dc_dom_bg_var)
-        time, hits = self.detector_hits(dt, offset=offset)
+        time, hits = self.detector_hits(dt, offset=offset)  # Includes deadtime
         signi = hits / np.sqrt(detector_bg_var)
         return time, signi
 
@@ -664,8 +684,8 @@ class Simulation:
         i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
         dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
 
-        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3', offset=offset)
-        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc', offset=offset)
+        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3', offset=offset)  # Includes Deadtime
+        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc', offset=offset)  # Includes Deadtime
 
         i3_bg = self.detector.i3_bg(dt=dt, size=i3_hits.size)
         dc_bg = self.detector.dc_bg(dt=dt, size=dc_hits.size)
