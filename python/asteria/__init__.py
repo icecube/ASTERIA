@@ -28,7 +28,7 @@ def set_rcparams(rcParams_file=None, *, verbose=False):
     import matplotlib as mpl
     if not rcParams_file:  # Load ASTERIA default
         import os
-        rcParams_file = os.path.join(os.environ['ASTERIA'], 'asteria.rcParam')
+        rcParams_file = os.path.join(os.environ['ASTERIA'], 'asteria.rcParams')
     rcParams = mpl.rc_params_from_file(rcParams_file, fail_on_error=True)
     mpl.rcParams.update(rcParams)
     return rcParams if verbose else None
