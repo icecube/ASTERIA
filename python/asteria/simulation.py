@@ -12,6 +12,7 @@ from __future__ import print_function, division
 from astropy import units as u
 from snewpy.neutrino import Flavor, MassHierarchy
 from snewpy import flavor_transformation as ft
+from math import ceil
 
 import numpy as np
 import configparser
@@ -189,6 +190,8 @@ class Simulation:
 
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')
+
+        self.scale_factor = None
 
     def _create_paramdict(self, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                           interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, t=None):
@@ -372,16 +375,13 @@ class Simulation:
             Average signal observed in one DOM as a function of time
         """
         if not dt:
-            if flavor is None:
-                E_per_V = self._total_E_per_V_binned
-            else:
-                E_per_V = self._E_per_V_binned[flavor]
+            dt = self._res_dt
+        self.rebin_result(dt)
+
+        if flavor is None:
+            E_per_V = self._total_E_per_V_binned
         else:
-            self.rebin_result(dt)
-            if flavor is None:
-                E_per_V = self._total_E_per_V
-            else:
-                E_per_V = self._E_per_V[flavor]
+            E_per_V = self._E_per_V_binned[flavor]
 
         effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
         return effvol * E_per_V * (self.eps_dc + self.eps_i3)/2
@@ -516,10 +516,11 @@ class Simulation:
 
         # TODO: Adjust this scaling based on the determined "proper" method for computing deadtime
         #   eps_dt = 0.87 / (1+ 250us * true_sn_rate) -- is true_sn_rate the rate in 500ms bins, 1s bins, etc?
-        #   SNDAQ always using 500ms
+        #   SNDAQ always uses 500ms
         # Convert scaling factor as if it is a 0.5s bin
         scaling_factor = 0.5/self._res_dt.to(u.s).value
-        return 0.87 / (1 + self.detector.deadtime * dom_signal * scaling_factor)
+        dom_signal *= scaling_factor
+        return 0.87 / (1 + self.detector.deadtime * dom_signal)
 
     @property
     def eps_i3(self):
@@ -543,7 +544,7 @@ class Simulation:
     def time_binned(self):
         return self._time_binned
 
-    def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0 * u.s):
+    def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0*u.s):
         """Compute signal rates observed by detector
 
         Parameters
@@ -574,7 +575,7 @@ class Simulation:
 
         return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
-    def detector_hits(self, dt=2 * u.ms, flavor=None, subdetector=None, offset=0 * u.s):
+    def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s):
         """Compute hit rates observed by detector
 
         Parameters
@@ -592,9 +593,11 @@ class Simulation:
             Hits observed by the IceCube detector (or subdetector) as a function of time
         """
         time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
-        return time_binned, np.random.poisson(signal)
+        # return time_binned, np.random.poisson(signal)
 
-    def detector_significance(self, dt=0.5*u.s, *, method=None, offset=True):
+        return time_binned, np.random.normal(signal, np.sqrt(signal))
+
+    def detector_significance(self, dt=0.5*u.s, *, method=None, offset=0*u.s, use_random_offset=True):
         """Returns SN triggering test statistic xi for the current neutrino lightcurve.
 
         Parameters
@@ -606,31 +609,27 @@ class Simulation:
             - None: Use simple method based on average DOM Effective volume
             - 'subdetector': compute using effective volume of IC80 & DeepCore separately
             - 'dom': compute using effective volume of each DOM individually
-        offset : Bool or Quantity
-            Random offset applied to trigger time (self.time~=0) before rebinning. The following cases are available
-            - True : Apply a random offset within [0, 0.5s) based on SNDAQ base analysis binning
-            - False : Do not apply any offset.
-            - offset : An Astropy quantity, apply a fixed offset to the trigger time (positive means onset is later)
-            Note : This argument is motivated by uncertainty on the placement of an SN trigger as it arrives
-            The onset of the neutrino signal will not necessarily coincide with a bin edge in online searches, as
-            is assumed for the `offset=False` case.
+        offset : Quantity
+            Fixed time offset that applied to the signal lightcurve (positive means onset is later)
+        use_random_offset : bool
+            Apply a random time offset to the signal lightcurve, in addition to the specified fixed offset.
+            This will take a value on [0, dt) ms according to the smallest binned search of SNDAQ
 
         Returns
         -------
         Significance : np.ndarray
             SN trigger test statistic as a function of time.
 
+        Notes
+        -----
+        The `offset` and `use_random_offset` arguments are motivated by uncertainty on the placement of the signakl
+        lightcurve as it arrives, relative to the bin edges used by SNDAQ to form triggers.
+        The signal lightcurve onset will align with a bin edge for the case `offset=0*u.s, use_random_offset=False`
         """
-        if isinstance(offset, u.Quantity):
-            _offset = offset.to(u.s).value
-        elif isinstance(offset, bool):
-            if offset:
-                _offset = np.random.randint(0, dt.to(u.ms)) * u.ms
-            else:
-                _offset = 0 * u.s
-        else:
-            raise ValueError(f"Invalid value for argument offset: {offset} ({type(offset)}),"
-                             " must be astropy.units.quantity or bool")
+        _offset = offset.to(u.s)
+
+        if use_random_offset:
+            _offset += np.random.randint(0, 500) * u.ms
 
         self.rebin_result(dt, offset=_offset)
         if method == 'subdetector':  # Use definition of dmu (and dmu_var) from SNDAQ
@@ -641,13 +640,15 @@ class Simulation:
             return self._simple_significance(dt, _offset)
 
     def _simple_significance(self, dt=0.5*u.s, offset=0 * u.s):
-        _dt = dt.to(u.s).value
-        i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
-        dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
-
-        detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_var + self.detector.n_dc_doms * dc_dom_bg_var)
+        # _dt = dt.to(u.s).value
+        # i3_dom_bg_sig = self.detector.i3_dom_bg_sig * _dt
+        # dc_dom_bg_sig = self.detector.dc_dom_bg_sig * _dt
+        #
+        # detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_sig**2 + self.detector.n_dc_doms * dc_dom_bg_sig**2)
         time, hits = self.detector_hits(dt, offset=offset)  # Includes deadtime
-        signi = hits / np.sqrt(detector_bg_var)
+        bg = self.detector.i3_bg(dt, hits.size) + self.detector.dc_bg(dt, hits.size)
+        signi = hits / bg.std()
+        # signi = hits / np.sqrt(detector_bg_mu)
         return time, signi
 
     def _domwise_significance(self, dt=0.5*u.s):
@@ -659,7 +660,7 @@ class Simulation:
 
         rel_eff = np.where(mask_dc, self.detector.dc_rel_eff, 1.)
         bg_mu = np.where(mask_dc, self.detector.dc_dom_bg_mu, self.detector.i3_dom_bg_mu) * _dt
-        bg_sig = np.where(mask_dc, self.detector.dc_dom_bg_sig, self.detector.i3_dom_bg_sig) * np.sqrt(_dt)
+        bg_sig = np.where(mask_dc, self.detector.dc_dom_bg_sig, self.detector.i3_dom_bg_sig) * _dt
 
         # Restrict memory usage here, maximum usage is expected to be ~10MB
         # TODO: Figure out runtime benchmark and increase part_size if necessary
@@ -681,8 +682,8 @@ class Simulation:
 
     def _subdetector_significance(self, dt=0.5*u.s, offset=0*u.s):
         _dt = dt.to(u.s).value
-        i3_dom_bg_var = self.detector.i3_dom_bg_sig**2 * _dt
-        dc_dom_bg_var = self.detector.dc_dom_bg_sig**2 * _dt
+        i3_dom_bg_var = (self.detector.i3_dom_bg_sig * _dt)**2
+        dc_dom_bg_var = (self.detector.dc_dom_bg_sig * _dt)**2
 
         time, i3_hits = self.detector_hits(dt=dt, subdetector='i3', offset=offset)  # Includes Deadtime
         _, dc_hits = self.detector_hits(dt=dt, subdetector='dc', offset=offset)  # Includes Deadtime
@@ -700,14 +701,95 @@ class Simulation:
         signi = dmu / np.sqrt(var_dmu)
         return time, signi
 
-    def trigger_significance(self, dt=0.5*u.s, *, method=None, offset=True):
-        return self.detector_significance(dt=dt, method=method, offset=offset)[1].max()
+    def trigger_significance(self, dt=0.5*u.s, *, method=None, offset=0*u.s, use_random_offset=True):
+        return self.detector_significance(dt=dt, method=method, offset=offset,
+                                          use_random_offset=use_random_offset)[1].max()
 
-    def sample_significance(self, sample_size, dt=0.5*u.s, distance=10*u.kpc, method=None, offset=True, seed=None):
-        if seed:
-            np.random.seed(seed)
+    def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, method=None, offset=0*u.s,
+                            use_random_offset=True):
         self.scale_result(distance)
-        return np.array([self.trigger_significance(dt, method=method, offset=offset) for _ in range(sample_size)])
+        if use_random_offset:
+            offsets = np.random.randint(0, 500, sample_size) * u.ms
+            return np.array([self.trigger_significance(dt, method=method, offset=offset+_offset)
+                             for _offset in offsets])
+        else:
+            return np.array([self.trigger_significance(dt, method=method, offset=offset) for _ in range(sample_size)])
+
+    def sample_sndaq_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=0*u.s,
+                                  use_random_offset=True, binnings=None):
+        self.scale_result(distance)
+        if use_random_offset:
+            rand_offsets = np.random.randint(0, 500, size=sample_size) * u.ms
+            return np.array([self.sndaq_trigger_significance(dt, offset=offset+rand_offset, binnings=binnings, seed=i)
+                             for i, rand_offset in enumerate(rand_offsets)])
+        else:
+            return np.array([self.sndaq_trigger_significance(dt, offset=offset, binnings=binnings)
+                             for _ in range(sample_size)])
+
+    def sndaq_trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s,*, seed=None):
+        _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
+        _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
+        xi = np.zeros(binnings.size)
+
+        for idx_bin, binsize in enumerate(binnings):
+            if seed is not None:
+                np.random.seed(seed)
+
+            rebin_factor = int(binsize.to(u.s).value / dt.to(u.s).value)
+            n_bins = ceil(hits_i3.size/rebin_factor)
+            bg_i3 = self.detector.i3_bg(dt=dt, size=hits_i3.size)
+            bg_dc = self.detector.dc_bg(dt=dt, size=hits_i3.size)
+
+            # Create a realization of background rate scaled up from dt to binsize
+            bg_i3_binned = np.zeros(n_bins)
+            bg_dc_binned = np.zeros(n_bins)
+            for idx_time, (bg_i3_part, bg_dc_part) in enumerate(_get_partitions(bg_i3, bg_dc, part_size=rebin_factor)):
+                bg_i3_binned[idx_time] = np.sum(bg_i3_part)
+                bg_dc_binned[idx_time] = np.sum(bg_dc_part)
+
+            # Compute *DOM* background rate variance
+            # Background variance is not well estimated after the rebin, so use lower binning and upscale
+            # This could be mitigated by extending background windows, at the cost of speed
+            bg_i3_var_dom = rebin_factor * self.detector.i3_dom_bg(dt=dt, size=1000).var()
+            bg_dc_var_dom = rebin_factor * self.detector.dc_dom_bg(dt=dt, size=1000).var()
+
+            # If hits_i3.size / rebin_factor is not an integer, then the last bin in the rebinned rates will be partial
+            # In this case, exclude it from the calculation of the background mean
+            if bg_i3.size % rebin_factor != 0:
+                idx_bg = bg_i3_binned.size - 1
+            else:
+                idx_bg = bg_i3_binned.size
+
+            bg_i3_mean = bg_i3_binned[:idx_bg].mean()  # IC80 *subdetector* rate mean
+            bg_dc_mean = bg_dc_binned[:idx_bg].mean()  # DeepCore *subdetector* rate mean
+
+            # Compute xi with increments of 0.5s offsets, mimicking the offset searches of SNDAQ
+            for idx_offset in range(rebin_factor):
+                hits_i3_offset = np.roll(hits_i3, idx_offset)
+                hits_dc_offset = np.roll(hits_dc, idx_offset)
+                hits_i3_offset[:idx_offset] = 0
+                hits_dc_offset[:idx_offset] = 0
+                hits_i3_binned = np.zeros(n_bins)
+                hits_dc_binned = np.zeros(n_bins)
+
+                for idx_time, (hits_i3_part, hits_dc_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
+                                                                                        part_size=rebin_factor)):
+                    hits_i3_binned[idx_time] = np.sum(hits_i3_part)
+                    hits_dc_binned[idx_time] = np.sum(hits_dc_part)
+
+                var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
+                             (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom))
+                dmu = var_dmu * (
+                        ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
+                        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom))
+                # Should rel. eff be considered here? It would ahve already been considered once during hit generation
+                # It's unclear if SNDAQ applies this same factor, it does apply *a* factor that is somehow normalized
+                #        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) * self.detector.dc_rel_eff / bg_dc_var_dom))
+                _xi = dmu/np.sqrt(var_dmu)
+
+                xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
+            test = None
+        return np.max(xi)
 
 
 def _get_partitions(*args, part_size=1000):
@@ -723,3 +805,7 @@ def _get_partitions(*args, part_size=1000):
             yield tuple(x[idx:idx + part_size] for x in args) if len(args) > 1 else args[0][idx:idx + part_size]
             idx += part_size
         yield tuple(x[idx:] for x in args) if len(args) > 1 else args[0][idx:]
+
+
+
+
