@@ -46,27 +46,61 @@ class Detector:
         self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'dc'])
 
         # DOM Artificial deadtime
-        self.deadtime = 0.25e-3  # s
+        self.deadtime = 0.256e-3  # s
         # Relative efficiency of dc DOMs compared to i3 DOMs
         self.dc_rel_eff = 1.35
 
         # Background rate and sigma for i3 DOMs (hits / s)
-        self.i3_dom_bg_mu = 284.9
-        self.i3_dom_bg_sig = 26.2
+        self._i3_dom_bg_mu = 284.9
+        self._i3_dom_bg_sig = 26.2
 
         # Background rate and sigma for dc DOMs
-        self.dc_dom_bg_mu = 358.9
-        self.dc_dom_bg_sig = 36.0
+        self._dc_dom_bg_mu = 358.9
+        self._dc_dom_bg_sig = 36.0
 
-    def i3_bg(self, dt=0.5*u.ms, size=1):
-        return np.sum(np.random.normal(loc=self.i3_dom_bg_mu * dt.to(u.s).value,
-                                       scale=np.sqrt(self.i3_dom_bg_sig**2 * dt.to(u.s).value),
-                                       size=(size, self.n_i3_doms)), axis=1)
+    @property
+    def i3_dom_bg_mu(self):
+        return self._i3_dom_bg_mu
 
-    def dc_bg(self, dt=0.5*u.ms, size=1):
-        return np.sum(np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value,
-                                       scale=np.sqrt(self.dc_dom_bg_sig ** 2 * dt.to(u.s).value),
-                                       size=(size, self.n_dc_doms)), axis=1)
+    @property
+    def i3_dom_bg_sig(self):
+        return self._i3_dom_bg_sig
+
+    @property
+    def dc_dom_bg_mu(self):
+        return self._dc_dom_bg_mu
+
+    @property
+    def dc_dom_bg_sig(self):
+        return self._dc_dom_bg_sig
+
+    def set_i3_background(self, mu=284.9, sig=26.2):
+        self._i3_dom_bg_mu = mu
+        self._i3_dom_bg_sig = sig
+
+    def set_dc_background(self, mu=358.9, sig=36.0):
+        self._dc_dom_bg_mu = mu
+        self._dc_dom_bg_sig = sig
+
+    def i3_dom_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.i3_dom_bg_mu * dt.to(u.s).value,
+                                scale=self.i3_dom_bg_sig * np.sqrt(dt.to(u.s).value),
+                                size=size)
+
+    def dc_dom_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value,
+                                scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value),
+                                size=size)
+
+    def i3_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.i3_dom_bg_mu * dt.to(u.s).value * self.n_i3_doms,
+                                scale=self.i3_dom_bg_sig * np.sqrt(dt.to(u.s).value * self.n_i3_doms),
+                                size=size)
+
+    def dc_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value * self.n_dc_doms,
+                                scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value * self.n_dc_doms),
+                                size=size)
     @property
     def i3_total_effvol(self):
         return self._i3_effvol
