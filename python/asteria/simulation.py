@@ -524,24 +524,27 @@ class Simulation:
 
     @property
     def eps_i3(self):
-        """Deadtime efficiency for IC80 DOMs
-        """
+        """Deadtime efficiency for IC80 DOMs"""
         return self._eps_i3
 
     @property
     def eps_dc(self):
+        """Deadtime efficiency for DeepCore DOMs"""
         return self._eps_dc
 
     @property
     def total_E_per_V_binned(self):
+        """All-flavor photonic energy deposition in result time binning"""
         return self._total_E_per_V_binned
 
     @property
     def E_per_V_binned(self):
+        """Flavor-keyed dictionary of photonic energy deposition in result time binning"""
         return self._E_per_V_binned
 
     @property
     def time_binned(self):
+        """Leading bin edges of in result time binning"""
         return self._time_binned
 
     def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0*u.s):
@@ -597,136 +600,120 @@ class Simulation:
 
         return time_binned, np.random.normal(signal, np.sqrt(signal))
 
-    def detector_significance(self, dt=0.5*u.s, *, method=None, offset=0*u.s, use_random_offset=True):
-        """Returns SN triggering test statistic xi for the current neutrino lightcurve.
+    def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=None, binnings=None,
+                            use_random_offset=True, *, only_highest=True, debug_info=False, seeds=None):
+        """Simulate and collects a sample of SNDAQ trigger, "significance", test statistics
 
         Parameters
         ----------
-        dt : Quantity
-            Time binning for hit rates (must be a multiple of base dt used for simulation)
-        method : string or None
-            Method for computing significance, default is None. Available values are...
-            - None: Use simple method based on average DOM Effective volume
-            - 'subdetector': compute using effective volume of IC80 & DeepCore separately
-            - 'dom': compute using effective volume of each DOM individually
-        offset : Quantity
-            Fixed time offset that applied to the signal lightcurve (positive means onset is later)
-        use_random_offset : bool
-            Apply a random time offset to the signal lightcurve, in addition to the specified fixed offset.
-            This will take a value on [0, dt) ms according to the smallest binned search of SNDAQ
+        sample_size : int
+            Number of triggers to simulate
+        dt : astropy.units.Quantity
+            Size of smallest binning of neutrino lightcurve used in simulation.
+        distance : astropy.units.Quantity
+            Distance to SN progenitor used in simulation.
+        offset : astropy.units.Quantity or None, default = 0 * astropy.units.s
+            Time shift(s) applied to neutrino lightcurve (positive shifts lightcurve later).
+            If an array of offsets are provided, it must have size equal to `sample_size`.
+            The i-th offset corresponds to the i-th sample.
+        binnings : astropy.units.Quantity or None, default = [0.5, 1.5, 4., 10.] * astropy.units.s
+            Size of time binnings at which to calculate trigger test statistic
+
+        use_random_offset : bool, optional
+            If True, apply a random time offset from the range (0, 500ms) to onset of neutrino lightcurve.
+                This will override the value of argument `offset`.
+            If False, use argument `offset`
+        only_highest : bool, optional
+            If True, sample only the highest significance triggers across the binsizes in `binnings`
+            If False, sample the trigger significances for each binsize in `binnings`
+        debug_info : bool
+            If True, return the offsets and seeds used during the simulation
+        seeds : np.ndarray or None, optional
+            Seeds used to obtain realizations of background rates
 
         Returns
         -------
-        Significance : np.ndarray
-            SN trigger test statistic as a function of time.
+        sample : np.ndarray
+            Sample of simulated SN trigger significances.
+        offsets : astropy.units.Quantity, optional
+            Random time offsets on neutrino signal onset used during simulation (Only returned when `debug_info=True`)
+        seeds : np.ndarray, optional
+            Random seeds used to create background rate realizations (Only returned when `debug_info=True`)
+
+        See Also
+        --------
+        asteria.simulation.Simulation.trigger_significance
 
         Notes
         -----
-        The `offset` and `use_random_offset` arguments are motivated by uncertainty on the placement of the signakl
-        lightcurve as it arrives, relative to the bin edges used by SNDAQ to form triggers.
+        The `offset` and `use_random_offset` arguments are motivated by uncertainty on timing og the signal
+        onset as it arrives relative to the bin edges used by SNDAQ to form triggers.
         The signal lightcurve onset will align with a bin edge for the case `offset=0*u.s, use_random_offset=False`
         """
-        _offset = offset.to(u.s)
-
-        if use_random_offset:
-            _offset += np.random.randint(0, 500) * u.ms
-
-        self.rebin_result(dt, offset=_offset)
-        if method == 'subdetector':  # Use definition of dmu (and dmu_var) from SNDAQ
-            return self._subdetector_significance(dt, _offset)
-        elif method == 'dom':  # Scale response based on EffVol of each DOM
-            return self._domwise_significance(dt)
-        else:  # Use simple calculation from USSR
-            return self._simple_significance(dt, _offset)
-
-    def _simple_significance(self, dt=0.5*u.s, offset=0 * u.s):
-        # _dt = dt.to(u.s).value
-        # i3_dom_bg_sig = self.detector.i3_dom_bg_sig * _dt
-        # dc_dom_bg_sig = self.detector.dc_dom_bg_sig * _dt
-        #
-        # detector_bg_var = (self.detector.n_i3_doms * i3_dom_bg_sig**2 + self.detector.n_dc_doms * dc_dom_bg_sig**2)
-        time, hits = self.detector_hits(dt, offset=offset)  # Includes deadtime
-        bg = self.detector.i3_bg(dt, hits.size) + self.detector.dc_bg(dt, hits.size)
-        signi = hits / bg.std()
-        # signi = hits / np.sqrt(detector_bg_mu)
-        return time, signi
-
-    def _domwise_significance(self, dt=0.5*u.s):
-        _dt = dt.to(u.s).value
-        signi = np.zeros(self._time_binned.size)
-
-        effvol = self.detector.doms_table['effvol']
-        mask_dc = self.detector.doms_table['type'] == 'dc'
-
-        rel_eff = np.where(mask_dc, self.detector.dc_rel_eff, 1.)
-        bg_mu = np.where(mask_dc, self.detector.dc_dom_bg_mu, self.detector.i3_dom_bg_mu) * _dt
-        bg_sig = np.where(mask_dc, self.detector.dc_dom_bg_sig, self.detector.i3_dom_bg_sig) * _dt
-
-        # Restrict memory usage here, maximum usage is expected to be ~10MB
-        # TODO: Figure out runtime benchmark and increase part_size if necessary
-        idc = np.arange(self.total_E_per_V_binned.size)
-        eps = self._compute_deadtime_efficiency(dom_effvol=effvol)  # (m,n)
-
-        for E_per_V_part, idc_part in _get_partitions(self.total_E_per_V_binned, idc, part_size=250):
-            # Notes for numpy broadcasting, dim(E_per_V_part) = m, dim(effvol) = n. Aligned dims must match
-            signal = E_per_V_part.value.reshape(-1, 1) * eps * effvol.reshape(1, -1)  # (m,n)=(m,1)*(m,n)*(1,n)
-            hits = np.random.poisson(signal, size=signal.shape)  # (m,n)
-            bg = np.random.normal(loc=bg_mu, scale=bg_sig, size=signal.shape)  # (m,n)
-            rate = hits + bg  # (m,n)=(m,n)+(m,n)
-
-            var_dmu = 1/np.sum((rel_eff**2 / bg_sig**2))  # float = sum((n,)/(n,))
-            # (m,) = float*sum( ((m,n)-(m,n)) / (1,n), axis=1 )
-            dmu = var_dmu * np.sum((rate - bg_mu) / bg_sig.reshape(1, - 1)**2, axis=1)
-            signi[idc_part] = dmu / np.sqrt(var_dmu)
-        return self._time_binned, signi
-
-    def _subdetector_significance(self, dt=0.5*u.s, offset=0*u.s):
-        _dt = dt.to(u.s).value
-        i3_dom_bg_var = (self.detector.i3_dom_bg_sig * _dt)**2
-        dc_dom_bg_var = (self.detector.dc_dom_bg_sig * _dt)**2
-
-        time, i3_hits = self.detector_hits(dt=dt, subdetector='i3', offset=offset)  # Includes Deadtime
-        _, dc_hits = self.detector_hits(dt=dt, subdetector='dc', offset=offset)  # Includes Deadtime
-
-        i3_bg = self.detector.i3_bg(dt=dt, size=i3_hits.size)
-        dc_bg = self.detector.dc_bg(dt=dt, size=dc_hits.size)
-        i3_rate = i3_hits + i3_bg
-        dc_rate = dc_hits + dc_bg
-
-        # TODO: Decide whether if the background lightcurve should be saved to a data member as part of this or any
-        #  similar operation
-        var_dmu = 1 / ((self.detector.n_i3_doms / i3_dom_bg_var) +
-                       (self.detector.n_dc_doms * self.detector.dc_rel_eff**2 / dc_dom_bg_var))
-        dmu = var_dmu * ((i3_rate - i3_bg.mean()) / i3_dom_bg_var + (dc_rate - dc_bg.mean()) / dc_dom_bg_var)
-        signi = dmu / np.sqrt(var_dmu)
-        return time, signi
-
-    def trigger_significance(self, dt=0.5*u.s, *, method=None, offset=0*u.s, use_random_offset=True):
-        return self.detector_significance(dt=dt, method=method, offset=offset,
-                                          use_random_offset=use_random_offset)[1].max()
-
-    def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, method=None, offset=0*u.s,
-                            use_random_offset=True):
         self.scale_result(distance)
-        if use_random_offset:
-            offsets = np.random.randint(0, 500, sample_size) * u.ms
-            return np.array([self.trigger_significance(dt, method=method, offset=offset+_offset)
-                             for _offset in offsets])
-        else:
-            return np.array([self.trigger_significance(dt, method=method, offset=offset) for _ in range(sample_size)])
 
-    def sample_sndaq_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=0*u.s,
-                                  use_random_offset=True, binnings=None):
-        self.scale_result(distance)
         if use_random_offset:
-            rand_offsets = np.random.randint(0, 500, size=sample_size) * u.ms
-            return np.array([self.sndaq_trigger_significance(dt, offset=offset+rand_offset, binnings=binnings, seed=i)
-                             for i, rand_offset in enumerate(rand_offsets)])
+            offsets = np.random.randint(0, 500, size=sample_size) * u.ms
+            seeds = os.urandom(sample_size)  # Sets random seed for realization of background in signi calc
+        elif isinstance(offset, u.Quantity):
+            if offset.size == 1:
+                offsets = offset.to(u.s).value * np.ones(sample_size) * u.s
+            else:
+                offsets = offset
         else:
-            return np.array([self.sndaq_trigger_significance(dt, offset=offset, binnings=binnings)
-                             for _ in range(sample_size)])
+            offsets = np.zeros(sample_size) * u.s
 
-    def sndaq_trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s,*, seed=None):
+        if seeds is None:
+            seeds = [None] * sample_size
+
+        sample = np.array([self.trigger_significance(dt=dt, offset=_offset, binnings=binnings, seed=seed)
+                           for _offset, seed in zip(offsets, seeds)])
+        if only_highest:
+            sample = sample.max(axis=1)
+        if debug_info:
+            return sample, offsets, seeds
+        return sample
+
+    def trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s, *, seed=None):
+        """Simulates one SNDAQ trigger "significance" test statistic for requested binnings
+
+        Parameters
+        ----------
+        dt : astropy.units.Quantity
+            Size of smallest binning of neutrino lightcurve used in simulation.
+        offset : astropy.units.Quantity or None, default = 0 * astropy.units.s, optional
+            Time shift(s) applied to neutrino lightcurve (positive shifts lightcurve later).
+            If an array of offsets are provided, it must have size equal to `sample_size`.
+            The i-th offset corresponds to the i-th sample.
+        binnings : astropy.units.Quantity or None, default = [0.5, 1.5, 4., 10.] * astropy.units.s
+            Size of time binnings at which to calculate trigger test statistic
+            Unexpected behaviors may arise if the binnings are not cleanly divisible by argument `dt`
+        seed : np.ndarray, optional
+            Random seed used to create background rate realizations
+
+        Returns
+        -------
+        xi : np.ndarray
+            SNDAQ trigger significances corresponding to `binnings`
+
+        Notes
+        -----
+        The `offset` and `use_random_offset` arguments are motivated by uncertainty on timing of the signal
+        onset as it arrives relative to the bin edges used by SNDAQ to form triggers.
+        The signal lightcurve onset will align with a bin edge for the case `offset=0*u.s, use_random_offset=False`
+
+        This simulation is an approximation of the live calculation performed by SNDAQ. See arXiv:1108.0171 for more
+        detail. The simulation proceeds as follows
+            1 - Obtain a realization of IceCube's background Rate the base time binning `dt`
+            2 - Rebin the background and signal rates to the search windows from `binnings`
+            3 - Shift signal forward in increments of dt to mimic offset searches of SNDAQ (first iter has no offset)
+            4 - Compute significance xi using max. LLH from arXiv:1108.0171
+            5 - Compare current offset's significances to prior results, if a higher significance is found in the same
+                binning overwrite that binning's prior result.
+            6 - Repeat 3--5 for all offsets as appropriate for binning
+            7 - Repeat 2--5 for all binnings in `binnings`
+
+        """
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
         _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
         xi = np.zeros(binnings.size)
@@ -737,6 +724,7 @@ class Simulation:
 
             rebin_factor = int(binsize.to(u.s).value / dt.to(u.s).value)
             n_bins = ceil(hits_i3.size/rebin_factor)
+
             bg_i3 = self.detector.i3_bg(dt=dt, size=hits_i3.size)
             bg_dc = self.detector.dc_bg(dt=dt, size=hits_i3.size)
 
@@ -782,14 +770,13 @@ class Simulation:
                 dmu = var_dmu * (
                         ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
                         ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom))
-                # Should rel. eff be considered here? It would ahve already been considered once during hit generation
+                # Should rel. eff be considered here? It would have already been considered once during hit generation
                 # It's unclear if SNDAQ applies this same factor, it does apply *a* factor that is somehow normalized
                 #        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) * self.detector.dc_rel_eff / bg_dc_var_dom))
                 _xi = dmu/np.sqrt(var_dmu)
 
                 xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
-            test = None
-        return np.max(xi)
+        return xi
 
 
 def _get_partitions(*args, part_size=1000):
