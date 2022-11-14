@@ -8,7 +8,7 @@ See either of these two resources:
 - https://github.com/SNEWS2/snewpy
 """
 try:
-    from snewpy.models.registry import init_model as init_snewpy_model_from_param
+    from snewpy.models.util import init_model
 except ModuleNotFoundError:
     from .util import init_model as init_snewpy_model_from_param
 
@@ -101,12 +101,7 @@ def init_snewpy_model(model, model_params):
 class Source:
 
     def __init__(self, model, model_params=None):
-        if model_params is None:
-            model_params = {}
-        if model == 'Nakazato_2013':
-            self.model = init_snewpy_model_from_param(model, **model_params)
-        else:
-            self.model = init_snewpy_model(model, model_params)
+        self.model = init_model(model, **model_params)
         self._interp_lum = {}
         self._interp_meanE = {}
         self._interp_pinch = {}
