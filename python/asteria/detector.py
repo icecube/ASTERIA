@@ -46,7 +46,7 @@ class Detector:
         self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'dc'])
 
         # DOM Artificial deadtime
-        self.deadtime = 0.256e-3  # s
+        self.deadtime = 0.25e-3  # s
         # Relative efficiency of dc DOMs compared to i3 DOMs
         self.dc_rel_eff = 1.35
 
