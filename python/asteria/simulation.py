@@ -316,8 +316,6 @@ class Simulation:
         self._total_E_per_V = np.zeros(self.time.size)
 
         for flavor in self.flavors:
-            print(f'Starting {flavor.name} simulation... {" " * (10 - len(flavor.name))}', end='')
-
             # Perform core calculation on partitions in E to regulate memory usage in vectorized function
             # Maximum usage is expected to be ~8MB
             result = np.zeros(self.time.size)
@@ -337,7 +335,7 @@ class Simulation:
                 result *= 2
             self._E_per_V.update({flavor: result * (u.MeV / u.m / u.m / u.m)})
             self._total_E_per_V += result
-            print('DONE')
+
         self._total_E_per_V *= (u.MeV / u.m / u.m / u.m)
         self.rebin_result(dt=self._res_dt, force_rebin=True)
 
