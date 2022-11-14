@@ -6,4 +6,4 @@ matplotlib
 Tables >=3.5.1
 nose2
 nose2[coverage_plugin]>=0.6.5
-snewpy~=1.1
+snewpy>=1.3b1
