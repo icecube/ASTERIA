@@ -38,9 +38,9 @@ class Interaction(ABC):
         self.e_compton_n = 0.95
         
         # Electron path length per leptonic MeV above cherenkov threshold. [m/MeV]
-        self.e_path_per_MeV = 0.580e-2 * u.m / u.MeV;
+        self.e_path_per_MeV = 0.580e-2 * u.m / u.MeV
         # Positron path length per leptonic MeV above cherenkov threshold. [m/MeV]
-        self.p_path_per_MeV = 0.577e-2 * u.m / u.MeV;
+        self.p_path_per_MeV = 0.577e-2 * u.m / u.MeV
         
         # Scaling factor to account for the number of photons produced by
         # an electron which differs from a positron due to the slight 
