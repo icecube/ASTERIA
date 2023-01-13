@@ -44,4 +44,4 @@ jobs:
       # Run the unit tests
       - name: Test with pytest
         run: |
-          pytest -m 'not snowglobes'
+          pytest python/asteria/tests
