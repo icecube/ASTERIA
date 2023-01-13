@@ -26,11 +26,15 @@ class Source:
         self._interp_meanE = {}
         self._interp_pinch = {}
 
-        for flavor in Flavor:
-            t = self.model.time
-            self._interp_lum.update({flavor: PchipInterpolator(t, self.model.luminosity[flavor], extrapolate=False)})
-            self._interp_meanE.update({flavor: PchipInterpolator(t, self.model.meanE[flavor], extrapolate=False)})
-            self._interp_pinch.update({flavor: PchipInterpolator(t, self.model.pinch[flavor], extrapolate=False)})
+        if hasattr(self.model, 'luminosity') and hasattr(self.model, 'meanE') and hasattr(self.model, 'pinch'):
+            for flavor in Flavor:
+                t = self.model.time
+                self._interp_lum.update({flavor: PchipInterpolator(t, self.model.luminosity[flavor], extrapolate=False)})
+                self._interp_meanE.update({flavor: PchipInterpolator(t, self.model.meanE[flavor], extrapolate=False)})
+                self._interp_pinch.update({flavor: PchipInterpolator(t, self.model.pinch[flavor], extrapolate=False)})
+        else:
+            raise NotImplementedError(f'Model {self.model.__class__.__name__} lacks properties for interpolation, '
+                                      'please use a different model')
 
     def luminosity(self, t, flavor=Flavor.NU_E_BAR):
         """Return interpolated source luminosity at time t for a given flavor.
