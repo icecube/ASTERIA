@@ -7,17 +7,9 @@ See either of these two resources:
 - snewpy.readthedocs.io
 - https://github.com/SNEWS2/snewpy
 """
-try:
-    from snewpy.models.util import init_model
-except ModuleNotFoundError:
-    from .util import init_model as init_snewpy_model_from_param
-
-try:
-    from snewpy import model_path
-except ImportError:
-    from .util import model_path
-
+from snewpy.models import _init_model as init_model
 from snewpy.neutrino import Flavor
+
 from scipy.interpolate import PchipInterpolator
 from numbers import Number
 from scipy.special import loggamma, gdtr
