@@ -13,25 +13,32 @@ class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, max_height=1900,
+    def __init__(self, doms_table, effvol_table, geomscope, max_height=1900,
                  f_dc_str=81, dc_rel_eff=1.35):
 
-        # Read in and sort effective volume table
-        effvol = np.genfromtxt(effvol_table)
-        self._effvol_table = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
-                                    meta={'Name': 'Effective_Volume'})
-        self._effvol_table.sort('z')
-
         # Read in doms table from file
-        doms = np.genfromtxt(doms_table)
-        doms = doms[doms[:, -1] <= max_height]
+        doms = np.genfromtxt(doms_table, delimiter = '\t', 
+                             names=['str', 'i', 'x', 'y', 'z', 'det_type', 'om_type'], 
+                             dtype='i8,i8,f8,f8,f8,S4,S2')
 
-        # Doms type: 'i3' (normal doms) and 'dc' (deep cores)
-        doms_type = np.where(doms[:, 0] < f_dc_str, 'i3', 'dc').reshape(-1, 1)
+        doms = doms[doms["z"] <= max_height]
+        # In standard icecube case just use IC86 geometry
+        if geomscope == "IC86":
+            doms[doms["det_type"] == "IC86"]
+            # Read in and sort effective volume table
+            effvol = np.genfromtxt(effvol_table["IC86"])
+            self._effvol_table = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
+                                    meta={'Name': 'Effective_Volume'})
+            self._effvol_table.sort('z')
+
+        else:
+            effvol = {"IC86": np.genfromtxt(effvol_table["IC86"]), "Gen2": np.genfromtxt(effvol_table["Gen2"])}
+            self._effvol_table = self.get_table(self, effvol)
+
 
         # Doms effective volume DeepCore and normal doms
         doms_effvol = self.effvol(doms[:, -1]).reshape(-1, 1)
-        doms_effvol[doms_type == 'dc'] = doms_effvol[doms_type == 'dc']*dc_rel_eff
+        doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
 
         # Create doms table
         self._doms_table = Table(np.hstack((doms, doms_effvol, doms_type)),
@@ -57,6 +64,18 @@ class Detector:
         # Background rate and sigma for dc DOMs
         self._dc_dom_bg_mu = 358.9
         self._dc_dom_bg_sig = 36.0
+    
+    def get_table(self, effvol):
+        keys = effvol.keys()
+        effvol_table = {}
+        for key in keys:
+            effvol_table[key] = Table(effvol[key], 
+                                      names=['z', 'effvol'], dtype=['f8', 'f8'], 
+                                      meta={'Name': 'Effective_Volume'})
+            effvol_table[key].sort('z')
+        return effvol_table
+
+
 
     @property
     def i3_dom_bg_mu(self):
@@ -117,7 +136,7 @@ class Detector:
     def dc_dom_effvol(self):
         return self.dc_total_effvol / self.n_dc_doms
 
-    def effvol(self, depth):
+    def effvol(self, doms, geomscope):
         """ Interpolate table to to get effective volumne
         Inputs:
         - depth: float, list, tuple, ndarray
@@ -125,11 +144,22 @@ class Detector:
         Outputs:
         - vol: float, list, tuple, ndarray
             Effective volume at depth """
-        vol = PchipInterpolator(self._effvol_table['z'], self._effvol_table['effvol'])(depth)
-        if isinstance(depth, (list, tuple, np.ndarray)):
-            return vol
-        # Avoid 0-dimensional array
-        return float(vol)
+        if geomscope == "ic86":
+            depth = doms["z"][doms["det_type"]==b"IC86"] #det_type is UTF-8 (b-string)
+            vol = PchipInterpolator(self._effvol_table['z'], self._effvol_table['effvol'])(depth)
+            if isinstance(depth, (list, tuple, np.ndarray)):
+                return vol
+            # Avoid 0-dimensional array
+            return float(vol)
+        else:
+            vol = {}
+            for key in self._effvol_table.keys():
+                depth = doms['z'][doms["det_type"]==key.encode('UTF-8')] #det_type is UTF-8 (b-string)
+                vol[key] = PchipInterpolator(self._effvol_table[key]['z'], self._effvol_table[key]['effvol'])(depth)
+            if isinstance(depth, (list, tuple, np.ndarray)):
+                return vol
+            # Avoid 0-dimensional array
+            return float(vol)
 
     @property
     def effvol_table(self):

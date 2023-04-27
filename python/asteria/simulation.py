@@ -29,7 +29,7 @@ class Simulation:
     """
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
-                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, effvolfile=None):
+                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, geomscope=None, effvolfile=None):
         self.param = {}
         if model and not config:
 
@@ -93,19 +93,24 @@ class Simulation:
             self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
+            self.geomscope = geomscope
+
             if not geomfile:
                 self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                              'data/detector/Icecube_geometry.20110102.complete.txt')
+                                              'data/detectogeomr/geo_IC86+Gen2.txt')
             else:
                 self._geomfile = geomfile
 
             if not effvolfile:
-                self._effvolfile = os.path.join(os.environ['ASTERIA'],
-                                                'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+                self._effvolfile = {"ic86": os.path.join(os.environ['ASTERIA'],
+                                            'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
+                                    "gen2": os.path.join(os.environ['ASTERIA'],
+                                            'data/detector/mDOM_eff_vol.txt')
+                                    }
             else:
                 self._effvolfile = effvolfile
 
-            self.detector = Detector(self._geomfile, self._effvolfile)
+            self.detector = Detector(self._geomfile, self._effvolfile, self.geomscope)
             self._eps_i3 = None
             self._eps_dc = None
             self._time_binned = None
