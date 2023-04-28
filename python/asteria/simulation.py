@@ -97,14 +97,14 @@ class Simulation:
 
             if not geomfile:
                 self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                              'data/detectogeomr/geo_IC86+Gen2.txt')
+                                              'data/detector/geo_IC86+Gen2.txt')
             else:
                 self._geomfile = geomfile
 
             if not effvolfile:
-                self._effvolfile = {"ic86": os.path.join(os.environ['ASTERIA'],
+                self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
                                             'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
-                                    "gen2": os.path.join(os.environ['ASTERIA'],
+                                    "Gen2": os.path.join(os.environ['ASTERIA'],
                                             'data/detector/mDOM_eff_vol.txt')
                                     }
             else:

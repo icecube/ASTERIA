@@ -13,8 +13,10 @@ class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, geomscope, max_height=1900,
+    def __init__(self, doms_table, effvol_table, geomscope=None, max_height=1900,
                  f_dc_str=81, dc_rel_eff=1.35):
+
+        self.geomscope = geomscope
 
         # Read in doms table from file
         doms = np.genfromtxt(doms_table, delimiter = '\t', 
@@ -22,35 +24,45 @@ class Detector:
                              dtype='i8,i8,f8,f8,f8,S4,S2')
 
         doms = doms[doms["z"] <= max_height]
-        # In standard icecube case just use IC86 geometry
-        if geomscope == "IC86":
-            doms[doms["det_type"] == "IC86"]
-            # Read in and sort effective volume table
-            effvol = np.genfromtxt(effvol_table["IC86"])
-            self._effvol_table = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
-                                    meta={'Name': 'Effective_Volume'})
-            self._effvol_table.sort('z')
-
-        else:
+        
+        # For Gen2
+        if self.geomscope == "Gen2":
+            # read in effective volume table
             effvol = {"IC86": np.genfromtxt(effvol_table["IC86"]), "Gen2": np.genfromtxt(effvol_table["Gen2"])}
-            self._effvol_table = self.get_table(self, effvol)
 
+        # For standard IceCube (IC86) and if geomscope not defined
+        else:
+            # downsample geometry
+            doms = doms[doms["det_type"] == b"IC86"]
+            # read in effective volume table
+            effvol = np.genfromtxt(effvol_table["IC86"])
 
+        self._effvol_table = self.get_effvol_table(effvol)
         # Doms effective volume DeepCore and normal doms
-        doms_effvol = self.effvol(doms[:, -1]).reshape(-1, 1)
-        doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
+        doms_effvol = self.effvol(doms)
+
+        doms_effvol[doms['om_type'] == b'dc'] = doms_effvol[doms['om_type'] == b'dc']*dc_rel_eff
+
+        print(doms, doms_effvol)
+        print(np.dtype(doms), np.dtype(doms_effvol))
 
         # Create doms table
-        self._doms_table = Table(np.hstack((doms, doms_effvol, doms_type)),
-                                 names=['str', 'i', 'x', 'y', 'z', 'effvol', 'type'],
-                                 dtype=['f4', 'f4', 'f8', 'f8', 'f8', 'f8', 'S2'],
+        self._doms_table = Table(np.hstack((doms, doms_effvol)),
+                                 names=['str', 'i', 'x', 'y', 'z', 'det_type', 'om_type', 'effvol'],
+                                 dtype=['f4', 'f4', 'f8', 'f8', 'f8', 'S4', 'S2', 'f8'],
                                  meta={'Name': 'DomsTable'})
-        self.n_i3_doms = np.sum(self._doms_table['type'] == 'i3')
-        self.n_dc_doms = np.sum(self._doms_table['type'] == 'dc')
+        self.n_i3_doms = np.sum(self._doms_table['om_type'] == 'i3')
+        self.n_dc_doms = np.sum(self._doms_table['om_type'] == 'dc')
+        self.n_md = np.sum(self._doms_table['om_type'] == 'md')
+
+        print(self._doms_table)
+
 
         # Total effective volume:
-        self._i3_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'i3'])
-        self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['type'] == 'dc'])
+        self._i3_effvol = np.sum(self._doms_table['effvol'][self._doms_table['om_type'] == 'i3'])
+        self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['om_type'] == 'dc'])
+        self._md_effvol = np.sum(self._doms_table['effvol'][self._doms_table['om_type'] == 'md'])
+
 
         # DOM Artificial deadtime
         self.deadtime = 0.25e-3  # s
@@ -65,15 +77,9 @@ class Detector:
         self._dc_dom_bg_mu = 358.9
         self._dc_dom_bg_sig = 36.0
     
-    def get_table(self, effvol):
-        keys = effvol.keys()
-        effvol_table = {}
-        for key in keys:
-            effvol_table[key] = Table(effvol[key], 
-                                      names=['z', 'effvol'], dtype=['f8', 'f8'], 
-                                      meta={'Name': 'Effective_Volume'})
-            effvol_table[key].sort('z')
-        return effvol_table
+        # Background rate and sigma for dc DOMs
+        self._md_bg_mu = 93.4
+        self._md_bg_sig = 13.0
 
 
 
@@ -92,6 +98,14 @@ class Detector:
     @property
     def dc_dom_bg_sig(self):
         return self._dc_dom_bg_sig
+    
+    @property
+    def md_bg_mu(self):
+        return self._md_bg_mu
+
+    @property
+    def md_bg_sig(self):
+        return self._md_bg_sig
 
     def set_i3_background(self, mu=284.9, sig=26.2):
         self._i3_dom_bg_mu = mu
@@ -101,6 +115,10 @@ class Detector:
         self._dc_dom_bg_mu = mu
         self._dc_dom_bg_sig = sig
 
+    def set_md_background(self, mu=93.4, sig=13.0):
+        self._md_bg_mu = mu
+        self._md_bg_sig = sig
+
     def i3_dom_bg(self, dt=0.5*u.s, size=1):
         return np.random.normal(loc=self.i3_dom_bg_mu * dt.to(u.s).value,
                                 scale=self.i3_dom_bg_sig * np.sqrt(dt.to(u.s).value),
@@ -109,6 +127,11 @@ class Detector:
     def dc_dom_bg(self, dt=0.5*u.s, size=1):
         return np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value,
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value),
+                                size=size)
+    
+    def md_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value,
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value),
                                 size=size)
 
     def i3_bg(self, dt=0.5*u.s, size=1):
@@ -120,6 +143,11 @@ class Detector:
         return np.random.normal(loc=self.dc_dom_bg_mu * dt.to(u.s).value * self.n_dc_doms,
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value * self.n_dc_doms),
                                 size=size)
+    
+    def md_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.n_md,
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value * self.n_md),
+                                size=size)
     @property
     def i3_total_effvol(self):
         return self._i3_effvol
@@ -127,6 +155,10 @@ class Detector:
     @property
     def dc_total_effvol(self):
         return self._dc_effvol
+    
+    @property
+    def md_total_effvol(self):
+        return self._md_effvol
 
     @property
     def i3_dom_effvol(self):
@@ -135,31 +167,65 @@ class Detector:
     @property
     def dc_dom_effvol(self):
         return self.dc_total_effvol / self.n_dc_doms
-
-    def effvol(self, doms, geomscope):
-        """ Interpolate table to to get effective volumne
+    
+    @property
+    def md_dom_effvol(self):
+        return self.md_total_effvol / self.n_md
+    
+    def get_effvol_table(self, effvol):
+        """ Load effective volume table as astropy table
         Inputs:
-        - depth: float, list, tuple, ndarray
-            Depth to evaluate effective volumne
+        - effvol: ndarray, dict of ndarray
+            Effective volume table from data files
+        Outputs:
+        - effvol_table: ndarray, dict of ndarry
+            Effective volume table in astropy Table format
+        """
+        if self.geomscope == "Gen2":
+            keys = effvol.keys()
+            effvol_table = {}
+            for key in keys:
+                evt = Table(effvol[key], names=['z', 'effvol'], dtype=['f8', 'f8'], 
+                            meta={'Name': 'Effective_Volume'})
+                evt.sort('z')
+                effvol_table[key] = evt
+            return effvol_table
+        else:
+            evt = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
+                        meta={'Name': 'Effective_Volume'})
+            evt.sort('z')
+            effvol_table[key] = evt
+            return effvol_table
+
+    def effvol(self, doms):
+        """ Interpolate table to to get effective volume
+        Inputs:
+        - doms: float, list, tuple, ndarray
+            DOMs table to read of the depth for given subdetector and sensor
         Outputs:
         - vol: float, list, tuple, ndarray
             Effective volume at depth """
-        if geomscope == "ic86":
-            depth = doms["z"][doms["det_type"]==b"IC86"] #det_type is UTF-8 (b-string)
-            vol = PchipInterpolator(self._effvol_table['z'], self._effvol_table['effvol'])(depth)
-            if isinstance(depth, (list, tuple, np.ndarray)):
-                return vol
-            # Avoid 0-dimensional array
-            return float(vol)
-        else:
-            vol = {}
+        # ToDO Jakob: make sure that for more complicated geometries (e.g. DOM,mDOM,DOM,mDOM) the effective volume 
+        # is correctly stacked, right now because there are only two components this is not needed (DOM,mDOM).
+        if self.geomscope == "Gen2":
+            vol = np.array([])
             for key in self._effvol_table.keys():
                 depth = doms['z'][doms["det_type"]==key.encode('UTF-8')] #det_type is UTF-8 (b-string)
-                vol[key] = PchipInterpolator(self._effvol_table[key]['z'], self._effvol_table[key]['effvol'])(depth)
+                vol_sens = PchipInterpolator(self._effvol_table[key]['z'], self._effvol_table[key]['effvol'])(depth).reshape(-1, 1)
+                vol = np.append(vol, vol_sens)
             if isinstance(depth, (list, tuple, np.ndarray)):
                 return vol
             # Avoid 0-dimensional array
             return float(vol)
+
+        else:
+            depth = doms["z"][doms["det_type"]==b"IC86"] #det_type is UTF-8 (b-string)
+            vol = PchipInterpolator(self._effvol_table['z'], self._effvol_table['effvol'])(depth).reshape(-1, 1)
+            if isinstance(depth, (list, tuple, np.ndarray)):
+                return vol
+            # Avoid 0-dimensional array
+            return float(vol)
+        
 
     @property
     def effvol_table(self):
@@ -168,15 +234,15 @@ class Detector:
 
     @property
     def doms_table(self, dom_type=None):
-        """ Return a copy of the doms table given type
+        """ Return a copy of the doms table given om_type
         Inputs:
-        + type: str (default=None)
-            If None, return full table. Else return the doms with the input type.
-            Type must be "dc" or "i3". """
+        + om_type: str (default=None)
+            If None, return full table. Else return the doms with the input om_type.
+            Type must be "dc", "i3" or "md". """
         if dom_type is None:
             return self._doms_table
         elif dom_type == 'dc' or dom_type == 'i3':
-            return self._doms_table[self._doms_table['type'] == dom_type]
+            return self._doms_table[self._doms_table['om_type'] == dom_type]
         else:
             raise ValueError('Type must be either "dc" or "i3".')
 
