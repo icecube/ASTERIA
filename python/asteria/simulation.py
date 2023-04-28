@@ -93,7 +93,12 @@ class Simulation:
             self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
-            self.geomscope = geomscope
+            if not geomscope:
+                self._geomscope = "IC86"
+            elif geomscope == 'IC86' or geomscope == 'Gen2':
+                self._geomscope = geomscope
+            else:
+                raise ValueError("geomscope only takes values `IC86`, `Gen2` or None")
 
             if not geomfile:
                 self._geomfile = os.path.join(os.environ['ASTERIA'],
@@ -110,9 +115,10 @@ class Simulation:
             else:
                 self._effvolfile = effvolfile
 
-            self.detector = Detector(self._geomfile, self._effvolfile, self.geomscope)
+            self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope)
             self._eps_i3 = None
             self._eps_dc = None
+            self._eps_md = None
             self._time_binned = None
             self._E_per_V_binned = None
             self._total_E_per_V_binned = None
@@ -127,6 +133,7 @@ class Simulation:
                 mixing = configuration['MIXING']
                 energy = configuration['ENERGY']
                 time = configuration['TIME']
+                scope = configuration['SCOPE']
 
                 if 'min' and 'max' and 'step' in configuration['ENERGY'].keys():
                     _Emin = float(energy['min'])
@@ -179,19 +186,31 @@ class Simulation:
                                        float(mixing['angle']), energy, time)
                 self.__init__(**self.param)
 
+                if 'geomscope' in configuration['SCOPE']:
+                    geomscope = str(scope['geomscope'])
+                    if geomscope == "IC86" or geomscope == "Gen2":
+                        self._geomscope = geomscope
+                    else:
+                        raise ValueError("geomscope only takes values `IC86`, `Gen2`")
+                else:
+                    self._geomscope = 'IC86'
+
                 if not geomfile:
                     self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                                  'data/detector/Icecube_geometry.20110102.complete.txt')
+                                                  'data/detector/geo_IC86+Gen2.txt')
                 else:
                     self._geomfile = geomfile
 
                 if not effvolfile:
-                    self._effvolfile = os.path.join(os.environ['ASTERIA'],
-                                                    'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+                    self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
+                                                'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
+                                        "Gen2": os.path.join(os.environ['ASTERIA'],
+                                                'data/detector/mDOM_eff_vol.txt')
+                                        }
                 else:
                     self._effvolfile = effvolfile
 
-                self.detector = Detector(self._geomfile, self._effvolfile)
+                self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope)
 
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')

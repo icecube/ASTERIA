@@ -83,10 +83,12 @@ model = {'name': 'Walk_2019',
              'progenitor_mass': 40*u.Msun}
          }
 
-sim = Simulation(model=model,
-                 distance=10 * u.kpc, 
-                 Emin=0*u.MeV, Emax=100*u.MeV, dE=1*u.MeV,
-                 tmin=-0.5*u.s, tmax=1.5*u.s, dt=1*u.ms,
-                 geomscope="Gen2")
+#sim = Simulation(model=model,
+#                 distance=10 * u.kpc, 
+#                 Emin=0*u.MeV, Emax=100*u.MeV, dE=1*u.MeV,
+#                 tmin=-0.5*u.s, tmax=1.5*u.s, dt=1*u.ms,
+#                 geomscope = None)
+
+sim = Simulation(config="/home/jakob/software/ASTERIA/ASTERIA/data/config/example.ini")
 sim.run()
 
