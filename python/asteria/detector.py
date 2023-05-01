@@ -8,7 +8,7 @@ from astropy.table import Table
 
 import numpy as np
 import numpy.lib.recfunctions as rfn
-from scipy.interpolate import PchipInterpolator
+from scipy.interpolate import PchipInterpolator, InterpolatedUnivariateSpline
 
 class Detector:
 
@@ -209,11 +209,13 @@ class Detector:
             Effective volume at depth """
         # ToDO Jakob: make sure that for more complicated geometries (e.g. DOM,mDOM,DOM,mDOM) the effective volume 
         # is correctly stacked, right now because there are only two components this is not needed (DOM,mDOM).
+        # TODO Jakob: consider changing interpolator and set values exceeding range to edge values
         if self._geomscope == 'Gen2':
             vol = np.array([])
             for key in self._effvol_table.keys():
                 depth = doms['z'][doms['det_type']==key] #det_type is UTF-8 (b-string)
-                vol_sens = PchipInterpolator(self._effvol_table[key]['z'], self._effvol_table[key]['effvol'])(depth).reshape(-1, 1)
+                vol_sens = InterpolatedUnivariateSpline(self._effvol_table[key]['z'], self._effvol_table[key]['effvol'],
+                                                        k=3,ext=3)(depth).reshape(-1, 1)
                 vol = np.append(vol, vol_sens)
             if isinstance(depth, (list, tuple, np.ndarray)):
                 return vol

@@ -405,8 +405,13 @@ class Simulation:
         else:
             E_per_V = self._E_per_V_binned[flavor]
 
-        effvol = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
-        return effvol * E_per_V * (self.eps_dc + self.eps_i3)/2
+        effvol_IC86 = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
+        effvol_Gen2 = 0.4288 * u.m ** 3 / u.MeV  # Simple estimation of Gen2 mDOM Eff. Vol. (np.avg(effvol_table))
+
+        if self._geomscope == "Gen2":
+            return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2 + effvol_Gen2 * E_per_V * self.eps_md
+        else:
+            return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2
 
     def rebin_result(self, dt, *, offset=0 * u.s, force_rebin=False):
         """Rebins the simulation results to a new time binning.
@@ -464,8 +469,11 @@ class Simulation:
             self._total_E_per_V_binned *= (u.MeV / u.m / u.m / u.m)
             self._res_dt = _dt * u.s
             self._res_offset = _offset * u.us.to(u.s) * u.s
-            self._eps_i3 = self._compute_deadtime_efficiency(domtype='i3')
-            self._eps_dc = self._compute_deadtime_efficiency(domtype='dc')
+            self._eps_i3 = self._compute_deadtime_efficiency(omtype='i3')
+            self._eps_dc = self._compute_deadtime_efficiency(omtype='dc')
+            if self._geomscope == 'Gen2':
+                self._eps_md = self._compute_deadtime_efficiency(omtype='md')
+
 
     def scale_result(self, distance, force_rescale=False):
         """Rescales the simulation results to a progenitor distance.
@@ -498,15 +506,16 @@ class Simulation:
             self.rebin_result(dt=self._res_dt, offset=self._res_offset, force_rebin=True)
             self.distance = new_dist * u.kpc
 
-    def _compute_deadtime_efficiency(self, domtype='i3', *, dom_effvol=None):
+    def _compute_deadtime_efficiency(self, omtype='i3', *, dom_effvol=None):
         """Compute DOM deadtime efficiency factor (arises from 250 us artificial deadtime).
         From A&A 535, A109 (2011) [https://doi.org/10.1051/0004-6361/201117810]
 
         Parameters
         ----------
-        domtype : str
-            Type of IceCube DOM 'i3' is IC80 DOM, 'dc' is DeepCore DOM from the Simulation.detector member
-            This argument is ignored if a specific DOM effective volume is provided.
+        omtype : str
+            Type of IceCube DOM 'i3' is IC80 DOM, 'dc' is DeepCore DOM or Gen2 mDOM 'md' from the 
+            Simulation.detector member. This argument is ignored if a specific DOM effective volume 
+            is provided.
         dom_effvol : float or np.ndarray, optional
             DOM effective volume measured in MeV / m**3 (but not stored with astropy units).
             This may either a float (for a single DOM) or an array of float (for a table of DOMs)
@@ -521,13 +530,18 @@ class Simulation:
         This deadtime factor is calculated using the rate observed in 1s bins (hz), but the results stored
         in class members are not scaled to 1s after this function has been run.
         """
-        if dom_effvol is None:  # If dom_effvol is provided, domtype argument is unused
-            if domtype == 'i3':
+        if dom_effvol is None:  # If dom_effvol is provided, omtype argument is unused
+            if omtype == 'i3':
                 dom_effvol = self.detector.i3_dom_effvol
-            elif domtype == 'dc':
+            elif omtype == 'dc':
                 dom_effvol = self.detector.dc_dom_effvol  # dc effective vol already includes relative efficiency
+            elif omtype == 'md':
+                if self._geomscope == 'Gen2':
+                    dom_effvol = self.detector.md_dom_effvol
+                else:
+                    raise ValueError(f"Unknown omtype: {omtype} for {self._geomscope} detector scope")
             else:
-                raise ValueError(f"Unknown domtype: {domtype}, expected ('i3', 'dc')")
+                raise ValueError(f"Unknown omtype: {omtype}, expected ('i3', 'dc', 'md')")
 
         if isinstance(dom_effvol, np.ndarray):
             # Ensures proper np broadcasting
@@ -553,6 +567,11 @@ class Simulation:
     def eps_dc(self):
         """Deadtime efficiency for DeepCore DOMs"""
         return self._eps_dc
+    
+    @property
+    def eps_md(self):
+        """Deadtime efficiency for Gen2 mDOMs"""
+        return self._eps_md
 
     @property
     def total_E_per_V_binned(self):
@@ -579,7 +598,8 @@ class Simulation:
         flavor: snewpy.neutrino.Flavor
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
         subdetector : None or str
-            IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, None for IC86
+            IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, 'md' for mDOM 
+            (if self._geomscope == 'Gen2'), None for full IC86/Gen2 (depending on self._geomscope)
         offset : astropy.quantity.Quantity
             Offset to apply to rebinned result in units s (or compatible)
 
@@ -594,11 +614,27 @@ class Simulation:
         """
         self.rebin_result(dt, offset=offset)
 
-        i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
-        dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
         E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
-        return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
+
+        if self._geomscope == 'Gen2':
+            if subdetector == 'i3':
+                return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3)
+            elif subdetector == 'dc':
+                return self.time_binned, E_per_V * (self.detector.dc_total_effvol * self.eps_dc)
+            elif subdetector == 'md':
+                return self.time_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md)
+            else:
+                return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 + 
+                                                    self.detector.dc_total_effvol * self.eps_dc + 
+                                                    self.detector.md_total_effvol * self.eps_md)
+        else:
+            if subdetector == 'md':
+                raise ValueError(f"Unknown omtype: {subdetector} for {self._geomscope} detector scope")7
+            else:
+                i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
+                dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
+                return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
     def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s):
         """Compute hit rates observed by detector
@@ -609,8 +645,9 @@ class Simulation:
             Time binning for hit rates (must be a multiple of base dt used for simulation)
         flavor: snewpy.neutrino.Flavor
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
-        subdetector: None or str
-            IceCube subdetector, must be None (Full Detector), 'i3' (IC80) or 'dc' (DeepCore)
+        subdetector : None or str
+            IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, 'md' for mDOM 
+            (if self._geomscope == 'Gen2'), None for full IC86/Gen2 (depending on self._geomscope)
 
         Returns
         -------
@@ -738,6 +775,9 @@ class Simulation:
         """
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
         _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
+        if self._geomscope == 'Gen2':
+            _, hits_md = self.detector_hits(dt=dt, offset=offset, subdetector='md')
+
         xi = np.zeros(binnings.size)
 
         for idx_bin, binsize in enumerate(binnings):
@@ -748,20 +788,32 @@ class Simulation:
             n_bins = ceil(hits_i3.size/rebin_factor)
 
             bg_i3 = self.detector.i3_bg(dt=dt, size=hits_i3.size)
-            bg_dc = self.detector.dc_bg(dt=dt, size=hits_i3.size)
+            bg_dc = self.detector.dc_bg(dt=dt, size=hits_dc.size)
+            if self._geomscope == 'Gen2':
+                bg_md = self.detector.md_bg(dt=dt, size=hits_md.size)
 
             # Create a realization of background rate scaled up from dt to binsize
             bg_i3_binned = np.zeros(n_bins)
             bg_dc_binned = np.zeros(n_bins)
-            for idx_time, (bg_i3_part, bg_dc_part) in enumerate(_get_partitions(bg_i3, bg_dc, part_size=rebin_factor)):
-                bg_i3_binned[idx_time] = np.sum(bg_i3_part)
-                bg_dc_binned[idx_time] = np.sum(bg_dc_part)
+
+            if self._geomscope == 'Gen2':
+                bg_md_binned = np.zeros(n_bins)
+                for idx_time, (bg_i3_part, bg_dc_part, bg_md_part) in enumerate(_get_partitions(bg_i3, bg_dc, bg_md, part_size=rebin_factor)):
+                    bg_i3_binned[idx_time] = np.sum(bg_i3_part)
+                    bg_dc_binned[idx_time] = np.sum(bg_dc_part)
+                    bg_md_binned[idx_time] = np.sum(bg_md_part)
+            else:
+                for idx_time, (bg_i3_part, bg_dc_part) in enumerate(_get_partitions(bg_i3, bg_dc, part_size=rebin_factor)):
+                    bg_i3_binned[idx_time] = np.sum(bg_i3_part)
+                    bg_dc_binned[idx_time] = np.sum(bg_dc_part)
 
             # Compute *DOM* background rate variance
             # Background variance is not well estimated after the rebin, so use lower binning and upscale
             # This could be mitigated by extending background windows, at the cost of speed
             bg_i3_var_dom = rebin_factor * self.detector.i3_dom_bg(dt=dt, size=1000).var()
             bg_dc_var_dom = rebin_factor * self.detector.dc_dom_bg(dt=dt, size=1000).var()
+            if self._geomscope == 'Gen2':
+                bg_md_var_dom = rebin_factor * self.detector.md_dom_bg(dt=dt, size=1000).var()
 
             # If hits_i3.size / rebin_factor is not an integer, then the last bin in the rebinned rates will be partial
             # In this case, exclude it from the calculation of the background mean
@@ -772,32 +824,65 @@ class Simulation:
 
             bg_i3_mean = bg_i3_binned[:idx_bg].mean()  # IC80 *subdetector* rate mean
             bg_dc_mean = bg_dc_binned[:idx_bg].mean()  # DeepCore *subdetector* rate mean
+            if self._geomscope == 'Gen2':
+                bg_md_mean = bg_md_binned[:idx_bg].mean()  # Gen2 mDOM *subdetector* rate mean
 
+            ###
             # Compute xi with increments of 0.5s offsets, mimicking the offset searches of SNDAQ
-            for idx_offset in range(rebin_factor):
-                hits_i3_offset = np.roll(hits_i3, idx_offset)
-                hits_dc_offset = np.roll(hits_dc, idx_offset)
-                hits_i3_offset[:idx_offset] = 0
-                hits_dc_offset[:idx_offset] = 0
-                hits_i3_binned = np.zeros(n_bins)
-                hits_dc_binned = np.zeros(n_bins)
+            if self._geomscope == 'Gen2':
+                for idx_offset in range(rebin_factor):
+                    hits_i3_offset = np.roll(hits_i3, idx_offset)
+                    hits_dc_offset = np.roll(hits_dc, idx_offset)
+                    hits_md_offset = np.roll(hits_md, idx_offset)
+                    hits_i3_offset[:idx_offset] = 0
+                    hits_dc_offset[:idx_offset] = 0
+                    hits_md_offset[:idx_offset] = 0
+                    hits_i3_binned = np.zeros(n_bins)
+                    hits_dc_binned = np.zeros(n_bins)
+                    hits_md_binned = np.zeros(n_bins)
+                    
+                    for idx_time, (hits_i3_part, hits_dc_part, hits_md_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
+                                                                                            hits_md_offset, part_size=rebin_factor)):
+                        hits_i3_binned[idx_time] = np.sum(hits_i3_part)
+                        hits_dc_binned[idx_time] = np.sum(hits_dc_part)
+                        hits_md_binned[idx_time] = np.sum(hits_md_part)
 
-                for idx_time, (hits_i3_part, hits_dc_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
-                                                                                        part_size=rebin_factor)):
-                    hits_i3_binned[idx_time] = np.sum(hits_i3_part)
-                    hits_dc_binned[idx_time] = np.sum(hits_dc_part)
+                    var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
+                                (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom) + 
+                                (self.detector.n_md/bg_md_var_dom))
+                    dmu = var_dmu * (
+                            ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
+                            ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom) +
+                            ((hits_md_binned + bg_md_binned - bg_md_mean) / bg_md_var_dom))
+                    _xi = dmu/np.sqrt(var_dmu)
 
-                var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
-                             (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom))
-                dmu = var_dmu * (
-                        ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
-                        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom))
-                # Should rel. eff be considered here? It would have already been considered once during hit generation
-                # It's unclear if SNDAQ applies this same factor, it does apply *a* factor that is somehow normalized
-                #        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) * self.detector.dc_rel_eff / bg_dc_var_dom))
-                _xi = dmu/np.sqrt(var_dmu)
+                    xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
 
-                xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
+            else:
+                for idx_offset in range(rebin_factor):
+                    hits_i3_offset = np.roll(hits_i3, idx_offset)
+                    hits_dc_offset = np.roll(hits_dc, idx_offset)
+                    hits_i3_offset[:idx_offset] = 0
+                    hits_dc_offset[:idx_offset] = 0
+                    hits_i3_binned = np.zeros(n_bins)
+                    hits_dc_binned = np.zeros(n_bins)
+                    
+                    for idx_time, (hits_i3_part, hits_dc_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
+                                                                                            part_size=rebin_factor)):
+                        hits_i3_binned[idx_time] = np.sum(hits_i3_part)
+                        hits_dc_binned[idx_time] = np.sum(hits_dc_part)
+
+                    var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
+                                (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom))
+                    dmu = var_dmu * (
+                            ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
+                            ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom))
+                    # Should rel. eff be considered here? It would have already been considered once during hit generation
+                    # It's unclear if SNDAQ applies this same factor, it does apply *a* factor that is somehow normalized
+                    #        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) * self.detector.dc_rel_eff / bg_dc_var_dom))
+                    _xi = dmu/np.sqrt(var_dmu)
+
+                    xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
         return xi
 
 
