@@ -69,17 +69,29 @@ class Detector:
         # Relative efficiency of dc DOMs compared to i3 DOMs
         self.dc_rel_eff = 1.35
 
+        # Number of PMTs per i3 DOM
+        self._i3_dom_num_pmt = 1
+        # Number of PMTs per dc DOM
+        self._dc_dom_num_pmt = 1
+        # Number of PMTs per mDOM
+        self._md_num_pmt = 24
+
+        # Scale mean (std) of single module PMT noise by the number of PMTs (sqrt(number of PMTs))
+        # according to the rules of summing N independent random variables.
+        # For every PMT we assume the same mean and std, therefore the addition becomes a factor N
+        # for the mean and sqrt(N) for the std
+        
         # Background rate and sigma for i3 DOMs (hits / s)
-        self._i3_dom_bg_mu = 284.9
-        self._i3_dom_bg_sig = 26.2
+        self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
+        self._i3_dom_bg_sig = 26.2 * np.sqrt(self._i3_dom_num_pmt)
 
         # Background rate and sigma for dc DOMs
-        self._dc_dom_bg_mu = 358.9
-        self._dc_dom_bg_sig = 36.0
+        self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
+        self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
     
-        # Background rate and sigma for dc DOMs
-        self._md_bg_mu = 93.4
-        self._md_bg_sig = 13.0
+        # Background rate and sigma for mDOMs
+        self._md_bg_mu = 93.4 * self._md_num_pmt
+        self._md_bg_sig = 13.0 * np.sqrt(self._md_num_pmt)
 
     @property
     def geomscope(self):
@@ -267,13 +279,14 @@ def initialize(config):
     Detector
         An initialized detector model.
     """
-
+    geomscope = config.detector.geomscope
+    
     geomfile = '/'.join([config.abs_base_path,
                          config.detector.geometry.table.path])
     effvfile = '/'.join([config.abs_base_path,
                          config.detector.effvol.table.path])
 
-    return Detector(geomfile, effvfile)
+    return Detector(geomfile, effvfile, geomscope)
 
 """
 def main():

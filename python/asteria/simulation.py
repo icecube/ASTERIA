@@ -79,7 +79,7 @@ class Simulation:
             self.mixing_scheme = mixing_scheme
             self.mixing_angle = mixing_angle
             if mixing_scheme:
-                if mixing_scheme == 'NoTransformation':
+                if mixing_scheme == 'NoTransformation' or mixing_scheme == 'CompleteExchange':
                     self._mixing = getattr(ft, mixing_scheme)()
                 else:
                     # TODO: Improve mixing name checking, this argument is case sensitive
@@ -630,7 +630,7 @@ class Simulation:
                                                     self.detector.md_total_effvol * self.eps_md)
         else:
             if subdetector == 'md':
-                raise ValueError(f"Unknown omtype: {subdetector} for {self._geomscope} detector scope")7
+                raise ValueError(f"Unknown omtype: {subdetector} for {self._geomscope} detector scope")
             else:
                 i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
                 dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
