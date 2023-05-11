@@ -110,7 +110,7 @@ class Simulation:
                 self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
                                             'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
                                     "Gen2": os.path.join(os.environ['ASTERIA'],
-                                            'data/detector/mDOM_eff_vol.txt')
+                                            'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt') #'data/detector/mDOM_effvol.txt'
                                     }
             else:
                 self._effvolfile = effvolfile

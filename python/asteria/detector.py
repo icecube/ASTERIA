@@ -46,7 +46,9 @@ class Detector:
         # Doms effective volume DeepCore and normal doms
         doms_effvol = self.effvol(doms)
 
+        md_rel_eff=2.33
         doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
+        doms_effvol[doms['om_type'] == 'md'] = doms_effvol[doms['om_type'] == 'md']*md_rel_eff
 
         # Create doms table
         #self._doms_table = Table(np.hstack((doms, doms_effvol)),
