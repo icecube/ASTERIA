@@ -14,19 +14,15 @@ class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, geomscope, max_height=1900,
-                 f_dc_str=81, dc_rel_eff=1.35):
+    def __init__(self, doms_table, effvol_table, geomscope, include_wls, max_height=1900, 
+                 dc_rel_eff=1.35, wls_md_rel_eff=1.81):
 
         self._geomscope = geomscope
-
-        # converts b-string to ascii-string
-        convertfunc = lambda x: x.decode('ascii')
 
         # Read in doms table from file
         doms = np.genfromtxt(doms_table, delimiter = '\t', 
                              names=['str', 'i', 'x', 'y', 'z', 'det_type', 'om_type'], 
-                             dtype='i4,i4,f8,f8,f8,U4,U2')#,
-                             #converters= {'det_type' : convertfunc, 'om_type' : convertfunc})
+                             dtype='i4,i4,f8,f8,f8,U4,U2')
 
         doms = doms[doms['z'] <= max_height]
         
@@ -46,9 +42,9 @@ class Detector:
         # Doms effective volume DeepCore and normal doms
         doms_effvol = self.effvol(doms)
 
-        md_rel_eff=2.33
         doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
-        doms_effvol[doms['om_type'] == 'md'] = doms_effvol[doms['om_type'] == 'md']*md_rel_eff
+        if include_wls:
+            doms_effvol[doms['om_type'] == 'md'] = doms_effvol[doms['om_type'] == 'md']*wls_md_rel_eff
 
         # Create doms table
         #self._doms_table = Table(np.hstack((doms, doms_effvol)),
@@ -94,6 +90,11 @@ class Detector:
         # Background rate and sigma for mDOMs
         self._md_bg_mu = 93.4 * self._md_num_pmt
         self._md_bg_sig = 13.0 * np.sqrt(self._md_num_pmt)
+
+        # Extra background by WLS tube, WLS tube is considered part of mDOM, mDOM is scaled
+        if include_wls:
+            self._md_bg_mu +=  204.3
+            self._md_bg_sig += np.sqrt(204.3)
 
     @property
     def geomscope(self):

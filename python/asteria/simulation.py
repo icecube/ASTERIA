@@ -29,7 +29,7 @@ class Simulation:
     """
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
-                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, geomscope=None, effvolfile=None):
+                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, effvolfile=None):
         self.param = {}
         if model and not config:
 
@@ -99,6 +99,13 @@ class Simulation:
                 self._geomscope = geomscope
             else:
                 raise ValueError("geomscope only takes values `IC86`, `Gen2` or None")
+            
+            if not include_wls:
+                self._include_wls = False
+            elif include_wls == True or include_wls == False:
+                self._include_wls = include_wls
+            else:
+                raise ValueError("include_wls only takes values True, False or None")
 
             if not geomfile:
                 self._geomfile = os.path.join(os.environ['ASTERIA'],
@@ -110,12 +117,12 @@ class Simulation:
                 self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
                                             'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
                                     "Gen2": os.path.join(os.environ['ASTERIA'],
-                                            'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt') #'data/detector/mDOM_effvol.txt'
+                                            'data/detector/mDOM_effvol.txt')
                                     }
             else:
                 self._effvolfile = effvolfile
 
-            self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope)
+            self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self._include_wls)
             self._eps_i3 = None
             self._eps_dc = None
             self._eps_md = None
@@ -636,7 +643,7 @@ class Simulation:
                 dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
                 return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
-    def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s):
+    def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s, size=1):
         """Compute hit rates observed by detector
 
         Parameters
@@ -656,8 +663,11 @@ class Simulation:
         """
         time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
         # return time_binned, np.random.poisson(signal)
-
-        return time_binned, np.random.normal(signal, np.sqrt(signal))
+        detector_hits = np.random.normal(signal, np.sqrt(signal),size=(size,len(signal)))
+        if size==1:
+            return time_binned, detector_hits.reshape(-1)
+        else:
+            return time_binned, detector_hits
 
     def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=None, binnings=None,
                             use_random_offset=True, *, only_highest=True, debug_info=False, seeds=None):
