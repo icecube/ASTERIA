@@ -8,7 +8,7 @@ See either of these two resources:
 - https://github.com/SNEWS2/snewpy
 """
 try:
-    from snewpy.models.util import init_model
+    from snewpy.models import _init_model as init_model
 except ModuleNotFoundError:
     from .util import init_model as init_snewpy_model_from_param
 
