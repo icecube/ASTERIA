@@ -23,13 +23,16 @@ from .interactions import Interactions
 from .source import Source
 from .detector import Detector
 
+from scipy.interpolate import InterpolatedUnivariateSpline
+
 
 class Simulation:
     """ Top-level class for performing ASTERIA's core simulation routine, and handler for the resulting outputs
     """
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
-                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, effvolfile=None):
+                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, 
+                 effvolfile=None, deadtimefile=None):
         self.param = {}
         if model and not config:
 
@@ -94,7 +97,7 @@ class Simulation:
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
             if not geomscope:
-                self._geomscope = "IC86"
+                self._geomscope = 'IC86'
             elif geomscope == 'IC86' or geomscope == 'Gen2':
                 self._geomscope = geomscope
             else:
@@ -121,6 +124,16 @@ class Simulation:
                                     }
             else:
                 self._effvolfile = effvolfile
+
+            if not deadtimefile:
+                self._deadtimefile = os.path.join(os.environ['ASTERIA'],'data/detector/mDOM_deadtime_efficiency_250us.txt')
+            
+            else:
+                self._deadtimefile = deadtimefile
+            
+            mDOM_deadtime_data = np.genfromtxt(self._deadtimefile, delimiter='', dtype=float)
+            mDOM_inj_sig, mDOM_deadtime = mDOM_deadtime_data.T
+            self._mDOM_deadtime_interpolated = InterpolatedUnivariateSpline(mDOM_inj_sig, mDOM_deadtime, k=3, ext=3)
 
             self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self._include_wls)
             self._eps_i3 = None
@@ -557,13 +570,26 @@ class Simulation:
             # In SNDAQ this is calculated **with** poisson randomness
             dom_signal = dom_effvol * self.total_E_per_V_binned.value
 
+        #if omtype == 'i3' or omtype == 'dc':
         # TODO: Adjust this scaling based on the determined "proper" method for computing deadtime
         #   eps_dt = 0.87 / (1+ 250us * true_sn_rate) -- is true_sn_rate the rate in 500ms bins, 1s bins, etc?
         #   SNDAQ always uses 500ms
         # Convert scaling factor as if it is a 0.5s bin
-        scaling_factor = 0.5/self._res_dt.to(u.s).value
-        dom_signal *= scaling_factor
-        return 0.87 / (1 + self.detector.deadtime * dom_signal)
+        #    scaling_factor = 0.5/self._res_dt.to(u.s).value
+        #    dom_signal *= scaling_factor
+        #    return 0.87 / (1 + self.detector.deadtime * dom_signal)
+
+        #elif self._geomscope == 'Gen2' and omtype == 'md':
+        #    # Deadtime efficiency simulation takes injection data/signal in Hz
+        #    scaling_factor = 1/self._res_dt.to(u.s).value
+        #    dom_signal *= scaling_factor
+        #    return self._mDOM_deadtime_interpolated(dom_signal)
+
+        #    scaling_factor = 0.5/self._res_dt.to(u.s).value
+        #    dom_signal *= scaling_factor
+        #    dom_background *= 0.5 # scale background rate to 0.5 s bins but detector.i3_dom_bg_mu given in Hz
+        #    return (1 - self.detector.deadtime * dom_background)**n_pmt / (2 - (1 - self.detector.deadtime * dom_signal)**n_pmt)
+        return 1
 
     @property
     def eps_i3(self):

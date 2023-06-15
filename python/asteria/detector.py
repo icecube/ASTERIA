@@ -80,16 +80,28 @@ class Detector:
         # for the mean and sqrt(N) for the std
         
         # Background rate and sigma for i3 DOMs (hits / s)
-        self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
-        self._i3_dom_bg_sig = 26.2 * np.sqrt(self._i3_dom_num_pmt)
+        # With a dead-time of 250µs
+        #self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
+        #self._i3_dom_bg_sig = 26.2 * np.sqrt(self._i3_dom_num_pmt)
+        # With no dead-time
+        self._i3_dom_bg_mu = 540 * self._i3_dom_num_pmt
+        self._i3_dom_bg_sig = 26.2 * np.sqrt(540/284.9) * np.sqrt(self._i3_dom_num_pmt)
 
         # Background rate and sigma for dc DOMs
-        self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
-        self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
+        # With a dead-time of 250µs
+        #self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
+        #self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
+        # With no dead-time
+        self._dc_dom_bg_mu = 540 * (358.9/284.9) * self._dc_dom_num_pmt
+        self._dc_dom_bg_sig = 36.0 * np.sqrt(540*358.9/284.9**2) * np.sqrt(self._dc_dom_num_pmt)
     
         # Background rate and sigma for mDOMs
-        self._md_bg_mu = 93.4 * self._md_num_pmt
-        self._md_bg_sig = 13.0 * np.sqrt(self._md_num_pmt)
+        # With a dead-time of 250µs
+        #self._md_bg_mu = 98.5 * self._md_num_pmt
+        #self._md_bg_sig = 13.7 * np.sqrt(self._md_num_pmt)
+        # With no dead-time
+        self._md_bg_mu =  418.2 * self._md_num_pmt
+        self._md_bg_sig = 73.3 * np.sqrt(self._md_num_pmt)
 
         # Extra background by WLS tube, WLS tube is considered part of mDOM, mDOM is scaled
         if include_wls:
