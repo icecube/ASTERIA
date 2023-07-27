@@ -81,32 +81,24 @@ class Detector:
         
         # Background rate and sigma for i3 DOMs (hits / s)
         # With a dead-time of 250µs
-        #self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
-        #self._i3_dom_bg_sig = 26.2 * np.sqrt(self._i3_dom_num_pmt)
-        # With no dead-time
-        self._i3_dom_bg_mu = 540 * self._i3_dom_num_pmt
-        self._i3_dom_bg_sig = 26.2 * np.sqrt(540/284.9) * np.sqrt(self._i3_dom_num_pmt)
+        self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
+        self._i3_dom_bg_sig = 26.2 * np.sqrt(self._i3_dom_num_pmt)
 
         # Background rate and sigma for dc DOMs
         # With a dead-time of 250µs
-        #self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
-        #self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
-        # With no dead-time
-        self._dc_dom_bg_mu = 540 * (358.9/284.9) * self._dc_dom_num_pmt
-        self._dc_dom_bg_sig = 36.0 * np.sqrt(540*358.9/284.9**2) * np.sqrt(self._dc_dom_num_pmt)
+        self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
+        self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
     
         # Background rate and sigma for mDOMs
         # With a dead-time of 250µs
-        #self._md_bg_mu = 98.5 * self._md_num_pmt
-        #self._md_bg_sig = 13.7 * np.sqrt(self._md_num_pmt)
-        # With no dead-time
-        self._md_bg_mu =  418.2 * self._md_num_pmt
-        self._md_bg_sig = 73.3 * np.sqrt(self._md_num_pmt)
+        self._md_bg_mu = 98.5 * self._md_num_pmt
+        self._md_bg_sig = 13.7 * np.sqrt(self._md_num_pmt)
 
         # Extra background by WLS tube, WLS tube is considered part of mDOM, mDOM is scaled
+        # !!! Has to be 2*204.3 to include both tubes !!!
         if include_wls:
-            self._md_bg_mu +=  204.3
-            self._md_bg_sig += np.sqrt(204.3)
+            self._md_bg_mu +=  204.3 * 2
+            self._md_bg_sig += np.sqrt(204.3 * 2)
 
     @property
     def geomscope(self):
@@ -144,7 +136,7 @@ class Detector:
         self._dc_dom_bg_mu = mu
         self._dc_dom_bg_sig = sig
 
-    def set_md_background(self, mu=93.4, sig=13.0):
+    def set_md_background(self, mu=98.7, sig=13.7):
         self._md_bg_mu = mu
         self._md_bg_sig = sig
 
@@ -263,21 +255,28 @@ class Detector:
         """ Return a copy of the effective volume table """
         return self._effvol_table
 
-    @property
-    def doms_table(self, om_type=None):
-        #ToDO Jakob: add also det_type as criteria and make sure that IC86 cannot request e.g. "md"
-        #ToDO Jakob: check why elif statement is not working
-        """ Return a copy of the doms table given om_type
+    def get_doms_table(self, det_type = None, om_type=None):
+        """ Return a copy of the doms table given a det_type or om_type
         Inputs:
-        + om_type: str (default=None)
+        - det_type: str (default=None)
+            If None, return full table. Else return the doms with the input det_type.
+            Type must be "IC86" or "Gen2".
+        - om_type: str (default=None)
             If None, return full table. Else return the doms with the input om_type.
             Type must be "dc", "i3" or "md". """
-        if om_type is None:
+        
+        if det_type is None and om_type is None:
             return self._doms_table
-        elif om_type == 'dc' or om_type == 'i3' or om_type == 'md':
-            return self._doms_table[self._doms_table['om_type'] == om_type]
-        else:
-            raise ValueError('Type must be either "dc", "i3" or "md".')
+        elif det_type is None and om_type is not None:
+            if om_type == 'dc' or om_type == 'i3' or om_type == 'md':
+                return self._doms_table[self._doms_table['om_type'] == om_type]
+            else:
+                raise ValueError('om_type must be either "dc", "i3" or "md".')
+        elif det_type is not None:
+            if det_type == 'IC86' or det_type == 'Gen2':
+                return self._doms_table[self._doms_table['det_type'] == det_type]
+            else:
+                raise ValueError('det_type must be either "IC86" or "Gen2"')           
 
 
 def initialize(config):
