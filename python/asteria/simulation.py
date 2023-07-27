@@ -32,7 +32,7 @@ class Simulation:
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
                  dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, 
-                 effvolfile=None, deadtimefile=None):
+                 effvolfile=None):
         self.param = {}
         if model and not config:
 
@@ -125,20 +125,12 @@ class Simulation:
             else:
                 self._effvolfile = effvolfile
 
-            if not deadtimefile:
-                self._deadtimefile = os.path.join(os.environ['ASTERIA'],'data/detector/mDOM_deadtime_efficiency_250us.txt')
-            
-            else:
-                self._deadtimefile = deadtimefile
-            
-            mDOM_deadtime_data = np.genfromtxt(self._deadtimefile, delimiter='', dtype=float)
-            mDOM_inj_sig, mDOM_deadtime = mDOM_deadtime_data.T
-            self._mDOM_deadtime_interpolated = InterpolatedUnivariateSpline(mDOM_inj_sig, mDOM_deadtime, k=3, ext=3)
-
             self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self._include_wls)
             self._eps_i3 = None
             self._eps_dc = None
             self._eps_md = None
+            self._max_deadtime_eff_i3 = 0.884
+            self._max_deadtime_eff_md = 0.958
             self._time_binned = None
             self._E_per_V_binned = None
             self._total_E_per_V_binned = None
@@ -412,7 +404,7 @@ class Simulation:
             If None is provided, this will return the avg signal from all flavors.
 
         Returns
-        -------
+        ----------
         avg_signal : numpy.ndarray
             Average signal observed in one DOM as a function of time
         """
@@ -429,9 +421,14 @@ class Simulation:
         effvol_Gen2 = 0.4288 * u.m ** 3 / u.MeV  # Simple estimation of Gen2 mDOM Eff. Vol. (np.avg(effvol_table))
 
         if self._geomscope == "Gen2":
-            return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2 + effvol_Gen2 * E_per_V * self.eps_md
+            return effvol_IC86 * E_per_V * (self.eps_dc * self.detector.n_dc_doms + self.eps_i3 * self.detector.n_i3_doms) \
+                    /(self.detector.n_dc_doms + self.detector.n_i3_doms) + effvol_Gen2 * E_per_V * self.eps_md
+            #return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2 + effvol_Gen2 * E_per_V * self.eps_md
+
         else:
-            return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2
+            return effvol_IC86 * E_per_V * (self.eps_dc * self.detector.n_dc_doms + self.eps_i3 * self.detector.n_i3_doms) \
+                    /(self.detector.n_dc_doms + self.detector.n_i3_doms)
+            #return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2
 
     def rebin_result(self, dt, *, offset=0 * u.s, force_rebin=False):
         """Rebins the simulation results to a new time binning.
@@ -553,11 +550,14 @@ class Simulation:
         if dom_effvol is None:  # If dom_effvol is provided, omtype argument is unused
             if omtype == 'i3':
                 dom_effvol = self.detector.i3_dom_effvol
+                max_deadtime_eff = self._max_deadtime_eff_i3
             elif omtype == 'dc':
                 dom_effvol = self.detector.dc_dom_effvol  # dc effective vol already includes relative efficiency
+                max_deadtime_eff = self._max_deadtime_eff_i3 # dc_ref_eff in detector.py should already include difference in deadtime
             elif omtype == 'md':
                 if self._geomscope == 'Gen2':
                     dom_effvol = self.detector.md_dom_effvol
+                    max_deadtime_eff = self._max_deadtime_eff_md
                 else:
                     raise ValueError(f"Unknown omtype: {omtype} for {self._geomscope} detector scope")
             else:
@@ -570,26 +570,13 @@ class Simulation:
             # In SNDAQ this is calculated **with** poisson randomness
             dom_signal = dom_effvol * self.total_E_per_V_binned.value
 
-        #if omtype == 'i3' or omtype == 'dc':
         # TODO: Adjust this scaling based on the determined "proper" method for computing deadtime
         #   eps_dt = 0.87 / (1+ 250us * true_sn_rate) -- is true_sn_rate the rate in 500ms bins, 1s bins, etc?
         #   SNDAQ always uses 500ms
         # Convert scaling factor as if it is a 0.5s bin
-        #    scaling_factor = 0.5/self._res_dt.to(u.s).value
-        #    dom_signal *= scaling_factor
-        #    return 0.87 / (1 + self.detector.deadtime * dom_signal)
-
-        #elif self._geomscope == 'Gen2' and omtype == 'md':
-        #    # Deadtime efficiency simulation takes injection data/signal in Hz
-        #    scaling_factor = 1/self._res_dt.to(u.s).value
-        #    dom_signal *= scaling_factor
-        #    return self._mDOM_deadtime_interpolated(dom_signal)
-
-        #    scaling_factor = 0.5/self._res_dt.to(u.s).value
-        #    dom_signal *= scaling_factor
-        #    dom_background *= 0.5 # scale background rate to 0.5 s bins but detector.i3_dom_bg_mu given in Hz
-        #    return (1 - self.detector.deadtime * dom_background)**n_pmt / (2 - (1 - self.detector.deadtime * dom_signal)**n_pmt)
-        return 1
+        scaling_factor = 0.5/self._res_dt.to(u.s).value
+        dom_signal *= scaling_factor
+        return max_deadtime_eff / (1 + self.detector.deadtime * dom_signal)
 
     @property
     def eps_i3(self):
