@@ -56,7 +56,8 @@ class Source:
             logging.warning(f"Model '{self.model.__class__.__name__}' lacks one or more of the following attributes: "
                              "'luminosity', 'meanE', 'pinch'. Some ASTERIA methods may not function fully")
 
-        if self.model.__class__.__name__ in ('Fornax_2019', 'Fornax_2021'):
+        # TODO: change condition to see if class inherits from Fornax baseclasses
+        if self.model.__class__.__name__ in ('Fornax_2019', 'Fornax_2021', 'Fornax_2022'):
             logging.warning(f"Model '{self.model.__class__.__name__}' detected. Special compatibility mode enabled.\n"
                             "Expect a reduction in performance and increase in simulation run times.", )
             self._special_compat_mode = True
