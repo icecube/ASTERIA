@@ -14,7 +14,7 @@ class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, geomscope, multi_id, multi_bkg, include_wls, max_height=1900, 
+    def __init__(self, doms_table, effvol_table, geomscope, include_wls, max_height=1900, 
                  dc_rel_eff=1.35, wls_md_rel_eff=1.81):
 
         self._geomscope = geomscope
@@ -45,10 +45,6 @@ class Detector:
         doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
         if include_wls:
             doms_effvol[doms['om_type'] == 'md'] = doms_effvol[doms['om_type'] == 'md']*wls_md_rel_eff
-
-        # mDOM coincidence/multiplicity table, signal reduction is done in detector_signal in simulation.py
-        self.multi_id = multi_id
-        self.multi_bkg = multi_bkg
 
         # Create doms table
         #self._doms_table = Table(np.hstack((doms, doms_effvol)),
@@ -153,9 +149,9 @@ class Detector:
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value),
                                 size=size)
     
-    def md_dom_bg(self, dt=0.5*u.s, size=1, new_multi=1):
-        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.multi_bkg[self.multi_id == new_multi],
-                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value) * self.multi_bkg[self.multi_id == new_multi],
+    def md_dom_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value,
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value),
                                 size=size)
 
     def i3_bg(self, dt=0.5*u.s, size=1):
@@ -168,9 +164,9 @@ class Detector:
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value * self.n_dc_doms),
                                 size=size)
     
-    def md_bg(self, dt=0.5*u.s, size=1, new_multi=1):
-        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.n_md * self.multi_bkg[self.multi_id == new_multi],
-                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value * self.n_md) * self.multi_bkg[self.multi_id == new_multi],
+    def md_bg(self, dt=0.5*u.s, size=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.n_md,
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value * self.n_md),
                                 size=size)
     @property
     def i3_total_effvol(self):
