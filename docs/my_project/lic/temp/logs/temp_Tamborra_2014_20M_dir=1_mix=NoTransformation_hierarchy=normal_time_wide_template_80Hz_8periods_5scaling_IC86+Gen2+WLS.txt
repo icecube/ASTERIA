@@ -1,0 +1,26 @@
+3 sigma detection level
+wls
+Distance: (29.1+4.7-3.4) kpc
+Coverage: (100.0+0.0-0.0) % 
+
+gen2
+Distance: (25.4+4.6-2.8) kpc
+Coverage: (100.0+0.0-0.2) % 
+
+ic86
+Distance: (19.5+3.5-2.2) kpc
+Coverage: (98.1+1.7-3.1) % 
+
+5 sigma detection level
+wls
+Distance: (23.6+2.7-1.9) kpc
+Coverage: (99.9+0.1-0.4) % 
+
+gen2
+Distance: (20.8+2.3-1.6) kpc
+Coverage: (99.1+0.8-1.3) % 
+
+ic86
+Distance: (15.8+2.0-1.2) kpc
+Coverage: (91.4+4.5-4.3) % 
+

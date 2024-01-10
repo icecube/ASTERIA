@@ -1,0 +1,78 @@
+3 sigma detection level
+wls
+Distance: (22.7+3.8-2.5) kpc
+Coverage: (99.8+0.2-1.1) % 
+
+gen2
+Distance: (20.1+3.3-2.2) kpc
+Coverage: (98.6+1.3-2.5) % 
+
+ic86
+Distance: (15.4+2.3-1.7) kpc
+Coverage: (90.3+5.6-6.8) % 
+
+5 sigma detection level
+wls
+Distance: (20.0+2.6-2.1) kpc
+Coverage: (98.5+1.3-2.4) % 
+
+gen2
+Distance: (17.7+2.3-1.5) kpc
+Coverage: (95.7+2.8-3.3) % 
+
+ic86
+Distance: (13.6+1.8-1.5) kpc
+Coverage: (82.8+7.5-9.6) % 
+
+3 sigma detection level
+wls
+Distance: (22.6+3.7-2.4) kpc
+Coverage: (99.8+0.2-1.1) % 
+
+gen2
+Distance: (20.2+3.2-2.3) kpc
+Coverage: (98.7+1.2-2.6) % 
+
+ic86
+Distance: (15.4+2.4-1.7) kpc
+Coverage: (90.2+5.7-6.8) % 
+
+5 sigma detection level
+wls
+Distance: (19.9+2.6-1.9) kpc
+Coverage: (98.4+1.3-2.2) % 
+
+gen2
+Distance: (17.7+2.4-1.7) kpc
+Coverage: (95.8+2.9-3.7) % 
+
+ic86
+Distance: (13.5+1.8-1.3) kpc
+Coverage: (82.3+7.8-7.8) % 
+
+3 sigma detection level
+wls
+Distance: (22.6+3.7-2.4) kpc
+Coverage: (99.8+0.2-1.1) % 
+
+gen2
+Distance: (20.2+3.2-2.3) kpc
+Coverage: (98.7+1.2-2.6) % 
+
+ic86
+Distance: (15.4+2.4-1.7) kpc
+Coverage: (90.2+5.7-6.8) % 
+
+5 sigma detection level
+wls
+Distance: (19.9+2.6-1.9) kpc
+Coverage: (98.4+1.3-2.2) % 
+
+gen2
+Distance: (17.7+2.4-1.7) kpc
+Coverage: (95.8+2.9-3.7) % 
+
+ic86
+Distance: (13.5+1.8-1.3) kpc
+Coverage: (82.3+7.8-7.8) % 
+

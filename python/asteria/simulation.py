@@ -103,6 +103,13 @@ class Simulation:
             else:
                 raise ValueError("geomscope only takes values `IC86`, `Gen2` or None")
             
+            self.current_multi = 1
+            self.multi_data = np.genfromtxt(os.path.join(os.environ['ASTERIA'], 'data/detector/mDOM_multiplicity.txt'))
+            multi_id, multi_sig, multi_bkg = self.multi_data.T
+            self.multi_id = multi_id
+            self.multi_sig = multi_sig
+            self.multi_bkg = multi_bkg
+
             if not include_wls:
                 self._include_wls = False
             elif include_wls == True or include_wls == False:
@@ -125,7 +132,7 @@ class Simulation:
             else:
                 self._effvolfile = effvolfile
 
-            self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self._include_wls)
+            self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self.multi_id, self.multi_bkg, self._include_wls)
             self._eps_i3 = None
             self._eps_dc = None
             self._eps_md = None
@@ -574,7 +581,7 @@ class Simulation:
         #   eps_dt = 0.87 / (1+ 250us * true_sn_rate) -- is true_sn_rate the rate in 500ms bins, 1s bins, etc?
         #   SNDAQ always uses 500ms
         # Convert scaling factor as if it is a 0.5s bin
-        scaling_factor = 0.5/self._res_dt.to(u.s).value
+        scaling_factor = 1/self._res_dt.to(u.s).value
         dom_signal *= scaling_factor
         return max_deadtime_eff / (1 + self.detector.deadtime * dom_signal)
 
@@ -608,7 +615,7 @@ class Simulation:
         """Leading bin edges of in result time binning"""
         return self._time_binned
 
-    def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0*u.s):
+    def detector_signal(self, dt=None, flavor=None, subdetector=None, offset=0*u.s, new_multi=1):
         """Compute signal rates observed by detector
 
         Parameters
@@ -622,6 +629,8 @@ class Simulation:
             (if self._geomscope == 'Gen2'), None for full IC86/Gen2 (depending on self._geomscope)
         offset : astropy.quantity.Quantity
             Offset to apply to rebinned result in units s (or compatible)
+        new_multi : int
+            Mulitplicity of mDOM sensor. Has to take int values between 1 and 9.
 
         Returns
         -------
@@ -636,6 +645,8 @@ class Simulation:
 
         E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
+        if not isinstance(new_multi, (int, np.integer)) or new_multi > 9 or new_multi < 1:
+            raise ValueError(f"new_multi has to be of type int and between 1 and 9 but is {new_multi}")
 
         if self._geomscope == 'Gen2':
             if subdetector == 'i3':
@@ -643,11 +654,11 @@ class Simulation:
             elif subdetector == 'dc':
                 return self.time_binned, E_per_V * (self.detector.dc_total_effvol * self.eps_dc)
             elif subdetector == 'md':
-                return self.time_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md)
+                return self.time_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md) * self.multi_sig[self.multi_id == new_multi]
             else:
                 return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 + 
                                                     self.detector.dc_total_effvol * self.eps_dc + 
-                                                    self.detector.md_total_effvol * self.eps_md)
+                                                    self.detector.md_total_effvol * self.eps_md * self.multi_sig[self.multi_id == new_multi])
         else:
             if subdetector == 'md':
                 raise ValueError(f"Unknown omtype: {subdetector} for {self._geomscope} detector scope")
@@ -656,7 +667,7 @@ class Simulation:
                 dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
                 return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
-    def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s, size=1):
+    def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s, size=1, new_multi=1):
         """Compute hit rates observed by detector
 
         Parameters
@@ -668,13 +679,17 @@ class Simulation:
         subdetector : None or str
             IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, 'md' for mDOM 
             (if self._geomscope == 'Gen2'), None for full IC86/Gen2 (depending on self._geomscope)
+        size : int
+            Number of random realizations of the hit rate.
+        new_multi : int
+            Mulitplicity of mDOM sensor. Has to take int values between 1 and 9.
 
         Returns
         -------
         hits : np.ndarray
             Hits observed by the IceCube detector (or subdetector) as a function of time
         """
-        time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
+        time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset, new_multi=new_multi)
         # return time_binned, np.random.poisson(signal)
         detector_hits = np.random.normal(signal, np.sqrt(signal),size=(size,len(signal)))
         if size==1:
@@ -683,7 +698,7 @@ class Simulation:
             return time_binned, detector_hits
 
     def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=None, binnings=None,
-                            use_random_offset=True, *, only_highest=True, debug_info=False, seeds=None):
+                            use_random_offset=True, *, only_highest=True, debug_info=False, seeds=None, new_multi=1):
         """Simulate and collects a sample of SNDAQ trigger, "significance", test statistics
 
         Parameters
@@ -712,6 +727,8 @@ class Simulation:
             If True, return the offsets and seeds used during the simulation
         seeds : np.ndarray or None, optional
             Seeds used to obtain realizations of background rates
+        new_multi : int
+            Mulitplicity of mDOM sensor. Has to take int values between 1 and 9.
 
         Returns
         -------
@@ -748,7 +765,7 @@ class Simulation:
         if seeds is None:
             seeds = [None] * sample_size
 
-        sample = np.array([self.trigger_significance(dt=dt, offset=_offset, binnings=binnings, seed=seed)
+        sample = np.array([self.trigger_significance(dt=dt, offset=_offset, binnings=binnings, seed=seed, new_multi=new_multi)
                            for _offset, seed in zip(offsets, seeds)])
         if only_highest:
             sample = sample.max(axis=1)
@@ -756,7 +773,7 @@ class Simulation:
             return sample, offsets, seeds
         return sample
 
-    def trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s, *, seed=None):
+    def trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s, *, seed=None, new_multi=1):
         """Simulates one SNDAQ trigger "significance" test statistic for requested binnings
 
         Parameters
@@ -772,6 +789,9 @@ class Simulation:
             Unexpected behaviors may arise if the binnings are not cleanly divisible by argument `dt`
         seed : np.ndarray, optional
             Random seed used to create background rate realizations
+        new_multi : int
+            Mulitplicity of mDOM sensor. Has to take int values between 1 and 9.
+
 
         Returns
         -------
@@ -799,7 +819,7 @@ class Simulation:
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
         _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
         if self._geomscope == 'Gen2':
-            _, hits_md = self.detector_hits(dt=dt, offset=offset, subdetector='md')
+            _, hits_md = self.detector_hits(dt=dt, offset=offset, subdetector='md', new_multi=new_multi)
 
         xi = np.zeros(binnings.size)
 
@@ -813,7 +833,7 @@ class Simulation:
             bg_i3 = self.detector.i3_bg(dt=dt, size=hits_i3.size)
             bg_dc = self.detector.dc_bg(dt=dt, size=hits_dc.size)
             if self._geomscope == 'Gen2':
-                bg_md = self.detector.md_bg(dt=dt, size=hits_md.size)
+                bg_md = self.detector.md_bg(dt=dt, size=hits_md.size, new_multi=new_multi)
 
             # Create a realization of background rate scaled up from dt to binsize
             bg_i3_binned = np.zeros(n_bins)
@@ -836,7 +856,7 @@ class Simulation:
             bg_i3_var_dom = rebin_factor * self.detector.i3_dom_bg(dt=dt, size=1000).var()
             bg_dc_var_dom = rebin_factor * self.detector.dc_dom_bg(dt=dt, size=1000).var()
             if self._geomscope == 'Gen2':
-                bg_md_var_dom = rebin_factor * self.detector.md_dom_bg(dt=dt, size=1000).var()
+                bg_md_var_dom = rebin_factor * self.detector.md_dom_bg(dt=dt, size=1000, new_multi=new_multi).var()
 
             # If hits_i3.size / rebin_factor is not an integer, then the last bin in the rebinned rates will be partial
             # In this case, exclude it from the calculation of the background mean

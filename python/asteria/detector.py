@@ -14,7 +14,7 @@ class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, geomscope, include_wls, max_height=1900, 
+    def __init__(self, doms_table, effvol_table, geomscope, multi_id, multi_bkg, include_wls, max_height=1900, 
                  dc_rel_eff=1.35, wls_md_rel_eff=1.81):
 
         self._geomscope = geomscope
@@ -46,6 +46,10 @@ class Detector:
         if include_wls:
             doms_effvol[doms['om_type'] == 'md'] = doms_effvol[doms['om_type'] == 'md']*wls_md_rel_eff
 
+        # mDOM coincidence/multiplicity table, signal reduction is done in detector_signal in simulation.py
+        self.multi_id = multi_id
+        self.multi_bkg = multi_bkg
+
         # Create doms table
         #self._doms_table = Table(np.hstack((doms, doms_effvol)),
         self._doms_table = Table(rfn.append_fields(doms, names='effvol', data=doms_effvol.flatten(), usemask=False),
@@ -61,7 +65,6 @@ class Detector:
         self._dc_effvol = np.sum(self._doms_table['effvol'][self._doms_table['om_type'] == 'dc'])
         self._md_effvol = np.sum(self._doms_table['effvol'][self._doms_table['om_type'] == 'md'])
 
-
         # DOM Artificial deadtime
         self.deadtime = 0.25e-3  # s
         # Relative efficiency of dc DOMs compared to i3 DOMs
@@ -73,12 +76,7 @@ class Detector:
         self._dc_dom_num_pmt = 1
         # Number of PMTs per mDOM
         self._md_num_pmt = 24
-
-        # Scale mean (std) of single module PMT noise by the number of PMTs (sqrt(number of PMTs))
-        # according to the rules of summing N independent random variables.
-        # For every PMT we assume the same mean and std, therefore the addition becomes a factor N
-        # for the mean and sqrt(N) for the std
-        
+      
         # Background rate and sigma for i3 DOMs (hits / s)
         # With a dead-time of 250µs
         self._i3_dom_bg_mu = 284.9 * self._i3_dom_num_pmt
@@ -88,6 +86,11 @@ class Detector:
         # With a dead-time of 250µs
         self._dc_dom_bg_mu = 358.9 * self._dc_dom_num_pmt
         self._dc_dom_bg_sig = 36.0 * np.sqrt(self._dc_dom_num_pmt)
+
+        # Scale mean (std) of single module PMT noise by the number of PMTs (sqrt(number of PMTs))
+        # according to the rules of summing N independent random variables.
+        # For every PMT we assume the same mean and std, therefore the addition becomes a factor N
+        # for the mean and sqrt(N) for the std
     
         # Background rate and sigma for mDOMs
         # With a dead-time of 250µs
@@ -95,7 +98,7 @@ class Detector:
         self._md_bg_sig = 13.7 * np.sqrt(self._md_num_pmt)
 
         # Extra background by WLS tube, WLS tube is considered part of mDOM, mDOM is scaled
-        # !!! Has to be 2*204.3 to include both tubes !!!
+        # Has to be 2*204.3 to include both tubes !
         if include_wls:
             self._md_bg_mu +=  204.3 * 2
             self._md_bg_sig += np.sqrt(204.3 * 2)
@@ -150,9 +153,9 @@ class Detector:
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value),
                                 size=size)
     
-    def md_dom_bg(self, dt=0.5*u.s, size=1):
-        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value,
-                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value),
+    def md_dom_bg(self, dt=0.5*u.s, size=1, new_multi=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.multi_bkg[self.multi_id == new_multi],
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value) * self.multi_bkg[self.multi_id == new_multi],
                                 size=size)
 
     def i3_bg(self, dt=0.5*u.s, size=1):
@@ -165,9 +168,9 @@ class Detector:
                                 scale=self.dc_dom_bg_sig * np.sqrt(dt.to(u.s).value * self.n_dc_doms),
                                 size=size)
     
-    def md_bg(self, dt=0.5*u.s, size=1):
-        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.n_md,
-                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value * self.n_md),
+    def md_bg(self, dt=0.5*u.s, size=1, new_multi=1):
+        return np.random.normal(loc=self.md_bg_mu * dt.to(u.s).value * self.n_md * self.multi_bkg[self.multi_id == new_multi],
+                                scale=self.md_bg_sig * np.sqrt(dt.to(u.s).value * self.n_md) * self.multi_bkg[self.multi_id == new_multi],
                                 size=size)
     @property
     def i3_total_effvol(self):
