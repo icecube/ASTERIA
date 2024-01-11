@@ -145,7 +145,7 @@ class Simulation:
                 mixing = configuration['MIXING']
                 energy = configuration['ENERGY']
                 time = configuration['TIME']
-                scope = configuration['SCOPE']
+                detector = configuration['DETECTOR']
 
                 if 'min' and 'max' and 'step' in configuration['ENERGY'].keys():
                     _Emin = float(energy['min'])
@@ -198,14 +198,21 @@ class Simulation:
                                        float(mixing['angle']), energy, time)
                 self.__init__(**self.param)
 
-                if 'geomscope' in configuration['SCOPE']:
-                    geomscope = str(scope['geomscope'])
+                if 'geomscope' and 'include_wls' in configuration['DETECTOR'].keys():
+                    geomscope = str(detector['geomscope'])
                     if geomscope == "IC86" or geomscope == "Gen2":
                         self._geomscope = geomscope
                     else:
                         raise ValueError("geomscope only takes values `IC86`, `Gen2`")
+                    
+                    include_wls = detector['include_wls']
+                    if include_wls == True or include_wls == False:
+                        self._include_wls = include_wls
+                    else:
+                        raise ValueError("include_wls only takes values True, False or None")
                 else:
                     self._geomscope = 'IC86'
+                    self._include_wls = False
 
                 if not geomfile:
                     self._geomfile = os.path.join(os.environ['ASTERIA'],
@@ -222,7 +229,7 @@ class Simulation:
                 else:
                     self._effvolfile = effvolfile
 
-                self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope)
+                self.detector = Detector(self._geomfile, self._effvolfile, self._geomscope, self._include_wls)
 
         else:
             raise ValueError('Missing required arguments. Use argument `config` or `model`.')
