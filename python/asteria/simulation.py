@@ -38,6 +38,9 @@ class Simulation:
         self.param = {}
         if model and not config:
 
+            self.metadata.update({'model': {'name': model['name'],
+                                            'param': '; '.join([f"{key}, {val}" for key, val in model['param'].items()])}
+                                })
             if not E and None in (Emin, Emax, dE):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `E` or "
                                  "arguments `Emin`, `Emax`, `dE")
