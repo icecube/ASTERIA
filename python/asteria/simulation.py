@@ -29,13 +29,20 @@ from scipy.interpolate import InterpolatedUnivariateSpline
 class Simulation:
     """ Top-level class for performing ASTERIA's core simulation routine, and handler for the resulting outputs
     """
-    def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
+    def __init__(self, config=None, *, model=None, distance=10 * u.kpc, res_dt=2 * u.ms, flavors=None, hierarchy=None,
                  interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
-                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, 
-                 effvolfile=None):
+                 dE=None, t=None, tmin=None, tmax=None, dt=None, geomscope=None, include_wls=None, geomfile=None, effvolfile=None):
+        self.metadata = {key: str(val) for key, val in locals().items() if
+                         val is not None and
+                         key not in ['self', 'E', 't']}
+        self.metadata.update({'interactions': ', '.join([item.name for item in interactions])})
+
         self.param = {}
         if model and not config:
 
+            self.metadata.update({'model': {'name': model['name'],
+                                            'param': '; '.join([f"{key}, {val}" for key, val in model['param'].items()])}
+                                })
             if not E and None in (Emin, Emax, dE):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `E` or "
                                  "arguments `Emin`, `Emax`, `dE")
@@ -46,6 +53,7 @@ class Simulation:
                 E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
             elif not E:
                 E = np.arange(0, 100, 1) * u.MeV
+                self.metadata.update({'Emin': 0 * u.MeV, 'Emax': 100 * u.MeV, 'dE': 1 * u.ms})
 
             if not t and None in (tmin, tmax, dt):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `t` or "
@@ -61,13 +69,14 @@ class Simulation:
             else:
                 t = np.arange(-1, 1, 0.001) * u.s
                 _dt = 1 * u.ms
+                self.metadata.update({'tmin': -1 * u.s, 'tmax': 1 * u.s, 'dt': 1 * u.ms})
 
             self.source = Source(model['name'], model['param'])
             self.distance = distance
             self.energy = E
             self.time = t
             self._sim_dt = _dt
-            self._res_dt = 2 * u.ms  # TODO: Add config/arg option for this
+            self._res_dt = res_dt
             self._res_offset = 0 * u.s  # TODO: Add config/arg option for this
             if flavors is None:
                 self.flavors = Flavor
@@ -301,37 +310,12 @@ class Simulation:
         spectrum : np.ndarray
             Mixed neutrino spectrum as a 2D array with dim (time, energy)
         """
-        # TODO: Check that this function still works when p_surv and pc_osc are arrays
-        # TODO: Simplify after adding neutrino oscillates_to property to SNEWPY
-        # The cflavor "complementary flavor" is the flavor that the provided argument `flavor` oscillates to/from
-        if flavor.is_neutrino:
-            if flavor.is_electron:
-                coeffs = mixing.prob_ee(t, E), mixing.prob_ex(t, E)
-                cflavor = Flavor.NU_X
-            else:
-                coeffs = mixing.prob_xx(t, E), mixing.prob_xe(t, E)
-                cflavor = Flavor.NU_E
-        else:
-            if flavor.is_electron:
-                coeffs = mixing.prob_eebar(t, E), mixing.prob_exbar(t, E)
-                cflavor = Flavor.NU_X_BAR
-            else:
-                coeffs = mixing.prob_xxbar(t, E), mixing.prob_xebar(t, E)
-                cflavor = Flavor.NU_E_BAR
-
-        nu_spectrum = np.zeros(shape=(t.size, E.size))
-        for coeff, _flavor in zip(coeffs, (flavor, cflavor)):
-            alpha = self.source.alpha(t, _flavor)
-            meanE = self.source.meanE(t, _flavor).to(u.MeV).value
-
-            alpha[alpha < 0] = 0
-            cut = (alpha >= 0) & (meanE > 0)
-
-            flux = self.source.flux(t[cut], _flavor).value.reshape(-1, 1)
-            nu_spectrum[cut] += coeff * self.source.energy_pdf(t[cut], E, _flavor) * flux
-
-        photon_spectrum = self._photon_spectra[flavor].to(u.m ** 2).value.reshape(1, -1)
-        return nu_spectrum * photon_spectrum
+        nu_spectrum = self.source.model.get_transformed_spectra(t, E, mixing)[flavor].reshape(t.size, E.size)
+        cut = (t < self.source.model.time[0]) | (self.source.model.time[-1] < t)
+        # TODO: Apply a fix for this once a fix has been applied to SNEWPY
+        nu_spectrum[cut] = 0
+        photon_spectrum = self._photon_spectra[flavor].reshape(1, E.size)
+        return nu_spectrum.to(1 / u.MeV / u.s).value * photon_spectrum.to(u.m ** 2).value
 
     def compute_energy_per_vol(self, *, part_size=1000):
         """Compute the energy deposited in a cubic meter of ice by photons
@@ -358,23 +342,32 @@ class Simulation:
         self._E_per_V = {}
         self._total_E_per_V = np.zeros(self.time.size)
 
+        if self.source.special_compat_mode:
+            part_size = 1  # Done for certain SNEWPY Models until a fix has been applied
+            # These models can only return spectra for 1 time per call.
+            # TODO: Fix this once a fix has been applied to SNEWPY
+
+        # Perform core calculation on partitions in E to regulate memory usage in vectorized function
+        # Maximum usage is expected to be ~8MB
         for flavor in self.flavors:
-            # Perform core calculation on partitions in E to regulate memory usage in vectorized function
-            # Maximum usage is expected to be ~8MB
             result = np.zeros(self.time.size)
             idx = 0
+
+            # Perform integration over spectrum
             if part_size < self.time.size:
-                while idx + part_size < self.time.size:
+                for idx in np.arange(0, self.time.size, part_size):
                     spectrum = self.get_combined_spectrum(self.time[idx:idx + part_size], self.energy, flavor,
                                                           self._mixing)
                     result[idx:idx + part_size] = np.trapz(spectrum, self.energy.value, axis=1)
-                    idx += part_size
-            spectrum = self.get_combined_spectrum(self.time[idx:], self.energy, flavor, self._mixing)
-            result[idx:] = np.trapz(spectrum, self.energy.value, axis=1)
-            # Add distance, density and time-binning scaling factors
-            result *= H2O_in_ice / (4 * np.pi * dist**2) * np.ediff1d(self.time,
-                                                                      to_end=(self.time[-1] - self.time[-2])).value
-            if not flavor.is_electron:
+
+            result *= (
+                H2O_in_ice *  # Target Molecule (H2O) density
+                np.ediff1d(self.time, to_end=(self.time[-1] - self.time[-2])).value *  # Time bin scaling
+                1 / (4 * np.pi * dist ** 2)  # Distance
+            )
+
+            if not flavor.is_electron:  # nu_x/nu_x_bar consist of nu_mu(_bar) & nu_tau(_bar), so double them
+                # TODO: Double check that the models describe single flavor spectrum or multi-flavor spectrum
                 result *= 2
             self._E_per_V.update({flavor: result * (u.MeV / u.m / u.m / u.m)})
             self._total_E_per_V += result
