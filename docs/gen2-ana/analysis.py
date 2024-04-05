@@ -27,14 +27,14 @@ class Analysis():
 
     def __init__(self, 
                  sim, 
-                 dt,
+                 res_dt,
                  distance, 
                  trials, 
                  temp_para):
 
         # define a few attributes
         self.sim = sim
-        self.sim._res_dt = dt.to(u.s)
+        self.sim._res_dt = res_dt
         self.distance = distance
         self.trials = trials
         self.tlength = len(self.sim.time)
@@ -53,6 +53,7 @@ class Analysis():
         self.stf_fit_freq = {"null" : {"ic86": None, "gen2": None}, "signal" : {"ic86": None, "gen2": None}}
         self.stf_fit_time = {"null" : {"ic86": None, "gen2": None}, "signal" : {"ic86": None, "gen2": None}}
         self.ts_stat = {"null" : {"ic86": None, "gen2": None}, "signal" : {"ic86": None, "gen2": None}}
+        self.zscore = {"ic86": None, "gen2": None}
 
 
         # rescale result
@@ -413,7 +414,8 @@ class Analysis():
             z_ic86.append(zz_ic86)
             z_gen2.append(zz_gen2)
         
-        return np.array(z_ic86), np.array(z_gen2)
+        self.zscore["ic86"] = np.array(z_ic86)
+        self.zscore["gen2"] = np.array(z_gen2)
 
   
     def run(self, fft_para, stf_para, mode = "STF"):
@@ -433,12 +435,46 @@ class Analysis():
         elif mode == "STF":
             self.stf(stf_para)
             self.get_ts_stat()
-            z_ic86, z_gen2 = self.get_zscore()
-            print(z_ic86, z_gen2)
-
+            self.get_zscore()
+            
         else:
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
       
+    def dist_scan(self, distance_range, fft_para, stf_para, mode = "STF"):
+        
+        # prepare empty lists for distance loop
+        zscore = {"ic86": [], "gen2": []}
+        ts_stat = {"null" : {"ic86": [], "gen2": []}, "signal" : {"ic86": [], "gen2": []}}
+
+        for dist in distance_range:
+
+            print("Distance: {:.1f}".format(dist))
+
+            self.set_distance(distance=dist) # set simulation to distance
+            self.run(fft_para, stf_para, mode = "STF")
+
+            zscore["ic86"].append(self.zscore["ic86"])
+            zscore["gen2"].append(self.zscore["gen2"])
+            
+            ts_stat["null"]["ic86"].append(self.ts_stat["null"]["ic86"])
+            ts_stat["null"]["gen2"].append(self.ts_stat["null"]["gen2"])
+
+            ts_stat["signal"]["ic86"].append(self.ts_stat["signal"]["ic86"])
+            ts_stat["signal"]["gen2"].append(self.ts_stat["signal"]["gen2"])
+
+        # for each key return array of length (3, len(dist_range))
+        Zscore = {}
+        for key, value in zscore.items():
+            Zscore[key] = np.transpose(np.array(value))
+
+        Ts_stat = {}
+        for key, nested_dict in ts_stat.items():
+            Ts_stat[key] = {}
+            for nested_key, value in nested_dict.items():
+                Ts_stat[key][nested_key] = np.transpose(np.array(value))
+
+        return Zscore, Ts_stat
+#
 
 
     """
