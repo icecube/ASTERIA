@@ -46,7 +46,7 @@ class Analysis():
         self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._sig_sample = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._comb = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._power = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._log = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.stf_ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
@@ -286,7 +286,7 @@ class Analysis():
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
-                self._power[hypo][det] = self._power[hypo][det][:,fmask]
+                self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
 
         self._freq_new = self._freq[fmask]
         self.flength_new = len(self._freq_new)
@@ -309,12 +309,19 @@ class Analysis():
         # power = (fourier modes) ** 2
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
-                self._power[hypo][det] = (2.0/self.tlength_new * np.abs(fft(self._comb[hypo][det], axis = -1)[:,1:self.tlength_new//2]))**2
+                # calculate FFT
+                self._fft[hypo][det] = (2.0/self.tlength_new * np.abs(fft(self._comb[hypo][det], axis = -1)[:,1:self.tlength_new//2]))**2
+                # return frequencies
+                self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2]
 
-        self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2]
-
-        # frequency cut
+        # apply frequency cuts
         self.apply_fmask(freq_win)
+        
+        for hypo in ["null", "signal"]: # loop over hypothesis
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                # max of FFT is used to build TS distribution
+                self.stf_ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
+                self.stf_fit_freq[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)]
 
         return
 
@@ -376,6 +383,9 @@ class Analysis():
                     # take difference between median of time averaged spectrum and spectrum
                     self._log[hypo][det] = self._log[hypo][det] - np.repeat(np.nanmedian(self._log[hypo][det], axis = -1), self._log[hypo][det].shape[-1]).reshape(self._log[hypo][det].shape) 
 
+                    # take only values where difference is larger than zero, i.e. only overfluctuations
+                    self._log[hypo][det] = np.maximum(self._log[hypo][det], 0)
+
                     # maximum (hottest pixel) in array of 2D STF, returns array of length trials
                     # value used for ts distribution
                     stf_ts.append(np.nanmax(self._log[hypo][det], axis = (1,2)))
@@ -431,19 +441,21 @@ class Analysis():
         self._flat_signal_sampled()
         self._sasi_signal()
         self._sasi_signal_sampled()
-        self._hypothesis()
 
         if mode == "FFT":
+            self._hypothesis(hanning=True)
             self.fft(fft_para)
 
         elif mode == "STF":
+            self._hypothesis
             self.stf(stf_para)
-            self.get_ts_stat()
-            self.get_zscore()
             
         else:
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
       
+        self.get_ts_stat()
+        self.get_zscore()
+        
     def dist_scan(self, distance_range, fft_para, stf_para, mode = "STF"):
         
         # prepare empty lists for distance loop
