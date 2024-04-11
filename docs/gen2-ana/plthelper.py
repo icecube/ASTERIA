@@ -5,6 +5,19 @@ import matplotlib.gridspec as gridspec
 from helper import *
 
 
+def plot_hits(time, hits, det = "ic86"):
+
+    time = time.value * 1000 # in ms
+
+    fig, ax = plt.subplots(1,1)
+    ax.step(time, hits["null"][det][0], color = 'C0', ls = '-', label=r'$H_{0}$', zorder = 0)
+    ax.step(time, hits["signal"][det][0], color = 'C1', ls = '-', alpha = 0.5, label=r'$H_{1}$', zorder = 10)
+    ax.set_xlabel('Time [ms]', fontsize = 14)
+    ax.set_ylabel('Counts/bin', fontsize = 14)
+    #ax.set_xlim(0,1000)
+    ax.tick_params(labelsize = 14)
+    ax.legend(fontsize = 14)
+
 def plot_stft(time ,freq, power, det = "ic86"):
 
     hypos = ["signal", "null"]
@@ -13,15 +26,56 @@ def plot_stft(time ,freq, power, det = "ic86"):
     fig, ax = plt.subplots(1,2, figsize = (10,4))
 
     for i in range(2):
-        im[i] = ax[i].pcolormesh(time, freq, power[hypos[i]][det][0], cmap='viridis', shading = "nearest", vmin = 0, vmax = 3.5)
+        im[i] = ax[i].pcolormesh(time, freq, np.log(power[hypos[i]][det][0]), cmap='plasma', shading = "nearest")
         
         cb = fig.colorbar(im[i])
         cb.ax.tick_params(labelsize=14)
-        cb.set_label(label=r"$|H(f,t)|^2 - \langle |H(f,t)|^2 \rangle_t$",size=14)
+        cb.set_label(label=r"$\log \{ S(f,t) \}$",size=14)
         ax[i].set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize=14)
         ax[i].set_ylabel(f"Frequency $f$ in [Hz]", fontsize=14)
         ax[i].yaxis.get_offset_text().set_fontsize(14)
         ax[i].tick_params(labelsize=14)
+
+    plt.tight_layout()
+
+def plot_stft_log(time ,freq, log_power, det = "ic86"):
+
+    hypos = ["signal", "null"]
+    im, cb = [None,None], [None,None]
+    
+    fig, ax = plt.subplots(1,2, figsize = (10,4))
+
+    for i in range(2):
+        im[i] = ax[i].pcolormesh(time, freq, log_power[hypos[i]][det][0], cmap='viridis', shading = "nearest", vmin = 0, vmax = 3.5)
+        
+        cb = fig.colorbar(im[i])
+        cb.ax.tick_params(labelsize=14)
+        cb.set_label(label=r"$\max_0 \left( \log \{ S(f,t) \} - \langle \log \{  S(f,t) \} \rangle_t \right)$",size=14)
+        ax[i].set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize=14)
+        ax[i].set_ylabel(f"Frequency $f$ in [Hz]", fontsize=14)
+        ax[i].yaxis.get_offset_text().set_fontsize(14)
+        ax[i].tick_params(labelsize=14)
+
+    plt.tight_layout()
+
+def plot_stft_time_int(freq, log_power, det = "ic86"):
+
+    sum_null = np.sum(log_power["null"][det][0], axis = 1)
+    sum_sig = np.sum(log_power["signal"][det][0], axis = 1)
+
+    diff = sum_sig - sum_null
+    
+    fig, ax = plt.subplots(1,1)
+
+    ax.step(freq, sum_null, color = "C0", ls = ":", label=r'$H_{0}$')
+    ax.step(freq, sum_sig, color = "C1", ls = "--", label=r'$H_{1}$')
+    ax.step(freq, diff, color = "k", label = "diff")
+
+    ax.set_xlabel('Frequency [Hz]', fontsize = 14)
+    ax.set_ylabel('summed log-power', fontsize = 14)
+    ax.set_xlim(0,500)
+    ax.tick_params(labelsize = 14)
+    ax.legend(fontsize = 14)
 
     plt.tight_layout()
 
@@ -32,20 +86,20 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
     bins = 40
 
     # histogram TS distribution of null and signal hypothesis for gen2 
-    y_signal, bins_signal = np.histogram(ts["signal"][det], bins = bins, density = True)
     y_null, bins_null = np.histogram(ts["null"][det], bins = bins, density = True)
+    y_signal, bins_signal = np.histogram(ts["signal"][det], bins = bins, density = True)
 
     # get x values
-    x_signal = (bins_signal[:-1]+bins_signal[1:])/2
     x_null = (bins_null[:-1]+bins_null[1:])/2
+    x_signal = (bins_signal[:-1]+bins_signal[1:])/2
 
     # get fitted background distribution
     x_fit = np.linspace(np.minimum(x_null[0],x_signal[0]), np.maximum(x_null[-1],x_signal[-1]), 100)
     y_fit = bkg_fit[det].pdf(x_fit)
 
     # mask range of 16% and 84% quantiles
-    mask_signal = np.logical_and(x_signal > ts_stat["signal"][det][1], x_signal < ts_stat["signal"][det][2])
     mask_null = np.logical_and(x_null > ts_stat["null"][det][1], x_null < ts_stat["null"][det][2])
+    mask_signal = np.logical_and(x_signal > ts_stat["signal"][det][1], x_signal < ts_stat["signal"][det][2])
 
     fig, ax = plt.subplots(1,1)
 
@@ -53,8 +107,8 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
     ax.step(x_signal, y_signal, where = "mid", label = r"$H_1$")
     ax.plot(x_fit, y_fit, "k--")
 
-    ax.axvline(ts_stat["signal"][det][0], ymin = 0, ymax =np.max(y_signal), color = 'C1', ls = '-')
     ax.axvline(ts_stat["null"][det][0], ymin = 0, ymax =np.max(y_null), color = 'C0', ls = '-')
+    ax.axvline(ts_stat["signal"][det][0], ymin = 0, ymax =np.max(y_signal), color = 'C1', ls = '-')
     ax.fill_between(x = x_signal[mask_signal], y1 = y_signal[mask_signal], color = 'C1', alpha = 0.5)
     ax.fill_between(x = x_null[mask_null], y1 = y_null[mask_null], color = 'C0', alpha = 0.5)
 
@@ -148,11 +202,14 @@ def plot_significance(dist_range, zscore, ts_stat):
                 ha="center", va="center",
                 bbox=dict(boxstyle="square", ec='k', fc='white'))
 
-        rates = np.array([0.1,0.5,0.75,0.9,0.95,0.99,1])
+        # distance for CDF value of 0.1, 0.5, etc.
+        cdf_val = np.array([0.1,0.5,0.75,0.9,0.95,0.99,1])
+        stellar_dist = coverage_to_distance(cdf_val).flatten()
+
         ax22 = ax[0].twiny()
         ax22.set_xlim(ax[0].get_xlim())
-        ax22.set_xticks(inv_cdf(rates).flatten())
-        ax22.set_xticklabels((rates*100).astype(dtype=int), rotation = 0, fontsize = 12)
+        ax22.set_xticks(stellar_dist)
+        ax22.set_xticklabels((cdf_val*100).astype(dtype=int), rotation = 0, fontsize = 12)
         ax22.set_xlabel('Cumulative galactic CCSNe distribution \n from Adams et al. (2013) in [%]', fontsize = 12)
 
         #signal without errorbar
