@@ -14,9 +14,28 @@ def plot_hits(time, hits, det = "ic86"):
     ax.step(time, hits["signal"][det][0], color = 'C1', ls = '-', alpha = 0.5, label=r'$H_{1}$', zorder = 10)
     ax.set_xlabel('Time [ms]', fontsize = 14)
     ax.set_ylabel('Counts/bin', fontsize = 14)
-    #ax.set_xlim(0,1000)
+    ax.set_xlim(0,1000)
     ax.tick_params(labelsize = 14)
     ax.legend(fontsize = 14)
+
+    plt.tight_layout()
+
+def plot_fft(freq, power, det = "ic86"):
+
+    freq = freq.value
+
+    fig, ax = plt.subplots(1,1)
+    ax.step(freq, power["null"][det][0], color = 'C0', ls = '-', label=r'$H_{0}$', zorder = 0)
+    ax.step(freq, power["signal"][det][0], color = 'C1', ls = '-', alpha = 0.5, label=r'$H_{1}$', zorder = 10)
+    ax.set_xlabel('Frequency [Hz]', fontsize = 14)
+    ax.set_ylabel('Power [au]', fontsize = 14)
+    ax.set_xlim(0,500)
+    ax.set_yscale("log")
+    ax.tick_params(labelsize = 14)
+    ax.legend(fontsize = 14)
+
+    plt.tight_layout()
+
 
 def plot_stft(time ,freq, power, det = "ic86"):
 
