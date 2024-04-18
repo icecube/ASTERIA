@@ -62,16 +62,36 @@ class Analysis():
         self.sim.scale_result(distance=distance)
 
     def set_sim(self, sim):
+        """Set simulation
+
+        Args:
+            sim (asteria.simulation.Simulation): ASTERIA Simulation Class
+        """
         self.sim = sim
 
     def set_distance(self, distance):
+        """Set distance and rescale simulation
+
+        Args:
+            distance (astropy.units.quantity.Quantity): distance for simulation
+        """
         self.distance = distance
         self.sim.scale_result(distance=distance)
 
     def set_trials(self, trials):
+        """Set number of trials
+
+        Args:
+            trials (int): number of trials
+        """
         self.trials = trials
 
     def set_temp_para(self, temp_para):
+        """Set template parameter dictionary
+
+        Args:
+            temp_para (dict): template parameter dictionary
+        """
         self.temp_para = temp_para
 
     def _background(self):
@@ -312,7 +332,7 @@ class Analysis():
                 # calculate FFT
                 self._fft[hypo][det] = (2.0/self.tlength_new * np.abs(fft(self._comb[hypo][det], axis = -1)[:,1:self.tlength_new//2]))**2
                 # return frequencies
-                self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2]
+                self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
         # apply frequency cuts
         self.apply_fmask(freq_win)
