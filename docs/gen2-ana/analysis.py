@@ -15,14 +15,6 @@ def argmax_lastNaxes(A, N):
     return np.unravel_index(max_idx, s[-N:])
 
 
-
-
-# test functions
-# units: closer to front end (_E_V) remove units at backend, add in frontend
-# units: be consistent with time units e.g. always s, ms, distance kpc  
-# wls: detector, read mdom table twice and rescale,
-
-# analysis class inherits methods of simulation class
 class Analysis():
 
     def __init__(self, 
@@ -41,10 +33,12 @@ class Analysis():
         self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
 
         #define empty dictionaries that will be filled with data later
-        self._bkg = {"ic86": None, "gen2": None, "wls": None}
-        self._avg_bkg = {"ic86": None, "gen2": None, "wls": None}
-        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._sig_sample = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self._sig_sample = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                            "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+
+
         self._comb = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
@@ -95,6 +89,12 @@ class Analysis():
         self.temp_para = temp_para
 
     def _background(self):
+        """Calculates the background hits in res_dt time steps for all sensors and combines the hits into three detector scopes
+        IceCube 86 (IC86) : i3 + dc
+        IceCube-Gen2      : i3 + dc + md
+        IceCube-Gen2 + WLS: i3 + dc + md + ws
+        """ 
+        self._bkg = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
         size = self.trials * self.tlength
 
@@ -116,9 +116,11 @@ class Analysis():
         return
     
     def _average_background(self):
-        
-        #average background given by the mean of the sensor distribution and scaled to the full detector
-        #rate is indirectly in Hz but noise rate is in units of binning e.g. 1 ms
+        """Calculates the average background hits in res_dt time steps by multiplying the mean detector noise rate with the number 
+        of sensors for each sensor type.
+        """
+        self._avg_bkg = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
+
         avg_bkg_ic86 = (self.sim.detector.n_i3_doms * self.sim.detector.i3_dom_bg_mu + 
                         self.sim.detector.n_dc_doms * self.sim.detector.dc_dom_bg_mu) * 1/u.s * self.sim._res_dt.to(u.s)
         avg_bkg_gen2 = (self.sim.detector.n_i3_doms * self.sim.detector.i3_dom_bg_mu + 
@@ -135,41 +137,25 @@ class Analysis():
 
         return
 
-    def _flat_signal(self):
+    def _template(self, temp_para):
+        """Returns a generic modulation (template) of the same length and binning like the simulated light curve.
 
-        #detector_signal s0 is not drawn from distribution
-        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
-        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
-        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
-        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
+        Args:
+            temp_para (dict): template parameter dictionary
 
-        # combine subdetector signal into IC86 and Gen2 background rate
-        sig_ic86 = sig_i3 + sig_dc
-        sig_gen2 = sig_i3 + sig_dc + sig_md
-        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
+        Raises:
+            ValueError: Valid values for temp_para["position"] are "left", "center" and "right"
 
-        self._sig["null"]["ic86"] = sig_ic86
-        self._sig["null"]["gen2"] = sig_gen2
-        self._sig["null"]["wls"] = sig_wls
-
-        return
-    
-    def _flat_signal_sampled(self):
-
-        #add Poissonian fluctuations of signal
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            self._sig_sample["null"][det] = np.random.normal(self._sig["null"][det], np.sqrt(np.abs(self._sig["null"][det])), size=(self.trials, self.tlength))
-               
-        return
-
-    def get_template(self, temp_para):
+        Returns:
+            template (numpy.ndarray): template to add to signal hits
+        """
 
         # template parameters
-        frequency = temp_para["frequency"] # SASI frequency
-        amplitude = temp_para["amplitude"] # SASI amplitude
-        time_start = temp_para["time_start"] #SASI start time
-        time_end = temp_para["time_end"] #SASI end time
-        position = temp_para["position"] #SASI positioning relative to start time
+        frequency = temp_para["frequency"] # frequency
+        amplitude = temp_para["amplitude"] # amplitude
+        time_start = temp_para["time_start"] # start time
+        time_end = temp_para["time_end"] # end time
+        position = temp_para["position"] # positioning relative to start time
 
         # transform all parameters in units of [s] and [1/s]
         frequency, dt, time_start, time_end = frequency.to(1/u.s).value, self.sim._res_dt.to(u.s).value, time_start.to(u.s).value, time_end.to(u.s).value
@@ -208,22 +194,46 @@ class Analysis():
         template = np.roll(template, bin_roll)
         
         return template
+    
+    def _signal(self):
+        """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
+        counts from a generic oscillation template are added to the flat light curve.
+        
+        """
+        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        
+        # 1) Null hypothesis, i.e. flat, no modulation SN light curve
+        # get signal hits in res_dt binning for all sensor types
+        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
+        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
+        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
+        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
 
-    def _sasi_signal(self):
+        # combine signal hits into IC86, Gen2 and Gen2+WLS
+        sig_ic86 = sig_i3 + sig_dc
+        sig_gen2 = sig_i3 + sig_dc + sig_md
+        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
 
+        self._sig["null"]["ic86"] = sig_ic86
+        self._sig["null"]["gen2"] = sig_gen2
+        self._sig["null"]["wls"] = sig_wls
+
+        # 2) Signal hypothesis, i.e. oscillations in the SN light curve
+        # The idea is we add the modulations from a template to the null hypothesis counts
         for det in ["ic86", "gen2", "wls"]: # loop over detector
-       
-            temp_para_det = dict(self.temp_para)
+            temp_para_det = dict(self.temp_para) # copy of template dictionary
 
             if self.temp_para["time_start"] < self.sim.time[0]:
                 raise ValueError("time_start = {} smaller than simulation time start of {}".format(self.temp_para["time_start"], self.sim.time[0]))
             elif self.temp_para["time_end"] > self.sim.time[-1]:
                 raise ValueError("time_end = {} larger than simulation time end of {}".format(self.temp_para["time_end"], self.sim.time[-1]))
 
-            # scale amplitude relative to max light curve of IC86, Gen2, WLS
+            # scale amplitude relative to maximum of light curve
             temp_para_det["amplitude"] = temp_para_det["amplitude"] * np.max(self._sig["null"][det])
       
-            template = self.get_template(temp_para_det)
+            # get template counts
+            template = self._template(temp_para_det)
             
             # combine flat light curve with template
             sig = self._sig["null"][det] + template
@@ -232,21 +242,29 @@ class Analysis():
             sig = np.maximum(sig, 0)
 
             self._sig["signal"][det] = sig
-        
+
         return
 
-    def _sasi_signal_sampled(self):
-                
-        #add Poissonian fluctuations of signal
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            self._sig_sample["signal"][det] = np.random.normal(self._sig["signal"][det], np.sqrt(np.abs(self._sig["signal"][det])), size=(self.trials, self.tlength))
+    def _signal_sampled(self):
+        """Add Poissonian fluctuations of signal
+        """
+        self._sig_sample = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                            "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        for hypo in ["null", "signal"]: # loop over hypothesis
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                self._sig_sample[hypo][det] = np.random.normal(self._sig[hypo][det], np.sqrt(np.abs(self._sig[hypo][det])), size=(self.trials, self.tlength))
         
         return
               
     def _hypothesis(self, residual = False, hanning = False):
+        """Combines signal and background hits for the null and signal hypothesis.
+        Uses residual counts via apply_residuals() if residual = True.
+        Applies hanning via apply_hanning() if hanning = True.
 
-        # combine signal and background for null and signal hypothesis
-        # apply residual or hanning if wanted
+        Args:
+            residual (bool, optional): Use residuals. Defaults to False.
+            hanning (bool, optional): Apply hanning. Defaults to False.
+        """
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -261,10 +279,9 @@ class Analysis():
         return
     
     def apply_residual(self):
-
-        # residual = ( combined (sampled) signal + background - averaged background ) / flat signal unsampled
-        # applying residual multiple times will repeatedly rescale combined hits which is undesirable
-        # make sure you only apply this once
+        """ The residual is defined as residual = ( sampled signal + background - averaged background ) / flat signal unsampled.
+        Make sure you apply this only once to avoid rescaling repeatedly. This method overwrites the content of _comb.
+        """
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -273,9 +290,9 @@ class Analysis():
         return
     
     def apply_hanning(self):
-        # get hanning window
-        # applying hanning multiple times will repeatedly hann combined hits which is undesirable
-        # make sure you only apply this once
+        """ Scales signal by a hanning window of size tlength. Make sure you apply this only once to avoid rescaling repeatedly. 
+        This method overwrites the content of _comb.
+        """
 
         hann = np.hanning(self.tlength)
 
@@ -341,7 +358,7 @@ class Analysis():
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 # max of FFT is used to build TS distribution
                 self.stf_ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
-                self.stf_fit_freq[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)]
+                self.stf_fit_freq[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)].value
 
         return
 
@@ -359,21 +376,7 @@ class Analysis():
         freq_mfft = int(freq_sam/hann_res)  #oversampling of hann window, relates to frequency resolution
         hann_ovl = int(hann_len - hann_hop) # define hann overlap
 
-        """
-        stf = ShortTimeFFT(hann_win, hop = hann_hop, fs = freq_sam)#, mfft= freq_mfft)
 
-        # low and high value of time and frequency range
-        time_low, time_high = np.array(stf.extent(self.tlength)[:2]) * 1000 # in ms units
-        freq_low, freq_high = np.array(stf.extent(self.tlength)[2:]) # in Hz
-
-        # edge values
-        self.stf_time_edge = np.arange(time_low, (time_high + hann_hop), step = hann_hop)-hann_hop/2
-        self.stf_freq_edge = np.arange(freq_low, (freq_high + hann_res), step = hann_res)-hann_res/2
-
-        # mid values
-        self.stf_time_mid = (self.stf_time_edge[1:] + self.stf_time_edge[:-1])/2
-        self.stf_freq_mid = (self.stf_freq_edge[1:] + self.stf_freq_edge[:-1])/2
-        """
         bat_step = 5000 # size of batches
         trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
 
@@ -457,10 +460,8 @@ class Analysis():
         # load and combine data
         self._background()
         self._average_background()
-        self._flat_signal()
-        self._flat_signal_sampled()
-        self._sasi_signal()
-        self._sasi_signal_sampled()
+        self._signal()
+        self._signal_sampled()
 
         if mode == "FFT":
             self._hypothesis(hanning=True)
@@ -476,7 +477,10 @@ class Analysis():
         self.get_ts_stat()
         self.get_zscore()
         
-    def dist_scan(self, distance_range, fft_para, stf_para, mode = "STF"):
+    def dist_scan(self, distance_range, fft_para, stf_para, trials = None, mode = "STF"):
+
+        if trials is not None:
+            self.trials = trials
         
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
@@ -487,7 +491,7 @@ class Analysis():
             print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(fft_para, stf_para, mode = "STF")
+            self.run(fft_para, stf_para, mode = mode)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
@@ -511,6 +515,8 @@ class Analysis():
 
     """
     ToDo
-    -implement SASI on lumi model basis, correct flat model
-    -write template loop, optimize fit
+    - implement SASI on lumi model basis, correct flat model
+    - write template loop, optimize fit
+    - test functions
+    - units: be consistent with time units e.g. always s, ms, distance kpc  
     """
