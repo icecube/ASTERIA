@@ -1,19 +1,11 @@
 import numpy as np
 import astropy.units as u
 from scipy.fft import fft, fftfreq
-from scipy.signal import ShortTimeFFT, stft
-from scipy.signal.windows import hann
+from scipy.signal import stft
 from scipy.stats import skewnorm, norm
 
+from helper import argmax_lastNaxes
 from asteria.simulation import Simulation as sim
-
-def argmax_lastNaxes(A, N):
-    # extension of argmax over several axis
-    s = A.shape
-    new_shp = s[:-N] + (np.prod(s[-N:]),)
-    max_idx = A.reshape(new_shp).argmax(-1)
-    return np.unravel_index(max_idx, s[-N:])
-
 
 class Analysis():
 
@@ -31,25 +23,6 @@ class Analysis():
         self.trials = trials
         self.tlength = len(self.sim.time)
         self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
-
-        #define empty dictionaries that will be filled with data later
-        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
-        self._sig_sample = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                            "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
-
-
-        self._comb = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._log = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self.stf_ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self.stf_fit_freq = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self.stf_fit_time = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} 
-        self.ts_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        self.zscore = {"ic86": None, "gen2": None, "wls": None}
-
 
         # rescale result
         self.sim.rebin_result(dt = self.sim._res_dt)
@@ -265,6 +238,8 @@ class Analysis():
             residual (bool, optional): Use residuals. Defaults to False.
             hanning (bool, optional): Apply hanning. Defaults to False.
         """
+        self._comb = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                      "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -348,13 +323,14 @@ class Analysis():
         if time_res != self.sim._res_dt:
             raise ValueError('fft_para["time_res"] = {} but ana.sim._res_dt = {}. Make sure to execute ana.run with the same resolution as you set in fft_para'.format(time_res, self.sim._res_dt))
 
-        # time cut    
-        self.apply_tmask(time_win)
+        self.apply_tmask(time_win) # apply time mask   
 
-        # power = (fourier modes) ** 2
+        self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
-                # calculate FFT
+                # calculate FFT, power = (fourier modes) ** 2
                 self._fft[hypo][det] = (2.0/self.tlength_new * np.abs(fft(self._comb[hypo][det], axis = -1)[:,1:self.tlength_new//2]))**2
                 # return frequencies
                 self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
@@ -362,11 +338,16 @@ class Analysis():
         # apply frequency cuts
         self.apply_fmask(freq_win)
         
+        self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                       "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                         "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 # max of FFT is used to build TS distribution
-                self.stf_ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
-                self.stf_fit_freq[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)].value
+                self.ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
+                self.ffit[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)].value
 
         return
 
@@ -376,6 +357,7 @@ class Analysis():
         hann_res = stf_para["hann_res"] # desired frequency resolution in Hann window
         hann_hop = stf_para["hann_hop"] # hann hop = number of time bins the window is moved
         freq_sam = stf_para["freq_sam"] # sampling frequency of entire signal (1 kHz for 1 ms binning)
+        time_int = stf_para["time_int"] # should power be summed over time?, True or False
 
         hann_len = int(hann_len.to_value(u.ms)) # define hann window
         hann_res = hann_res.to_value(u.Hz)
@@ -384,26 +366,37 @@ class Analysis():
         freq_mfft = int(freq_sam/hann_res)  #oversampling of hann window, relates to frequency resolution
         hann_ovl = int(hann_len - hann_hop) # define hann overlap
 
-
+        # STFT is computationally expensive, batching will ensure that RAM is not completly used up
         bat_step = 5000 # size of batches
         trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
+
+        self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self._log = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                   "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self.tfit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
 
                 # empty lists filled in batch loop
-                stf_ts = []
+                ts = []
                 fit_freq, fit_time = [], []
 
                 for bat in trial_batch: # loop over batches
-
-                    #self._stf[hypo][det] = stf.spectrogram(self._comb[hypo][det][bat:bat+1000], axis = -1) 
-                    self.stf_freq_mid, self.stf_time_mid, self._stf[hypo][det] = stft(self._comb[hypo][det][bat:bat+bat_step], 
+                    
+                    # avoid padding as this will introduce artefacts in the FT
+                    self.freq_mid, self.time_mid, self._stf[hypo][det] = stft(self._comb[hypo][det][bat:bat+bat_step], 
                                                                                       fs = freq_sam, window = "hann", 
                                                                                       nperseg = hann_len, noverlap = hann_ovl, 
                                                                                       boundary = None, padded = False, 
                                                                                       return_onesided = True)
-                    self.stf_time_mid *= 1000 # time in units of ms
+                    self.time_mid *= 1000 # time in units of ms
 
                     # take square of absolute for power
                     self._stf[hypo][det] = np.abs(self._stf[hypo][det]) ** 2
@@ -419,34 +412,40 @@ class Analysis():
 
                     # maximum (hottest pixel) in array of 2D STF, returns array of length trials
                     # value used for ts distribution
-                    stf_ts.append(np.nanmax(self._log[hypo][det], axis = (1,2)))
+                    ts.append(np.nanmax(self._log[hypo][det], axis = (1,2)))
 
                     # get time and freq index position of maximum 
                     ind_freq, ind_time = argmax_lastNaxes(self._log[hypo][det], 2)
                     # get corresponding time and freq of bin
-                    fit_freq.append(self.stf_freq_mid[ind_freq])
-                    fit_time.append(self.stf_time_mid[ind_time])
+                    fit_freq.append(self.freq_mid[ind_freq])
+                    fit_time.append(self.time_mid[ind_time])
                 
-                self.stf_ts[hypo][det] = np.array(stf_ts).flatten()
-                self.stf_fit_freq[hypo][det], self.stf_fit_time[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
+                self.ts[hypo][det] = np.array(ts).flatten()
+                self.ffit[hypo][det], self.tfit[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
 
         return
 
     def get_ts_stat(self):
+
+        self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
+        self.ts_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                        "signal" : {"ic86": None, "gen2": None, "wls": None}}
         
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             # fitted background TS distribution
-            self._ts_bkg_fit[det] = skewnorm(*skewnorm.fit(self.stf_ts["null"][det]))
+            self._ts_bkg_fit[det] = skewnorm(*skewnorm.fit(self.ts["null"][det]))
         
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
 
                 # median, 16% and 84% quantiles of TS distribution
-                self.ts_stat[hypo][det] = np.array([np.median(self.stf_ts[hypo][det]), np.quantile(self.stf_ts[hypo][det], 0.16), np.quantile(self.stf_ts[hypo][det], 0.84)])
+                self.ts_stat[hypo][det] = np.array([np.median(self.ts[hypo][det]), np.quantile(self.ts[hypo][det], 0.16), np.quantile(self.ts[hypo][det], 0.84)])
 
         return
 
     def get_zscore(self):
+
+        self.zscore = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             z = []
@@ -463,7 +462,22 @@ class Analysis():
 
         return
   
-    def run(self, fft_para, stf_para, mode = "STF"):
+    def run(self, mode, ft_para, trials = None):
+        """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
+        and short-time fourier transform (STF). It computes background and signal hits, 
+        combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
+
+        Args:
+            mode (str): analysis mode (FFT or STF)
+            ft_para (dict): parameters of the fourier transform (FFT or STF)
+            trials (int, optional): Number of trials. Defaults to None.
+
+        Raises:
+            ValueError: mode takes two valid values: "FFT" and "STF".
+        """
+
+        if trials is not None:
+            self.trials = trials
 
         # load and combine data
         self._background()
@@ -472,12 +486,12 @@ class Analysis():
         self._signal_sampled()
 
         if mode == "FFT":
-            self._hypothesis(hanning=True)
-            self.fft(fft_para)
+            self._hypothesis(hanning = ft_para["hanning"])
+            self.fft(ft_para)
 
         elif mode == "STF":
-            self._hypothesis
-            self.stf(stf_para)
+            self._hypothesis()
+            self.stf(ft_para)
             
         else:
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
@@ -485,7 +499,7 @@ class Analysis():
         self.get_ts_stat()
         self.get_zscore()
         
-    def dist_scan(self, distance_range, fft_para, stf_para, trials = None, mode = "STF"):
+    def dist_scan(self, distance_range, mode, ft_para, trials = None):
 
         if trials is not None:
             self.trials = trials
@@ -499,7 +513,7 @@ class Analysis():
             print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(fft_para, stf_para, mode = mode)
+            self.run(mode, ft_para)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
