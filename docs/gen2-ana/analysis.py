@@ -279,7 +279,7 @@ class Analysis():
         return
     
     def apply_residual(self):
-        """ The residual is defined as residual = ( sampled signal + background - averaged background ) / flat signal unsampled.
+        """ Applies residual. The residual is defined as residual = ( sampled signal + background - averaged background ) / flat signal unsampled.
         Make sure you apply this only once to avoid rescaling repeatedly. This method overwrites the content of _comb.
         """
 
@@ -290,7 +290,7 @@ class Analysis():
         return
     
     def apply_hanning(self):
-        """ Scales signal by a hanning window of size tlength. Make sure you apply this only once to avoid rescaling repeatedly. 
+        """ Applies hanning. Scales signal by a hanning window of size tlength. Make sure you apply this only once to avoid rescaling repeatedly. 
         This method overwrites the content of _comb.
         """
 
@@ -303,30 +303,38 @@ class Analysis():
         return
     
     def apply_tmask(self, time_win):
-        #apply time cut before FFT
+        """ Applies time mask. Cuts signal window to values given in time_win. This method overwrites the content of _comb.
+        The new, cut time is _time_new with length tlength_new.
+        Args:
+            time_win (list of astropy.units.quantity.Quantity): lower and higher time cut
+        """
         time_low, time_high = time_win
-        tmask = np.logical_and(self.sim.time>=time_low, self.sim.time<=time_high)
+        tmask = np.logical_and(self.sim.time>=time_low, self.sim.time<=time_high) # time mask
         
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
 
-        self._time_new = self.sim.time[tmask]
-        self.tlength_new = len(self._time_new)
+        self._time_new = self.sim.time[tmask] # new times
+        self.tlength_new = len(self._time_new) # new length of time array
 
         return
 
     def apply_fmask(self, freq_win):
-        #apply frequency cut after FFT
+        """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win. This method overwrites the content of _fft.
+        The new, cut frequency is _freq_new with length flength_new.
+        Args:
+            freq_win (list of astropy.units.quantity.Quantity): lower and higher frequency cut
+        """        
         freq_low, freq_high = freq_win
-        fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high)
+        fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high) # frequency mask
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
 
-        self._freq_new = self._freq[fmask]
-        self.flength_new = len(self._freq_new)
+        self._freq_new = self._freq[fmask] # new frequency array
+        self.flength_new = len(self._freq_new) # new length of frequency array
 
         return
 
