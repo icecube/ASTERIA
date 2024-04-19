@@ -104,33 +104,45 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
 
     bins = 40
 
-    # histogram TS distribution of null and signal hypothesis for gen2 
-    y_null, bins_null = np.histogram(ts["null"][det], bins = bins, density = True)
-    y_signal, bins_signal = np.histogram(ts["signal"][det], bins = bins, density = True)
+    # get 16, 50, 86% of TS distribution
+    ps_null = np.percentile(ts["null"][det], [16, 50, 84])
+    ps_signal = np.percentile(ts["signal"][det], [16, 50, 84])
 
+    fig, ax = plt.subplots(1,1)
+
+    hist_null = plt.hist(ts["null"][det], histtype="step", density=True, bins = bins, color = 'C0', lw = 2, label = r"$H_0$")
+    hist_signal = plt.hist(ts["signal"][det], histtype="step", density=True, bins = bins, color = 'C1', lw = 2, label = r"$H_1$")
+
+    # get histogram bins and values
+    bin_null, bin_signal = hist_null[1], hist_signal[1]
+    y_null, y_signal = hist_null[0], hist_signal[0]
     # get x values
-    x_null = (bins_null[:-1]+bins_null[1:])/2
-    x_signal = (bins_signal[:-1]+bins_signal[1:])/2
+    x_null, x_signal = (bin_null[1:]+bin_null[:-1])/2, (bin_signal[1:]+bin_signal[:-1])/2
+
 
     # get fitted background distribution
     x_fit = np.linspace(np.minimum(x_null[0],x_signal[0]), np.maximum(x_null[-1],x_signal[-1]), 100)
     y_fit = bkg_fit[det].pdf(x_fit)
 
     # mask range of 16% and 84% quantiles
-    mask_null = np.logical_and(x_null > ts_stat["null"][det][1], x_null < ts_stat["null"][det][2])
-    mask_signal = np.logical_and(x_signal > ts_stat["signal"][det][1], x_signal < ts_stat["signal"][det][2])
+    mask_null = np.logical_and(x_null > ps_null[0], x_null < ps_null[2])
+    mask_signal = np.logical_and(x_signal > ps_signal[0], x_signal < ps_signal[2])
 
-    fig, ax = plt.subplots(1,1)
+    # Search for the heights of the bins in which the percentiles are
+    _, ymax = ax.get_ybound()
 
-    ax.step(x_null, y_null, where = "mid", label = r"$H_0$")
-    ax.step(x_signal, y_signal, where = "mid", label = r"$H_1$")
+    hi_null = y_null[np.searchsorted(x_null, ps_null, side='left')-1]
+    hi_signal = y_signal[np.searchsorted(x_signal, ps_signal, side='left')-1]
+
+    print(hi_null)
+
     ax.plot(x_fit, y_fit, "k--")
 
-    ax.axvline(ts_stat["null"][det][0], ymin = 0, ymax =np.max(y_null), color = 'C0', ls = '-')
-    ax.axvline(ts_stat["signal"][det][0], ymin = 0, ymax =np.max(y_signal), color = 'C1', ls = '-')
+    ax.axvline(ps_null[1], ymin = 0, ymax = hi_null[1]/ymax, color = 'C0', ls = '-')
+    ax.axvline(ps_signal[1], ymin = 0, ymax = hi_signal[1]/ymax, color = 'C1', ls = '-')
+
     ax.fill_between(x = x_signal[mask_signal], y1 = y_signal[mask_signal], color = 'C1', alpha = 0.5)
     ax.fill_between(x = x_null[mask_null], y1 = y_null[mask_null], color = 'C0', alpha = 0.5)
-
 
     ax.set_xlabel("TS value", fontsize = 14)
     ax.set_ylabel("Normalized Counts", fontsize = 14)
@@ -140,7 +152,24 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_parareco(fit_freq, fit_time, det = "ic86"):
+def plot_fit_freq(fit_freq, det = "ic86"):
+    # Data
+    fit_freq_null, fit_freq_signal = fit_freq["signal"][det], fit_freq["signal"]["ic86"]
+
+    fig, ax = plt.subplots()
+
+    ax.hist(fit_freq_null, bins=30, range = (0, 500), alpha=0.5, color="C0", label=r"$H_0$")
+    ax.hist(fit_freq_signal, bins=30, range = (0, 500), alpha=0.5, color="C1", label=r"$H_0$")
+    ax.axvline(np.median(fit_freq_null), color="C0")
+    ax.axvline(np.median(fit_freq_signal), color="C1")
+    ax.set_xlabel("Frequency [Hz]", fontsize=14)
+    ax.set_xlabel("Counts", fontsize=14)
+    ax.tick_params(labelsize=14)
+    ax.legend(fontsize = 14)
+
+    plt.tight_layout()
+
+def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
     # Data
     fit_freq_null, fit_time_null = fit_freq["null"][det], fit_time["null"]["ic86"]
     fit_freq_signal, fit_time_signal = fit_freq["signal"][det], fit_time["signal"]["ic86"]
@@ -199,7 +228,7 @@ def plot_significance(dist_range, zscore, ts_stat):
 
         ax[0].set_xlabel('Distance d [kpc]', fontsize = 12)
         ax[0].set_ylabel(r'SASI detection significance [$\sigma$]' , fontsize = 12)
-        ax[0].set_xlim((1,20))
+        #ax[0].set_xlim((1,20))
         ax[0].set_ylim((1,30))
 
         ax[0].tick_params(labelsize = 12)
@@ -248,7 +277,7 @@ def plot_significance(dist_range, zscore, ts_stat):
 
     ax[1].set_xlabel('Distance d [kpc]', fontsize = 12)
     ax[1].set_ylabel('Median of test statistics (TS)', fontsize = 12)
-    ax[1].set_xlim((1,10))
+    #ax[1].set_xlim((1,20))
     ax[1].set_yscale('log')
     ax[1].tick_params(labelsize = 12)
     ax[1].legend(handles, labels, ncol = 3, fontsize = 12, bbox_to_anchor=(0.13, 1))
