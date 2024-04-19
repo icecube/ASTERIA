@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from scipy.stats import skewnorm
 
 from helper import *
 
@@ -98,7 +99,7 @@ def plot_stft_time_int(freq, log_power, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
+def plot_ts(ts, det = "ic86"):
 
     # Plot TS distribution for null and signal hypothesis for gen2
 
@@ -121,8 +122,9 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
 
 
     # get fitted background distribution
-    x_fit = np.linspace(np.minimum(x_null[0],x_signal[0]), np.maximum(x_null[-1],x_signal[-1]), 100)
-    y_fit = bkg_fit[det].pdf(x_fit)
+    bkg_fit = skewnorm(*skewnorm.fit(ts["null"][det]))
+    x_fit = np.linspace(np.minimum(x_null[0],x_signal[0]), np.maximum(x_null[-1],x_signal[-1]), 200)
+    y_fit = bkg_fit.pdf(x_fit)
 
     # mask range of 16% and 84% quantiles
     mask_null = np.logical_and(x_null > ps_null[0], x_null < ps_null[2])
@@ -134,12 +136,14 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
     hi_null = y_null[np.searchsorted(x_null, ps_null, side='left')-1]
     hi_signal = y_signal[np.searchsorted(x_signal, ps_signal, side='left')-1]
 
-    print(hi_null)
-
     ax.plot(x_fit, y_fit, "k--")
 
     ax.axvline(ps_null[1], ymin = 0, ymax = hi_null[1]/ymax, color = 'C0', ls = '-')
     ax.axvline(ps_signal[1], ymin = 0, ymax = hi_signal[1]/ymax, color = 'C1', ls = '-')
+
+    #for i in range(len(bin_null) - 1):
+    #    ax.fill_between([bin_null[i], bin_null[i + 1]], y_null[i], step='post', color='C0', ec = None, alpha=0.5) if mask_null[i] == 1 else None
+    #    ax.fill_between([bin_signal[i], bin_signal[i + 1]], y_signal[i], step='post', color='C1', ec = None, alpha=0.5) if mask_signal[i] == 1 else None
 
     ax.fill_between(x = x_signal[mask_signal], y1 = y_signal[mask_signal], color = 'C1', alpha = 0.5)
     ax.fill_between(x = x_null[mask_null], y1 = y_null[mask_null], color = 'C0', alpha = 0.5)
@@ -154,16 +158,19 @@ def plot_ts(ts, ts_stat, bkg_fit, det = "ic86"):
 
 def plot_fit_freq(fit_freq, det = "ic86"):
     # Data
-    fit_freq_null, fit_freq_signal = fit_freq["signal"][det], fit_freq["signal"]["ic86"]
+    fit_freq_null, fit_freq_signal = fit_freq["null"][det], fit_freq["signal"][det]
+
+    bins = 20
 
     fig, ax = plt.subplots()
 
-    ax.hist(fit_freq_null, bins=30, range = (0, 500), alpha=0.5, color="C0", label=r"$H_0$")
-    ax.hist(fit_freq_signal, bins=30, range = (0, 500), alpha=0.5, color="C1", label=r"$H_0$")
+    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C0", label=r"$H_0$")
+    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C1", label=r"$H_1$")
     ax.axvline(np.median(fit_freq_null), color="C0")
     ax.axvline(np.median(fit_freq_signal), color="C1")
     ax.set_xlabel("Frequency [Hz]", fontsize=14)
     ax.set_xlabel("Counts", fontsize=14)
+    ax.set_yscale("log")
     ax.tick_params(labelsize=14)
     ax.legend(fontsize = 14)
 

@@ -4,6 +4,12 @@ from asteria.stellardist import StellarDensity
 from scipy.interpolate import PchipInterpolator
 from scipy.optimize import minimize
 
+def argmax_lastNaxes(A, N):
+    # extension of argmax over several axis
+    s = A.shape
+    new_shp = s[:-N] + (np.prod(s[-N:]),)
+    max_idx = np.nanargmax(A.reshape(new_shp), axis = -1)
+    return np.unravel_index(max_idx, s[-N:])
 
 def loss_function(dist, cdf_val):
     # for distances above 25 kpc the CDF = 1, but we want hit the 'edge'
