@@ -4,7 +4,7 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import stft
 from scipy.stats import skewnorm, norm
 
-from helper import argmax_lastNaxes
+from helper import argmax_lastNaxes, moving_average
 from asteria.simulation import Simulation as sim
 
 class Analysis():
@@ -167,6 +167,46 @@ class Analysis():
         template = np.roll(template, bin_roll)
         
         return template
+    
+    def _signal_model(self):
+        """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
+        counts from a generic oscillation template are added to the flat light curve.
+        
+        """
+        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        
+        # 1) Signal hypothesis, i.e. oscillations in the SN light curve
+        # get signal hits in res_dt binning for all sensor types
+        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
+        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
+        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
+        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
+
+        # combine signal hits into IC86, Gen2 and Gen2+WLS
+        sig_ic86 = sig_i3 + sig_dc
+        sig_gen2 = sig_i3 + sig_dc + sig_md
+        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
+
+        self._sig["signal"]["ic86"] = sig_ic86
+        self._sig["signal"]["gen2"] = sig_gen2
+        self._sig["signal"]["wls"] = sig_wls
+
+        # 2) Null hypothesis, i.e. flat, no modulation SN light curve
+        # The idea is use a moving average filter to smoothen the SASI wiggles out
+
+        # binning needed to smoothen a frequency f, for Tamborra 2014, 20 M: f_sasi = 80 Hz
+        frequency = 80*u.Hz
+        duration = self.sim.time[-1]-self.sim.time[0]
+        samples = (duration/self.sim._res_dt.to(u.s)).value
+
+        binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sasi
+
+        for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+            self._sig["null"][det] = moving_average(self._sig["signal"][det], n = binning, const_padding = True)
+
+        return
     
     def _signal(self):
         """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
@@ -482,7 +522,8 @@ class Analysis():
         # load and combine data
         self._background()
         self._average_background()
-        self._signal()
+        #self._signal()
+        self._signal_model()
         self._signal_sampled()
 
         if mode == "FFT":
