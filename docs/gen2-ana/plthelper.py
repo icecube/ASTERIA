@@ -78,18 +78,15 @@ def plot_stft_log(time ,freq, log_power, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_stft_time_int(freq, log_power, det = "ic86"):
+def plot_stft_time_int(freq, log_int, det = "ic86"):
 
-    sum_null = np.sum(log_power["null"][det][0], axis = 1)
-    sum_sig = np.sum(log_power["signal"][det][0], axis = 1)
-
-    diff = sum_sig - sum_null
+    diff = log_int["signal"][det][0] - log_int["null"][det][0]
     
     fig, ax = plt.subplots(1,1)
 
-    ax.step(freq, sum_null, color = "C0", ls = ":", label=r'$H_{0}$')
-    ax.step(freq, sum_sig, color = "C1", ls = "--", label=r'$H_{1}$')
-    ax.step(freq, diff, color = "k", label = "diff")
+    ax.step(freq, log_int["null"][det][0], color = "C0", ls = ":", label=r'$H_{0}$')
+    ax.step(freq, log_int["signal"][det][0], color = "C1", ls = "--", label=r'$H_{1}$')
+    ax.step(freq, diff, color = "k", label = r'$H_{1} - H_{0}$')
 
     ax.set_xlabel('Frequency [Hz]', fontsize = 14)
     ax.set_ylabel('summed log-power', fontsize = 14)
@@ -160,7 +157,7 @@ def plot_fit_freq(fit_freq, det = "ic86"):
     # Data
     fit_freq_null, fit_freq_signal = fit_freq["null"][det], fit_freq["signal"][det]
 
-    bins = 20
+    bins = 50
 
     fig, ax = plt.subplots()
 
@@ -177,9 +174,11 @@ def plot_fit_freq(fit_freq, det = "ic86"):
     plt.tight_layout()
 
 def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
-    # Data
+    # Data    
     fit_freq_null, fit_time_null = fit_freq["null"][det], fit_time["null"]["ic86"]
     fit_freq_signal, fit_time_signal = fit_freq["signal"][det], fit_time["signal"]["ic86"]
+
+    bins = 50
 
     fig = plt.figure(figsize=(8, 8))
     gs = fig.add_gridspec(4, 4)
@@ -195,8 +194,8 @@ def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
 
     # Top histogram
     ax_top = fig.add_subplot(gs[0, :-1], sharex=ax_main)
-    ax_top.hist(fit_time_null, bins=30, range = (0, 1000), alpha=0.5, color="C0", orientation='vertical')
-    ax_top.hist(fit_time_signal, bins=30, range = (0, 1000), alpha=0.5, color="C1", orientation='vertical')
+    ax_top.hist(fit_time_null, bins=bins, range = (0, 1000), alpha=0.5, color="C0", orientation='vertical')
+    ax_top.hist(fit_time_signal, bins=bins, range = (0, 1000), alpha=0.5, color="C1", orientation='vertical')
     ax_top.axvline(np.median(fit_time_null), color="C0")
     ax_top.axvline(np.median(fit_time_signal), color="C1")
 
@@ -205,8 +204,8 @@ def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
 
     # Right histogram
     ax_right = fig.add_subplot(gs[1:, -1], sharey=ax_main)
-    ax_right.hist(fit_freq_null, bins=30, range = (0, 500), alpha=0.5, color="C0", orientation='horizontal')
-    ax_right.hist(fit_freq_signal, bins=30, range = (0, 500), alpha=0.5, color="C1", orientation='horizontal')
+    ax_right.hist(fit_freq_null, bins=bins, range = (0, 500), alpha=0.5, color="C0", orientation='horizontal')
+    ax_right.hist(fit_freq_signal, bins=bins, range = (0, 500), alpha=0.5, color="C1", orientation='horizontal')
     ax_right.axhline(np.median(fit_freq_null), color="C0")
     ax_right.axhline(np.median(fit_freq_signal), color="C1")
     ax_right.set_xlabel("Counts", fontsize=14)
