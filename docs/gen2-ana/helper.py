@@ -10,6 +10,24 @@ def argmax_lastNaxes(A, N):
     new_shp = s[:-N] + (np.prod(s[-N:]),)
     max_idx = np.nanargmax(A.reshape(new_shp), axis = -1)
     return np.unravel_index(max_idx, s[-N:])
+    
+def moving_average(a, n=3, zero_padding = False, const_padding = False):
+    if zero_padding:
+        a = np.insert(a, np.zeros(n-1,dtype=int), np.zeros(n-1), axis=-1)
+        a = np.roll(a, -int((n-1)/2), axis=-1)
+    if const_padding:
+        l1 = int(n/2)
+        if n%2 != 1: # n is even
+            l2 = l1-1
+        else: # n is odd
+            l2 = l1
+            ind2 = -np.arange(1,(n+1)/2).astype(int)
+        a = np.insert(a, np.zeros(l1, dtype=int), np.ones(l1)*a[0])
+        a = np.insert(a, -np.ones(l2, dtype=int), np.ones(l2)*a[-1])
+    ret = np.cumsum(a, dtype=float, axis=-1)
+    ret[n:] = ret[n:] - ret[:-n]
+    return ret[n - 1:] / n
+
 
 def loss_function(dist, cdf_val):
     # for distances above 25 kpc the CDF = 1, but we want hit the 'edge'
