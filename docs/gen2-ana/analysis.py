@@ -208,7 +208,7 @@ class Analysis():
 
         return
     
-    def _signal(self):
+    def _signal_generic(self):
         """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
         counts from a generic oscillation template are added to the flat light curve.
         
@@ -413,13 +413,23 @@ class Analysis():
         self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
         self._log = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                   "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+                   "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.tfit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        
+        if time_int:
+            self._log_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                              "signal" : {"ic86": None, "gen2": None, "wls": None}}
+            self.ts_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                            "signal" : {"ic86": None, "gen2": None, "wls": None}}
+            self.ffit_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                              "signal" : {"ic86": None, "gen2": None, "wls": None}}
+            ts_tint = []
+            fit_freq_tint = []
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -459,27 +469,49 @@ class Analysis():
                     # get corresponding time and freq of bin
                     fit_freq.append(self.freq_mid[ind_freq])
                     fit_time.append(self.time_mid[ind_time])
+
+                    if time_int:
+                        self._log_tint[hypo][det] = np.sum(self._log[hypo][det], axis = -1)
+                        ts_tint.append(np.nanmax(self._log_tint[hypo][det], axis = -1))
+                        ind_freq_tint = np.nanargmax(self._log_tint[hypo][det], axis = -1)
+                        fit_freq_tint.append(self.freq_mid[ind_freq_tint])
                 
                 self.ts[hypo][det] = np.array(ts).flatten()
                 self.ffit[hypo][det], self.tfit[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
 
+                if time_int:
+                    self.ts_tint[hypo][det] = np.array(ts_tint).flatten()
+                    self.ffit_tint[hypo][det] = np.array(fit_freq_tint).flatten()
+
+
         return
 
-    def get_ts_stat(self):
+    def get_ts_stat(self, time_int = False):
 
         self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self.ts_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                         "signal" : {"ic86": None, "gen2": None, "wls": None}}
         
+        if time_int:
+            self._ts_bkg_fit_tint = {"ic86": None, "gen2": None, "wls": None}
+            self.ts_stat_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                                 "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             # fitted background TS distribution
             self._ts_bkg_fit[det] = skewnorm(*skewnorm.fit(self.ts["null"][det]))
-        
+
+            if time_int:
+                self._ts_bkg_fit_tint[det] = skewnorm(*skewnorm.fit(self.ts_tint["null"][det]))
+
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
 
                 # median, 16% and 84% quantiles of TS distribution
                 self.ts_stat[hypo][det] = np.array([np.median(self.ts[hypo][det]), np.quantile(self.ts[hypo][det], 0.16), np.quantile(self.ts[hypo][det], 0.84)])
+
+                if time_int:
+                    self.ts_stat_tint[hypo][det] = np.array([np.median(self.ts_tint[hypo][det]), np.quantile(self.ts_tint[hypo][det], 0.16), np.quantile(self.ts_tint[hypo][det], 0.84)])
 
         return
 
@@ -502,7 +534,7 @@ class Analysis():
 
         return
   
-    def run(self, mode, ft_para, trials = None):
+    def run(self, mode, ft_para, model = "generic", trials = None):
         """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
         and short-time fourier transform (STF). It computes background and signal hits, 
         combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
@@ -522,28 +554,28 @@ class Analysis():
         # load and combine data
         self._background()
         self._average_background()
-        #self._signal()
-        self._signal_model()
+        if model == "generic":
+            self._signal_generic()
+        if model == "model":
+            self._signal_model()
         self._signal_sampled()
 
         if mode == "FFT":
             self._hypothesis(hanning = ft_para["hanning"])
             self.fft(ft_para)
+            self.get_ts_stat()
 
         elif mode == "STF":
             self._hypothesis()
             self.stf(ft_para)
-            
+            self.get_ts_stat(time_int=ft_para["time_int"])
+
         else:
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
       
-        self.get_ts_stat()
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, trials = None):
-
-        if trials is not None:
-            self.trials = trials
+    def dist_scan(self, distance_range, mode, ft_para, model = "generic", trials = None):
         
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
@@ -554,7 +586,7 @@ class Analysis():
             print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(mode, ft_para)
+            self.run(mode, ft_para, model = model, trials = trials)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
