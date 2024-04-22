@@ -257,6 +257,66 @@ class Analysis():
             self._sig["signal"][det] = sig
 
         return
+    
+    def _signal_mix(self):
+        """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
+        counts from a generic oscillation template are added to the flat light curve.
+        
+        """
+        self._sig = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        
+        # 1) Null hypothesis, i.e. flat, no modulation SN light curve
+        # The idea is that we first get the SASI wiggles and then smoothen them out with a moving average filter
+        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
+        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
+        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
+        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
+
+        # combine signal hits into IC86, Gen2 and Gen2+WLS
+        sig_ic86 = sig_i3 + sig_dc
+        sig_gen2 = sig_i3 + sig_dc + sig_md
+        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
+
+        self._sig["null"]["ic86"] = sig_ic86
+        self._sig["null"]["gen2"] = sig_gen2
+        self._sig["null"]["wls"] = sig_wls
+
+        # binning needed to smoothen a frequency f, for Tamborra 2014, 20 M: f_sasi = 80 Hz
+        frequency = 80*u.Hz
+        duration = self.sim.time[-1]-self.sim.time[0]
+        samples = (duration/self.sim._res_dt.to(u.s)).value
+
+        binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sasi
+
+        for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+            self._sig["null"][det] = moving_average(self._sig["null"][det], n = binning, const_padding = True)
+
+        # 2) Signal hypothesis, i.e. oscillations in the SN light curve
+        # The idea is we add the modulations from a template to the null hypothesis counts
+        for det in ["ic86", "gen2", "wls"]: # loop over detector
+            temp_para_det = dict(self.temp_para) # copy of template dictionary
+
+            if self.temp_para["time_start"] < self.sim.time[0]:
+                raise ValueError("time_start = {} smaller than simulation time start of {}".format(self.temp_para["time_start"], self.sim.time[0]))
+            elif self.temp_para["time_end"] > self.sim.time[-1]:
+                raise ValueError("time_end = {} larger than simulation time end of {}".format(self.temp_para["time_end"], self.sim.time[-1]))
+
+            # scale amplitude relative to maximum of light curve
+            temp_para_det["amplitude"] = temp_para_det["amplitude"] * np.max(self._sig["null"][det])
+      
+            # get template counts
+            template = self._template(temp_para_det)
+            
+            # combine flat light curve with template
+            sig = self._sig["null"][det] + template
+        
+            # make sure that high amplitude fluctuations do not cause negative counts
+            sig = np.maximum(sig, 0)
+
+            self._sig["signal"][det] = sig
+        return
 
     def _signal_sampled(self):
         """Add Poissonian fluctuations of signal
@@ -556,8 +616,12 @@ class Analysis():
         self._average_background()
         if model == "generic":
             self._signal_generic()
-        if model == "model":
+        elif model == "model":
             self._signal_model()
+        elif model == "mix":
+            self._signal_mix()
+        else:
+            raise ValueError('{} model type does not exist. Choose from "generic", "model", "mix".'.format(model))
         self._signal_sampled()
 
         if mode == "FFT":
