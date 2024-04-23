@@ -639,7 +639,7 @@ class Analysis():
       
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, model = "generic", trials = None):
+    def dist_scan(self, distance_range, mode, ft_para, model = "generic", trials = None, verbose = False):
         
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
@@ -647,7 +647,8 @@ class Analysis():
 
         for dist in distance_range:
 
-            print("Distance: {:.1f}".format(dist))
+            if verbose:
+                print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
             self.run(mode, ft_para, model = model, trials = trials)
@@ -669,7 +670,6 @@ class Analysis():
                 Ts_stat[key][nested_key] = np.transpose(np.array(value))
 
         return Zscore, Ts_stat
-
 
 
     """
