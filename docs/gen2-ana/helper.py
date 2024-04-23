@@ -4,6 +4,8 @@ from asteria.stellardist import StellarDensity
 from scipy.interpolate import PchipInterpolator
 from scipy.optimize import minimize
 
+import astropy.units as u
+
 def argmax_lastNaxes(A, N):
     # extension of argmax over several axis
     s = A.shape
@@ -29,7 +31,7 @@ def moving_average(a, n=3, zero_padding = False, const_padding = False):
     return ret[n - 1:] / n
 
 
-def loss_function(dist, cdf_val):
+def loss_stellar(dist, cdf_val):
     # for distances above 25 kpc the CDF = 1, but we want hit the 'edge'
     # we punish any value that is higher than 25 kpc + epsilon, epsilon << 1
 
@@ -48,7 +50,7 @@ def coverage_to_distance(cdf_val):
 
     # for single value
     if not isinstance(cdf_val, np.ndarray):
-        res = minimize(loss_function, x0 = 5, args=cdf_val)
+        res = minimize(loss_stellar, x0 = 5, args=cdf_val)
         return res.x
     
     # for an array loop through the entries
@@ -58,7 +60,7 @@ def coverage_to_distance(cdf_val):
             loss, i = 1, 0 # initialize loss and counter
             x0 = np.array([5,10,15,20]) # list of initial guess
             while loss > 1E-3: # repeat as long as loss > 0.001
-                res = minimize(loss_function, x0 = x0[i], args = cv)
+                res = minimize(loss_stellar, x0 = x0[i], args = cv)
                 loss = res.fun
                 i += 1
                 if i > 3:
@@ -67,6 +69,56 @@ def coverage_to_distance(cdf_val):
             dist.append(res.x)
         dist = np.array(dist)
         return dist
+    
+def loss_dist_horizon(dist, quan, sig):
+    return np.sqrt(np.sum((quan(dist)-sig)**2))
+
+def significance_horizon(dist_range, Zscore, confidence_level = [3,5]):
+                        
+    sigma = [str(cl) + "sig" for cl in confidence_level] 
+
+    dist = {key : {"ic86": None, "gen2": None, "wls": None} for key in sigma} # empty dictionary
+    perc = {key : {"ic86": None, "gen2": None, "wls": None} for key in sigma}
+                        
+
+    for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+        dist_min = 0.5 * u.kpc
+
+        # cutoff distance for interpolation, inf values need to be excluded, take 86% and first distance
+        dist_cutoff = dist_range[np.logical_and(dist_range>dist_min, np.where(np.isinf(Zscore[det][2])==True, 0, 1))][0]
+
+        # Interpolate Zscore data for 16%, 50% and 84% quantiles
+        q50 = PchipInterpolator(dist_range[dist_range>dist_cutoff], Zscore[det][0][dist_range>dist_cutoff])
+        q16 = PchipInterpolator(dist_range[dist_range>dist_cutoff], Zscore[det][1][dist_range>dist_cutoff])
+        q84 = PchipInterpolator(dist_range[dist_range>dist_cutoff], Zscore[det][2][dist_range>dist_cutoff])
+        
+        quantiles = [q50, q16, q84]
+
+        for i, cl in enumerate(confidence_level): # loop over confidence level (e.g. 3, 5 sigma)
+            x0 = dist_cutoff.value #???
+            di, pe = [], [] # temporary lists to store distance and percentage
+
+            for quan in quantiles: # loop over quantiles
+                loss = 1
+                while loss > 1E-3:
+                    res = minimize(loss_dist_horizon, x0=x0, args = (quan, cl))
+                    loss = res.fun
+                    x0 += 1
+                    if x0 > 50:
+                        print('Minimization did not converge')
+                        break
+                di.append(res.x[0])
+                if res.x >= 25:
+                    pe.append(1)
+                else:
+                    pe.append(stellar_inter(res.x[0]))
+                
+            dist[sigma[i]][det] = np.array(di) * u.kpc
+            perc[sigma[i]][det] = np.array(pe)*100
+
+        
+    return dist, perc
 
 
 # stellar distribution file, Adams 2013 model, returns CDF
