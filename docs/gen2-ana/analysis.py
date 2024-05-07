@@ -377,36 +377,84 @@ class Analysis():
 
         return
     
-    def apply_tmask(self, time_win):
-        """ Applies time mask. Cuts signal window to values given in time_win. This method overwrites the content of _comb.
-        The new, cut time is _time_new with length tlength_new.
+    def apply_tmask(self, time_win, mode, hypo = None, det = None):
+        """ Applies time mask. Cuts signal window to values given in time_win for both FFT and STF method. 
+        This method overwrites the content of _comb. If keywords hypo and det are set to None, the cut is applied to all
+        hypothesis and subdetectors. The new, cut time is _time_new with length tlength_new.
         Args:
             time_win (list of astropy.units.quantity.Quantity): lower and higher time cut
+            mode (str): analysis mode (FFT or STF)
+            hypo (str): hypothesis ("null" or "signal"), default None
+            det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """
         time_low, time_high = time_win
-        tmask = np.logical_and(self.sim.time>=time_low, self.sim.time<=time_high) # time mask
-        
-        for hypo in ["null", "signal"]: # loop over hypothesis
-            for det in ["ic86", "gen2", "wls"]: # loop over detector
-                self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
+        tmask = np.logical_and(self._time>=time_low, self._time<=time_high) # time mask
 
-        self._time_new = self.sim.time[tmask] # new times
+        if hypo is None and det is None:
+            if mode == "FFT":
+                for hypo in ["null", "signal"]: # loop over hypothesis
+                    for det in ["ic86", "gen2", "wls"]: # loop over detector
+                        self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
+                
+            elif mode == "STF":
+                for hypo in ["null", "signal"]: # loop over hypothesis
+                    for det in ["ic86", "gen2", "wls"]: # loop over detector
+                        self._stf[hypo][det] = self._stf[hypo][det][:,:,tmask]
+            
+            else:
+                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
+
+        else:
+            if mode == "FFT":
+                self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
+                
+            elif mode == "STF":
+                self._stf[hypo][det] = self._stf[hypo][det][:,:,tmask]
+            
+            else:
+                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
+
+        self._time_new = self._time[tmask]
         self.tlength_new = len(self._time_new) # new length of time array
 
         return
 
-    def apply_fmask(self, freq_win):
-        """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win. This method overwrites the content of _fft.
-        The new, cut frequency is _freq_new with length flength_new.
+    def apply_fmask(self, freq_win, mode, hypo = None, det = None):
+        """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win for both FFT and STF method. 
+        This method overwrites the content of _fft or _stf. If keywords hypo and det are set to None, the cut is applied to all
+        hypothesis and subdetectors. The new, cut frequency is _freq_new with length flength_new.
         Args:
             freq_win (list of astropy.units.quantity.Quantity): lower and higher frequency cut
+            mode (str): analysis mode (FFT or STF)
+            hypo (str): hypothesis ("null" or "signal"), default None
+            det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """        
         freq_low, freq_high = freq_win
         fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high) # frequency mask
 
-        for hypo in ["null", "signal"]: # loop over hypothesis
-            for det in ["ic86", "gen2", "wls"]: # loop over detector
+        if hypo is None and det is None:
+            if mode == "FFT":
+                for hypo in ["null", "signal"]: # loop over hypothesis
+                    for det in ["ic86", "gen2", "wls"]: # loop over detector
+                        self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
+                
+            elif mode == "STF":
+                for hypo in ["null", "signal"]: # loop over hypothesis
+                    for det in ["ic86", "gen2", "wls"]: # loop over detector
+                        self._stf[hypo][det] = self._stf[hypo][det][:,fmask,:]
+            
+            else:
+                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
+
+        else:
+            if mode == "FFT":
                 self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
+                
+            elif mode == "STF":
+                self._stf[hypo][det] = self._stf[hypo][det][:,fmask,:]
+            
+            else:
+                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
 
         self._freq_new = self._freq[fmask] # new frequency array
         self.flength_new = len(self._freq_new) # new length of frequency array
@@ -422,11 +470,17 @@ class Analysis():
 
         if time_res != self.sim._res_dt:
             raise ValueError('fft_para["time_res"] = {} but ana.sim._res_dt = {}. Make sure to execute ana.run with the same resolution as you set in fft_para'.format(time_res, self.sim._res_dt))
-
-        self.apply_tmask(time_win) # apply time mask   
+        
+        self._time = self.sim.time
+        self.apply_tmask(time_win, mode = "FFT") # apply time mask   
 
         self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
+        self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                       "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                         "signal" : {"ic86": None, "gen2": None, "wls": None}}
+
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -435,16 +489,8 @@ class Analysis():
                 # return frequencies
                 self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
-        # apply frequency cuts
-        self.apply_fmask(freq_win)
+                self.apply_fmask(freq_win, mode = "FFT", hypo = hypo, det = det) # apply frequency mask
         
-        self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                       "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
-        self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                         "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
-
-        for hypo in ["null", "signal"]: # loop over hypothesis
-            for det in ["ic86", "gen2", "wls"]: # loop over detector
                 # max of FFT is used to build TS distribution
                 self.ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
                 self.ffit[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)].value
@@ -458,6 +504,9 @@ class Analysis():
         hann_hop = stf_para["hann_hop"] # hann hop = number of time bins the window is moved
         freq_sam = stf_para["freq_sam"] # sampling frequency of entire signal (1 kHz for 1 ms binning)
         time_int = stf_para["time_int"] # should power be summed over time?, True or False
+        time_win = stf_para["time_win"]
+        freq_win = stf_para["freq_win"]
+
 
         hann_len = int(hann_len.to_value(u.ms)) # define hann window
         hann_res = hann_res.to_value(u.Hz)
@@ -481,6 +530,7 @@ class Analysis():
         self.tfit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}}
         
+        # extra variables if time integration is selected
         if time_int:
             self._log_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                               "signal" : {"ic86": None, "gen2": None, "wls": None}}
@@ -501,12 +551,16 @@ class Analysis():
                 for bat in trial_batch: # loop over batches
                     
                     # avoid padding as this will introduce artefacts in the FT
-                    self.freq_mid, self.time_mid, self._stf[hypo][det] = stft(self._comb[hypo][det][bat:bat+bat_step], 
+                    self._freq, self._time, self._stf[hypo][det] = stft(self._comb[hypo][det][bat:bat+bat_step], 
                                                                                       fs = freq_sam, window = "hann", 
                                                                                       nperseg = hann_len, noverlap = hann_ovl, 
                                                                                       boundary = None, padded = False, 
                                                                                       return_onesided = True)
-                    self.time_mid *= 1000 # time in units of ms
+                    self._freq *= u.Hz
+                    self._time = (self._time * u.s).to(u.ms) # time in units of ms
+                    
+                    self.apply_tmask(time_win, mode = "STF", hypo = hypo, det = det)
+                    self.apply_fmask(freq_win, mode = "STF", hypo = hypo, det = det)
 
                     # take square of absolute for power
                     self._stf[hypo][det] = np.abs(self._stf[hypo][det]) ** 2
@@ -527,14 +581,14 @@ class Analysis():
                     # get time and freq index position of maximum 
                     ind_freq, ind_time = argmax_lastNaxes(self._log[hypo][det], 2)
                     # get corresponding time and freq of bin
-                    fit_freq.append(self.freq_mid[ind_freq])
-                    fit_time.append(self.time_mid[ind_time])
+                    fit_freq.append(self._freq[ind_freq])
+                    fit_time.append(self._time[ind_time])
 
                     if time_int:
                         self._log_tint[hypo][det] = np.sum(self._log[hypo][det], axis = -1)
                         ts_tint.append(np.nanmax(self._log_tint[hypo][det], axis = -1))
                         ind_freq_tint = np.nanargmax(self._log_tint[hypo][det], axis = -1)
-                        fit_freq_tint.append(self.freq_mid[ind_freq_tint])
+                        fit_freq_tint.append(self._freq[ind_freq_tint])
                 
                 self.ts[hypo][det] = np.array(ts).flatten()
                 self.ffit[hypo][det], self.tfit[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
@@ -639,7 +693,7 @@ class Analysis():
       
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, model = "generic", trials = None, verbose = False):
+    def dist_scan(self, distance_range, mode, ft_para, model = "generic", trials = None, verbose = None):
         
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
@@ -647,7 +701,7 @@ class Analysis():
 
         for dist in distance_range:
 
-            if verbose:
+            if verbose == "debug":
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
