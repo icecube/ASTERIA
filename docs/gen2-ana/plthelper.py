@@ -312,3 +312,28 @@ def plot_para_scan(freq_range, ampl_range, data):
     ax.tick_params(labelsize=14)
 
     plt.tight_layout()
+
+def plot_bootstrap(zscore):
+
+    fig, ax = plt.subplots(3, 1, figsize=(10, 5))
+
+    for i, det in enumerate(["ic86", "gen2", "wls"]):
+        ax[i].hist(zscore[det][:, 0], bins=20, density=True, histtype="step", color="C0", label="50%")
+        ax[i].hist(zscore[det][:, 1], bins=20, density=True, histtype="step", color="C1", label="14%")
+        ax[i].hist(zscore[det][:, 2], bins=20, density=True, histtype="step", color="C2", label="86%")
+        ax[i].text(0.15, 0.9, s = det, transform=ax[i].transAxes, fontsize=14,
+        verticalalignment='top', bbox= dict(boxstyle='round', facecolor='white', alpha=0.5))
+        ax[i].tick_params(labelsize = 14)
+
+
+    # Create a common legend for all subplots
+    ax[0].legend(loc="upper center", bbox_to_anchor=(0.5, 1.2), fontsize=14, ncols = 3)
+
+    # add a big axis, hide frame
+    fig.add_subplot(111, frameon=False)
+    plt.tick_params(labelcolor='none', which='both', top=False, bottom=False, left=False, right=False)
+    plt.xlabel("Mean Significance", fontsize = 14)
+    plt.ylabel("Normalized Counts", fontsize = 14)
+
+    plt.tight_layout()
+    plt.show()
