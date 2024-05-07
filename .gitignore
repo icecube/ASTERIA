@@ -5,7 +5,7 @@ scratch/*
 !scratch/.gitignore
 data/processed/*
 !data/processed/.gitignore
-docs/gen2-ana/minimal_example.ipynb
+docs/gen2-ana/files/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
