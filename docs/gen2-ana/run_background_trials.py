@@ -20,6 +20,9 @@ class BGT():
 
     def generate_data(self, samples, filename = None):
         print("DATA GENERATION -- SAMPLES {}".format(samples))
+
+        if not os.path.isdir("./files"):
+            os.mkdir("./files")
         if filename is None:
             filename = "./files/background_{}_generate_{:1.0e}_distance_{:.0f}kpc.npz".format(self.ana_para["mode"], int(samples), self.ana_para["distance"].value)
 
