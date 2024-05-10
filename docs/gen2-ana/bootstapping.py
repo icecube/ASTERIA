@@ -2,8 +2,8 @@ import numpy as np
 from analysis import *
 import matplotlib.pyplot as plt
 import pickle
-from helper import update_progress_with_text
 from tqdm import tqdm
+from scipy.stats import lognorm
 
 class Bootstrapping():
 
@@ -17,15 +17,15 @@ class Bootstrapping():
         self.verbose = verbose
 
     def generate_data(self, samples, filename = None):
-        print("DATA GENERATION")
+        print("DATA GENERATION -- SAMPLES {}".format(samples))
         if filename is None:
             filename = "./files/bootstrapping/bootstrapping_generate_{:1.0e}_distance_{:.0f}kpc.npz".format(int(samples), self.ana_para["distance"].value)
 
         self.max_trials = 10000 # size of batches
-        self.repetition = np.round(samples/self.max_trials).astype(int)
+        self.repetitions = np.round(samples/self.max_trials).astype(int)
 
         ts = []
-        for r in tqdm(range(self.repetition)):
+        for r in tqdm(range(self.repetitions)):
             # Initialize analysis class and run analysis
             ana = Analysis(self.sim, res_dt = self.ana_para["res_dt"], distance=self.ana_para["distance"], trials = self.max_trials, temp_para=self.ana_para["temp_para"])
             ana.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], model = "generic")
@@ -44,13 +44,13 @@ class Bootstrapping():
             for hypo in hypothesis:
                 dd = []
                 #for q in np.arange(len(quantiles)):
-                for r in range(self.repetition):
+                for r in range(self.repetitions):
                     d = item[r][hypo][det]
                     dd.append(d)
                 data[det][hypo] = np.array(dd, dtype=float).reshape(self.repetitions*self.max_trials)
 
         np.savez(file = filename, 
-                    reps = self.repetition, 
+                    reps = self.repetitions, 
                     trials = self.max_trials, 
                     hypo = hypothesis,
                     ic86 = data["ic86"],
@@ -65,14 +65,14 @@ class Bootstrapping():
         for key in ["ic86", "gen2", "wls"]:
             tts[key] = ts[key].item()
         
-        self.repetition = ts["reps"]
+        self.repetitions = ts["reps"]
         self.max_trials = ts["trials"]
         self.ts = tts
 
 
     def run(self, trials = 10000, repetitions = 100, mode = "generate"):
         
-        print("BOOTSTRAPPING")
+        print("BOOTSTRAPPING -- TRIALS {} -- REPETITIONS {}".format(trials, repetitions))
         samples = trials * repetitions
         self.zscore = {"ic86": [], "gen2": [], "wls": []}
 
@@ -110,7 +110,8 @@ class Bootstrapping():
                 # needs to be replaced with a better fit
                 # fit of null hypothesis
                 # Later fit should be on self.ts[det]["null"] instead of subsample
-                ts_nul_fit = skewnorm(*skewnorm.fit(ts_nul[r]))
+                dist = lognorm
+                ts_nul_fit = dist(*dist.fit(ts_nul[r]))
                 
                 # get p value and Z score
                 for i in range(3):
@@ -131,7 +132,8 @@ class Bootstrapping():
             if self.verbose: print("Detector: {}".format(det))
 
             # bkg fit on full 1E6 bkg TS trials
-            ts_nul_fit = skewnorm(*skewnorm.fit(self.ts[det]["null"]))
+            dist = lognorm
+            ts_nul_fit = dist(*dist.fit(self.ts[det]["null"]))
 
             ts_sig = np.random.choice(self.ts[det]["signal"], size = samples, replace = True).reshape(repetitions, trials)
              
