@@ -136,19 +136,13 @@ def plot_ts(ts, det = "ic86"):
     mask_signal = np.logical_and(x_signal > ps_signal[0], x_signal < ps_signal[2])
 
     # Search for the heights of the bins in which the percentiles are
-    _, ymax = ax.get_ybound()
-
     hi_null = y_null[np.searchsorted(x_null, ps_null, side='left')-1]
     hi_signal = y_signal[np.searchsorted(x_signal, ps_signal, side='left')-1]
 
     ax.plot(x_fit, y_fit, "k--")
 
-    ax.axvline(ps_null[1], ymin = 0, ymax = hi_null[1]/ymax, color = 'C0', ls = '-')
-    ax.axvline(ps_signal[1], ymin = 0, ymax = hi_signal[1]/ymax, color = 'C1', ls = '-')
-
-    #for i in range(len(bin_null) - 1):
-    #    ax.fill_between([bin_null[i], bin_null[i + 1]], y_null[i], step='post', color='C0', ec = None, alpha=0.5) if mask_null[i] == 1 else None
-    #    ax.fill_between([bin_signal[i], bin_signal[i + 1]], y_signal[i], step='post', color='C1', ec = None, alpha=0.5) if mask_signal[i] == 1 else None
+    ax.vlines(ps_null[1], ymin = 0, ymax = hi_null[1], color = 'C0', ls = '-')
+    ax.vlines(ps_signal[1], ymin = 0, ymax = hi_signal[1], color = 'C1', ls = '-')
 
     ax.fill_between(x = x_signal[mask_signal], y1 = y_signal[mask_signal], color = 'C1', alpha = 0.5)
     ax.fill_between(x = x_null[mask_null], y1 = y_null[mask_null], color = 'C0', alpha = 0.5)
@@ -318,11 +312,19 @@ def plot_bootstrap(zscore):
     fig, ax = plt.subplots(3, 1, figsize=(10, 5))
 
     for i, det in enumerate(["ic86", "gen2", "wls"]):
-        ax[i].hist(zscore[det][:, 0], bins=20, density=True, histtype="step", color="C0", label="50%")
-        ax[i].hist(zscore[det][:, 1], bins=20, density=True, histtype="step", color="C1", label="14%")
-        ax[i].hist(zscore[det][:, 2], bins=20, density=True, histtype="step", color="C2", label="86%")
-        ax[i].text(0.15, 0.9, s = det, transform=ax[i].transAxes, fontsize=14,
-        verticalalignment='top', bbox= dict(boxstyle='round', facecolor='white', alpha=0.5))
+
+        rel_error = np.std(zscore[det], axis = 0)/np.mean(zscore[det], axis = 0)
+
+        n1, _, _ = ax[i].hist(zscore[det][:, 1], bins=20, density=True, histtype="step", color="C1", label="16%")
+        n0, _, _ = ax[i].hist(zscore[det][:, 0], bins=20, density=True, histtype="step", color="C0", label="50%")
+        n2, _, _ = ax[i].hist(zscore[det][:, 2], bins=20, density=True, histtype="step", color="C2", label="84%")
+
+        ax[i].text(zscore[det][:, 1].mean(), n1.max()/2, s = "{:1.1E}".format(rel_error[1]), color = "C1", fontsize = 10, weight = "bold", ha = "center")
+        ax[i].text(zscore[det][:, 0].mean(), n0.max()/2, s = "{:1.1E}".format(rel_error[0]), color = "C0", fontsize = 10, weight = "bold", ha = "center")
+        ax[i].text(zscore[det][:, 2].mean(), n2.max()/2, s = "{:1.1E}".format(rel_error[2]), color = "C2", fontsize = 10, weight = "bold", ha = "center")
+
+        ax[i].text(0.15, 0.9, s = det, transform=ax[i].transAxes, fontsize=14, va='top', 
+                   bbox= dict(boxstyle='round', facecolor='white', alpha=0.5))
         ax[i].tick_params(labelsize = 14)
 
 
@@ -336,4 +338,5 @@ def plot_bootstrap(zscore):
     plt.ylabel("Normalized Counts", fontsize = 14)
 
     plt.tight_layout()
-    plt.show()
+
+    return fig, ax
