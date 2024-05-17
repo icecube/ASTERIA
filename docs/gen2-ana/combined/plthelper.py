@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
-from scipy.stats import skewnorm
+from scipy.stats import norm, lognorm, skewnorm
 
 from helper import *
 
@@ -340,3 +340,66 @@ def plot_bootstrap(zscore):
     plt.tight_layout()
 
     return fig, ax
+
+def plot_hist_fit(ts_binned, fit_func, pvalue, bins, det = "ic86"):
+
+    ts_xhist, ts_yhist = ts_binned[det]
+    pvals = pvalue[det]
+
+    zscore = norm.isf(pvals/2)
+    diff_zscore = np.diff(zscore)
+
+    # get fit params from npz file for given det and distance
+    fig, ax = plt.subplots(2,2, figsize = (10,10))
+    ax = ax.ravel()
+
+    ax[0].step(ts_xhist, ts_yhist)
+    ax[0].plot(ts_xhist, fit_func.pdf(ts_xhist), "k:")
+    ax[0].set_ylabel("Normalized Counts")
+    ax[0].set_yscale("log")
+    ax[0].set_xticklabels([]) #Remove x-tic labels for the first frame
+
+    # residual axis
+    rax0 = ax[0].inset_axes([0, -0.25, 1, 0.2])
+    rax0.plot(ts_xhist, (ts_yhist-fit_func.pdf(ts_xhist))/ts_yhist, color='k')
+    rax0.set_xlabel("TS value")
+    rax0.set_ylabel("rel. residuals")
+    rax0.set_yscale("log")
+
+    ax[1].step(ts_xhist, pvals, color = "C0")
+    ax[1].plot(ts_xhist, fit_func.sf(ts_xhist), "k:")
+    ax[1].set_ylabel("p-value")
+    ax[1].set_xticklabels([]) #Remove x-tic labels for the first frame
+
+    ax11 = ax[1].twinx()
+    ax11.step(ts_xhist, zscore, color = "C1")
+    ax11.plot(ts_xhist, norm.isf(fit_func.sf(ts_xhist)/2), "k:")
+    ax11.set_ylabel(r"Z-score ($\sigma$)")
+
+    # residual axis
+    rax1 = ax[1].inset_axes([0, -0.25, 1, 0.2])
+    rax1.plot(ts_xhist, pvals-fit_func.sf(ts_xhist), color='C0')
+    rax1.plot(ts_xhist, (zscore-norm.isf(fit_func.sf(ts_xhist)/2))/zscore, color='C1', ls = "--")
+    rax1.set_xlabel("TS value")
+    rax1.set_ylabel("rel. residuals")
+    rax1.set_yscale("log")
+
+    ax[1].spines['left'].set_color('C0')
+    ax[1].yaxis.label.set_color('C0')
+    ax[1].tick_params(axis='y', colors='C0')
+    ax11.spines['right'].set_color('C1')
+    ax11.yaxis.label.set_color('C1')
+    ax11.tick_params(axis='y', colors='C1')
+    ax11.grid(axis="y")
+
+    ax[2].step((ts_xhist[1:]+ts_xhist[:-1])/2, diff_zscore, color = "C1")
+    ax[2].set_xlabel("TS value")
+    ax[2].set_ylabel(r"$\Delta$Z-score ($\Delta\sigma$)")
+
+    ax[3].hist(diff_zscore[~np.isinf(diff_zscore)], bins = int(np.sqrt(bins)))
+    ax[3].set_xlabel(r"$\Delta$Z-score ($\Delta\sigma$)")
+    ax[3].set_ylabel("Normalized Counts")
+    ax[3].set_yscale("log")
+
+    plt.tight_layout()
+    plt.show()

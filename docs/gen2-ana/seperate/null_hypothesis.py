@@ -7,7 +7,7 @@ from scipy.stats import skewnorm, norm
 from helper import argmax_lastNaxes, moving_average
 from asteria.simulation import Simulation as sim
 
-class Background_Trials():
+class Null_Hypothesis():
 
     def __init__(self, 
                  sim, 

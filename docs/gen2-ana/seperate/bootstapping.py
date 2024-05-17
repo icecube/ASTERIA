@@ -3,7 +3,7 @@ from analysis import *
 import matplotlib.pyplot as plt
 import pickle
 from tqdm import tqdm
-from scipy.stats import lognorm
+from scipy.stats import lognorm, skewnorm
 
 class Bootstrapping():
 
@@ -70,36 +70,38 @@ class Bootstrapping():
         self.ts = tts
 
 
-    def run(self, trials = 10000, repetitions = 100, mode = "generate"):
+    def run_same(self, trials = 10000, repetitions = 100, distribution = None):
+        """_summary_
+
+        Args:
+            trials (int, optional): _description_. Defaults to 10000.
+            repetitions (int, optional): _description_. Defaults to 100.
+            mode (str, optional): _description_. Defaults to "generate".
+            distribution (_type_, optional): _description_. Defaults to None.
+
+        Raises:
+            ValueError: _description_
+            ValueError: _description_
+        """
         
-        print("BOOTSTRAPPING -- TRIALS {} -- REPETITIONS {}".format(trials, repetitions))
         samples = trials * repetitions
         self.zscore = {"ic86": [], "gen2": [], "wls": []}
+
+        if distribution is None or distribution == "lognorm":
+            distr = lognorm
+        elif distribution == "skewnorm":
+            distr = skewnorm
+        else:
+            raise ValueError('{} not supported. Choose from "lognorm" and "skewnorm"'.format(distribution)) 
 
         #loop over detector
         for det in ["ic86", "gen2", "wls"]:
             if self.verbose: print("Detector: {}".format(det))
 
-            filename = "./files/bootstrapping/bootstrapping_sample_"+det+"_trials_{}_reps_{}_distance_{:.0f}kpc.npz".format(trials, repetitions, self.ana_para["distance"].value)
-
-            # first we either generate or load data
-            if mode == "generate":
-                # sample trials of TS values from signal and null hypothesis, values can be re-picked
-                ts_nul = np.random.choice(self.ts[det]["null"], size = samples, replace = True).reshape(repetitions, trials)
-                ts_sig = np.random.choice(self.ts[det]["signal"], size = samples, replace = True).reshape(repetitions, trials)
-                data = [ts_nul, ts_sig]
-
-                file = open(filename, "wb")
-                pickle.dump(data, file)
-                file.close()
-
-            elif mode == "load":
-                file = open(filename, "rb")
-                data = pickle.load(file)
-                ts_nul, ts_sig = data
-
-            else:
-                raise ValueError('{} mode does not exist. Choose from "generate" and "load"'.format(mode))    
+            # sample trials of TS values from signal and null hypothesis, values can be re-picked
+            ts_nul = np.random.choice(self.ts[det]["null"], size = samples, replace = True).reshape(repetitions, trials)
+            ts_sig = np.random.choice(self.ts[det]["signal"], size = samples, replace = True).reshape(repetitions, trials)
+            data = [ts_nul, ts_sig]
             
             for r in tqdm(range(repetitions)):
                 # calculate median, 16% and 84% quantiles of sampled signal TS distribution
@@ -107,11 +109,8 @@ class Bootstrapping():
                                         np.quantile(ts_sig[r], 0.16), 
                                         np.quantile(ts_sig[r], 0.84)])
 
-                # needs to be replaced with a better fit
                 # fit of null hypothesis
-                # Later fit should be on self.ts[det]["null"] instead of subsample
-                dist = lognorm
-                ts_nul_fit = dist(*dist.fit(ts_nul[r]))
+                ts_nul_fit = distr(*distr.fit(ts_nul[r]))
                 
                 # get p value and Z score
                 for i in range(3):
@@ -121,9 +120,15 @@ class Bootstrapping():
 
             self.zscore[det] = np.array(self.zscore[det]).reshape(repetitions, 3)
 
-    def realdeal(self, trials = 10000, repetitions = 100):
+    def run_full(self, trials = 10000, repetitions = 100, distribution = None):
         
-        print("REALDEAL")
+        if distribution is None or distribution == "lognorm":
+            distr = lognorm
+        elif distribution == "skewnorm":
+            distr = skewnorm
+        else:
+            raise ValueError('{} not supported. Choose from "lognorm" and "skewnorm"'.format(distribution)) 
+
         samples = trials * repetitions
         self.zscore = {"ic86": [], "gen2": [], "wls": []}
 
@@ -132,8 +137,7 @@ class Bootstrapping():
             if self.verbose: print("Detector: {}".format(det))
 
             # bkg fit on full 1E6 bkg TS trials
-            dist = lognorm
-            ts_nul_fit = dist(*dist.fit(self.ts[det]["null"]))
+            ts_nul_fit = distr(*distr.fit(self.ts[det]["null"]))
 
             ts_sig = np.random.choice(self.ts[det]["signal"], size = samples, replace = True).reshape(repetitions, trials)
              
