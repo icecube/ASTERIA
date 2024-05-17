@@ -5,8 +5,8 @@ scratch/*
 !scratch/.gitignore
 data/processed/*
 !data/processed/.gitignore
-docs/gen2-ana/files/*
-docs/gen2-ana/plots/*
+docs/gen2-ana/seperate/files/*
+docs/gen2-ana/seperate/plots/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
