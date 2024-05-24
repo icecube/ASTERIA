@@ -43,17 +43,20 @@ def plot_stft(time, freq, power, det = "ic86"):
     freq = freq.value
     time = time.value
 
+    vmin = np.min([power["null"][det][0], power["signal"][det][0]])
+    vmax = np.max([power["null"][det][0], power["signal"][det][0]])
+
     hypos = ["signal", "null"]
     im, cb = [None,None], [None,None]
     
     fig, ax = plt.subplots(1,2, figsize = (10,4))
 
     for i in range(2):
-        im[i] = ax[i].pcolormesh(time, freq, np.log(power[hypos[i]][det][0]), cmap='plasma', shading = "nearest", vmin = 0, vmax = 8)
+        im[i] = ax[i].pcolormesh(time, freq, power[hypos[i]][det][0], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)
         
         cb = fig.colorbar(im[i])
         cb.ax.tick_params(labelsize=14)
-        cb.set_label(label=r"$\log \{ S(f,t) \}$",size=14)
+        cb.set_label(label=r"$S(f,t)$",size=14)
         ax[i].set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize=14)
         ax[i].set_ylabel(f"Frequency $f$ in [Hz]", fontsize=14)
         ax[i].yaxis.get_offset_text().set_fontsize(14)
@@ -97,16 +100,23 @@ def plot_stft_time_int(freq, log_int, det = "ic86"):
     ax.step(freq, diff, color = "k", label = r'$H_{1} - H_{0}$')
 
     ax.set_xlabel('Frequency [Hz]', fontsize = 14)
-    ax.set_ylabel('summed log-power', fontsize = 14)
+    ax.set_ylabel('summed power', fontsize = 14)
     ax.set_xlim(0,500)
     ax.tick_params(labelsize = 14)
-    ax.legend(fontsize = 14)
+    ax.legend(fontsize = 14, ncol = 3)
 
     plt.tight_layout()
 
-def plot_ts(ts, det = "ic86"):
+def plot_ts(ts, bkg_distr, det = "ic86"):
 
     # Plot TS distribution for null and signal hypothesis for gen2
+
+    if bkg_distr == "lognorm":
+            distr = lognorm
+    elif bkg_distr == "skewnorm":
+        distr = skewnorm
+    else:
+        raise ValueError('{} not supported. Choose from "lognorm" or "skewnorm"'.format(bkg_distr)) 
 
     bins = 40
 
@@ -127,7 +137,7 @@ def plot_ts(ts, det = "ic86"):
 
 
     # get fitted background distribution
-    bkg_fit = skewnorm(*skewnorm.fit(ts["null"][det]))
+    bkg_fit = distr(*distr.fit(ts["null"][det]))
     x_fit = np.linspace(np.minimum(x_null[0],x_signal[0]), np.maximum(x_null[-1],x_signal[-1]), 200)
     y_fit = bkg_fit.pdf(x_fit)
 
@@ -163,8 +173,8 @@ def plot_fit_freq(fit_freq, det = "ic86"):
 
     fig, ax = plt.subplots()
 
-    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C0", label=r"$H_0$")
-    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C1", label=r"$H_1$")
+    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C0", label=r"$H_0$", align='left')
+    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C1", label=r"$H_1$", align='left')
     ax.axvline(np.median(fit_freq_null), color="C0")
     ax.axvline(np.median(fit_freq_signal), color="C1")
     ax.set_xlabel("Frequency [Hz]", fontsize=14)
@@ -196,8 +206,8 @@ def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
 
     # Top histogram
     ax_top = fig.add_subplot(gs[0, :-1], sharex=ax_main)
-    ax_top.hist(fit_time_null, bins=bins, range = (0, 1000), alpha=0.5, color="C0", orientation='vertical')
-    ax_top.hist(fit_time_signal, bins=bins, range = (0, 1000), alpha=0.5, color="C1", orientation='vertical')
+    ax_top.hist(fit_time_null, bins=bins, range = (0, 1000), alpha=0.5, color="C0", orientation='vertical', align='left')
+    ax_top.hist(fit_time_signal, bins=bins, range = (0, 1000), alpha=0.5, color="C1", orientation='vertical', align='left')
     ax_top.axvline(np.median(fit_time_null), color="C0")
     ax_top.axvline(np.median(fit_time_signal), color="C1")
 
@@ -206,8 +216,8 @@ def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
 
     # Right histogram
     ax_right = fig.add_subplot(gs[1:, -1], sharey=ax_main)
-    ax_right.hist(fit_freq_null, bins=bins, range = (0, 500), alpha=0.5, color="C0", orientation='horizontal')
-    ax_right.hist(fit_freq_signal, bins=bins, range = (0, 500), alpha=0.5, color="C1", orientation='horizontal')
+    ax_right.hist(fit_freq_null, bins=bins, range = (0, 500), alpha=0.5, color="C0", orientation='horizontal', align='left')
+    ax_right.hist(fit_freq_signal, bins=bins, range = (0, 500), alpha=0.5, color="C1", orientation='horizontal', align='left')
     ax_right.axhline(np.median(fit_freq_null), color="C0")
     ax_right.axhline(np.median(fit_freq_signal), color="C1")
     ax_right.set_xlabel("Counts", fontsize=14)
@@ -271,11 +281,13 @@ def plot_significance(dist_range, zscore, ts_stat):
     # distance for CDF value of 0.1, 0.5, etc.
     cdf_val = np.array([0.1,0.5,0.75,0.9,0.95,0.99,1])
     stellar_dist = coverage_to_distance(cdf_val).flatten()
+    # cut all stellar_dist and cdf entries that are smaller (larger) than the smallest (largest) entry in dist_range
+    mask = np.logical_and(stellar_dist > dist_range.value.min(), stellar_dist < dist_range.value.max())
 
     ax22 = ax[0].twiny()
     ax22.set_xlim(ax[0].get_xlim())
-    ax22.set_xticks(stellar_dist)
-    ax22.set_xticklabels((cdf_val*100).astype(dtype=int), rotation = 0, fontsize = 12)
+    ax22.set_xticks(stellar_dist[mask])
+    ax22.set_xticklabels((cdf_val[mask]*100).astype(dtype=int), rotation = 0, fontsize = 12)
     ax22.set_xlabel('Cumulative galactic CCSNe distribution \n from Adams et al. (2013) in [%]', fontsize = 12)
 
     #rearrange legend handels
