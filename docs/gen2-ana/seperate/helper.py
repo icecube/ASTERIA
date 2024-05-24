@@ -70,7 +70,7 @@ def significance_horizon(dist_range, Zscore, sigma = [3,5]):
                         
 
     for det in ["ic86", "gen2", "wls"]: # loop over detector
-        print(det)
+
         dist_min = 0.5 * u.kpc
 
         # cutoff distance for interpolation, inf values need to be excluded, take 86% and first distance
