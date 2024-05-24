@@ -1,8 +1,10 @@
 #!/bin/bash
 
-samples=100000
+OUTPUTVAL=$1
 
-for dist in {1..2}
+SAMPLES=100000
+
+for DIST in {1..2}
 do
-    python run_background_trials.py $dist $samples
+    python run_background_trials.py $DIST $SAMPLES $OUTPUTVAL
 done
