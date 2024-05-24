@@ -208,7 +208,7 @@ class Analysis():
 
         return
     
-    def _signal_generic(self):
+    def _signal_generic(self, smoothing = False):
         """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
         counts from a generic oscillation template are added to the flat light curve.
         
@@ -231,6 +231,16 @@ class Analysis():
         self._sig["null"]["ic86"] = sig_ic86
         self._sig["null"]["gen2"] = sig_gen2
         self._sig["null"]["wls"] = sig_wls
+
+        if smoothing:
+            # binning needed to smoothen a frequency f, low frequency cut of 100 Hz
+            frequency = 100*u.Hz
+            duration = self.sim.time[-1]-self.sim.time[0]
+            samples = (duration/self.sim._res_dt.to(u.s)).value
+            binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sas
+
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                self._sig["null"][det] = moving_average(self._sig["null"][det], n = binning, const_padding = True)
 
         # 2) Signal hypothesis, i.e. oscillations in the SN light curve
         # The idea is we add the modulations from a template to the null hypothesis counts
@@ -521,8 +531,6 @@ class Analysis():
 
         self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
-        self._log = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
-                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                    "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
@@ -532,14 +540,12 @@ class Analysis():
         
         # extra variables if time integration is selected
         if time_int:
-            self._log_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+            self._stf_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                               "signal" : {"ic86": None, "gen2": None, "wls": None}}
             self.ts_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                             "signal" : {"ic86": None, "gen2": None, "wls": None}}
             self.ffit_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                               "signal" : {"ic86": None, "gen2": None, "wls": None}}
-            ts_tint = []
-            fit_freq_tint = []
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -547,6 +553,10 @@ class Analysis():
                 # empty lists filled in batch loop
                 ts = []
                 fit_freq, fit_time = [], []
+
+                if time_int:
+                    ts_tint = []
+                    fit_freq_tint = []
 
                 for bat in trial_batch: # loop over batches
                     
@@ -565,30 +575,22 @@ class Analysis():
                     # take square of absolute for power
                     self._stf[hypo][det] = np.abs(self._stf[hypo][det]) ** 2
 
-                    # take logarithm of max normalized power
-                    self._log[hypo][det] = np.log10(self._stf[hypo][det]/np.nanmax(self._stf[hypo][det]))
-                    
-                    # take difference between median of time averaged spectrum and spectrum
-                    self._log[hypo][det] = self._log[hypo][det] - np.repeat(np.nanmedian(self._log[hypo][det], axis = -1), self._log[hypo][det].shape[-1]).reshape(self._log[hypo][det].shape) 
-
-                    # take only values where difference is larger than zero, i.e. only overfluctuations
-                    self._log[hypo][det] = np.maximum(self._log[hypo][det], 0)
-
                     # maximum (hottest pixel) in array of 2D STF, returns array of length trials
                     # value used for ts distribution
-                    ts.append(np.nanmax(self._log[hypo][det], axis = (1,2)))
+                    ts.append(np.nanmax(self._stf[hypo][det], axis = (1,2)))
 
                     # get time and freq index position of maximum 
-                    ind_freq, ind_time = argmax_lastNaxes(self._log[hypo][det], 2)
+                    ind_freq, ind_time = argmax_lastNaxes(self._stf[hypo][det], 2)
+
                     # get corresponding time and freq of bin
-                    fit_freq.append(self._freq[ind_freq])
-                    fit_time.append(self._time[ind_time])
+                    fit_freq.append(self._freq_new[ind_freq])
+                    fit_time.append(self._time_new[ind_time])
 
                     if time_int:
-                        self._log_tint[hypo][det] = np.sum(self._log[hypo][det], axis = -1)
-                        ts_tint.append(np.nanmax(self._log_tint[hypo][det], axis = -1))
-                        ind_freq_tint = np.nanargmax(self._log_tint[hypo][det], axis = -1)
-                        fit_freq_tint.append(self._freq[ind_freq_tint])
+                        self._stf_tint[hypo][det] = np.sum(self._stf[hypo][det], axis = -1)
+                        ts_tint.append(np.nanmax(self._stf_tint[hypo][det], axis = -1))
+                        ind_freq_tint = np.nanargmax(self._stf_tint[hypo][det], axis = -1)
+                        fit_freq_tint.append(self._freq_new[ind_freq_tint])
                 
                 self.ts[hypo][det] = np.array(ts).flatten()
                 self.ffit[hypo][det], self.tfit[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
@@ -655,7 +657,7 @@ class Analysis():
 
         return
   
-    def run(self, mode, ft_para, distribution, model = "generic", trials = None):
+    def run(self, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None):
         """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
         and short-time fourier transform (STF). It computes background and signal hits, 
         combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
@@ -676,7 +678,7 @@ class Analysis():
         self._background()
         self._average_background()
         if model == "generic":
-            self._signal_generic()
+            self._signal_generic(smoothing=smoothing)
         elif model == "model":
             self._signal_model()
         elif model == "mix":
@@ -700,7 +702,7 @@ class Analysis():
       
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", trials = None, verbose = None):
+    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, verbose = None):
         
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
@@ -712,7 +714,7 @@ class Analysis():
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(mode, ft_para, distribution, model = model, trials = trials)
+            self.run(mode, ft_para, distribution, model = model, smoothing = smoothing, trials = trials)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])

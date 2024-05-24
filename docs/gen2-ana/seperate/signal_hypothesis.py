@@ -193,7 +193,7 @@ class Signal_Hypothesis():
 
         return
     
-    def _signal_generic(self):
+    def _signal_generic(self, smoothing = False):
         """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
         counts from a generic oscillation template are added to the flat light curve.
         
@@ -214,6 +214,16 @@ class Signal_Hypothesis():
         self._sig["ic86"] = sig_ic86
         self._sig["gen2"] = sig_gen2
         self._sig["wls"] = sig_wls
+
+        if smoothing:
+            # binning needed to smoothen a frequency f, low frequency cut of 100 Hz
+            frequency = 100*u.Hz
+            duration = self.sim.time[-1]-self.sim.time[0]
+            samples = (duration/self.sim._res_dt.to(u.s)).value
+            binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sas
+
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                self._sig[det] = moving_average(self._sig[det], n = binning, const_padding = True)
 
         # 2) The idea is we add the modulations from a template to the null hypothesis counts
         for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -483,14 +493,13 @@ class Signal_Hypothesis():
         trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
 
         self._stf = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
-        self._log = {"ic86": None, "gen2": None, "wls": None}
         self.ts = {"ic86": None, "gen2": None, "wls": None}
         self.ffit = {"ic86": None, "gen2": None, "wls": None}
         self.tfit = {"ic86": None, "gen2": None, "wls": None}
         
         # extra variables if time integration is selected
         if time_int:
-            self._log_tint = {"ic86": None, "gen2": None, "wls": None}
+            self._stf_tint = {"ic86": None, "gen2": None, "wls": None}
             self.ts_tint = {"ic86": None, "gen2": None, "wls": None}
             self.ffit_tint = {"ic86": None, "gen2": None, "wls": None}
             ts_tint = []
@@ -519,30 +528,21 @@ class Signal_Hypothesis():
                 # take square of absolute for power
                 self._stf[det] = np.abs(self._stf[det]) ** 2
 
-                # take logarithm of max normalized power
-                self._log[det] = np.log10(self._stf[det]/np.nanmax(self._stf[det]))
-                
-                # take difference between median of time averaged spectrum and spectrum
-                self._log[det] = self._log[det] - np.repeat(np.nanmedian(self._log[det], axis = -1), self._log[det].shape[-1]).reshape(self._log[det].shape) 
-
-                # take only values where difference is larger than zero, i.e. only overfluctuations
-                self._log[det] = np.maximum(self._log[det], 0)
-
                 # maximum (hottest pixel) in array of 2D STF, returns array of length trials
                 # value used for ts distribution
-                ts.append(np.nanmax(self._log[det], axis = (1,2)))
+                ts.append(np.nanmax(self._stf[det], axis = (1,2)))
 
                 # get time and freq index position of maximum 
-                ind_freq, ind_time = argmax_lastNaxes(self._log[det], 2)
+                ind_freq, ind_time = argmax_lastNaxes(self._stf[det], 2)
                 # get corresponding time and freq of bin
-                fit_freq.append(self._freq[ind_freq])
-                fit_time.append(self._time[ind_time])
+                fit_freq.append(self._freq_new[ind_freq])
+                fit_time.append(self._time_new[ind_time])
 
                 if time_int:
-                    self._log_tint[det] = np.sum(self._log[det], axis = -1)
-                    ts_tint.append(np.nanmax(self._log_tint[det], axis = -1))
-                    ind_freq_tint = np.nanargmax(self._log_tint[det], axis = -1)
-                    fit_freq_tint.append(self._freq[ind_freq_tint])
+                    self._stf_tint[det] = np.sum(self._stf[det], axis = -1)
+                    ts_tint.append(np.nanmax(self._sft_tint[det], axis = -1))
+                    ind_freq_tint = np.nanargmax(self._stf_tint[det], axis = -1)
+                    fit_freq_tint.append(self._freq_new[ind_freq_tint])
             
             self.ts[det] = np.array(ts).flatten()
             self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
@@ -650,7 +650,7 @@ class Signal_Hypothesis():
 
         return
   
-    def run(self, mode, ft_para, distribution, model = "generic", trials = None, bins = None):
+    def run(self, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, bins = None):
         """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
         and short-time fourier transform (STF). It computes background and signal hits, 
         combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
@@ -675,7 +675,7 @@ class Signal_Hypothesis():
         self._background()
         self._average_background()
         if model == "generic":
-            self._signal_generic()
+            self._signal_generic(smoothing=smoothing)
         elif model == "model":
             self._signal_model()
         elif model == "mix":
@@ -699,7 +699,7 @@ class Signal_Hypothesis():
       
         self.get_zscore(distribution=distribution, bins = bins)
         
-    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", trials = None, bins = None, verbose = None):
+    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, bins = None, verbose = None):
         
         self.mode = mode
 
@@ -713,7 +713,7 @@ class Signal_Hypothesis():
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(self.mode, ft_para, distribution, model = model, trials = trials, bins = bins)
+            self.run(self.mode, ft_para, distribution, model = model, smoothing = smoothing, trials = trials, bins = bins)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
