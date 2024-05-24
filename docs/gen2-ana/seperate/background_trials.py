@@ -15,12 +15,16 @@ class Background_Trials():
                  sim,
                  ana_para,
                  samples,
+                 output,
                  verbose = None):
         
         self.sim = sim
         self.ana_para = ana_para
         self.samples = samples
+        self.output = output
         self.verbose = verbose
+
+        np.random.seed(output)
 
     def generate_data(self, filename = None):
         print("DATA GENERATION -- SAMPLES {}".format(self.samples))
@@ -29,7 +33,7 @@ class Background_Trials():
             os.mkdir("./files")
         if filename is None:
             path_to_folder = "./files/background/"
-            filename = path_to_folder+"/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.0f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.samples, self.ana_para["distance"].value)
+            filename = path_to_folder+"/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.0f}kpc_output_{}.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.samples, self.ana_para["distance"].value, self.output)
 
         self.max_trials = 10000 # size of batches
         self.repetitions = np.round(self.samples/self.max_trials).astype(int)
@@ -38,7 +42,7 @@ class Background_Trials():
         for r in tqdm(range(self.repetitions)):
             # Initialize analysis class and run analysis
             ana = Null_Hypothesis(self.sim, res_dt = self.ana_para["res_dt"], distance=self.ana_para["distance"], trials = self.max_trials)
-            ana.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], model = "generic")
+            ana.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], model = "generic", smoothing = False)
             ts.append(ana.ts)
 
         self.ts = ts
