@@ -86,8 +86,8 @@ class Scan():
                 # we search for significances slightly above (below) 5 (3) sigma.
                 # It turns out that for limits [2.5, 5.5] with a limited statistics of 1,000 trials there are cases in which the 
                 # e.g. the IC86 significance for 10,000 trials is slightly below 5 sigma. Therefore we increase the range to [2,6].
-                args_dist_low = (ana_para, 6, "ic86")
-                args_dist_high = (ana_para, 2, "wls")
+                args_dist_low = (ana_para, 5.5, "ic86")
+                args_dist_high = (ana_para, 2.5, "wls")
 
                 if 0:#self.verbose == "debug":
                     import matplotlib.pyplot as plt
@@ -114,7 +114,17 @@ class Scan():
                 # 2) Distance scan
 
                 # distance search range
-                dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 2) * u.kpc
+                #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
+
+                d_low, d_high = np.floor(dist_low.value), np.ceil(dist_high.value)
+
+                # If difference between d_low and d_high is small (< 10 kpc) 5 steps should be enough, else 10 steps are used
+                if d_high-d_low < 10:
+                    num_steps = 5
+                else:
+                    num_steps = 10
+
+                dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
 
                 # initialize new Analysis instance for distance scan
                 sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
@@ -214,7 +224,6 @@ class Scan():
                         else:
                             # Handle the case where the key is not found
                             dd.append(0)
-            print(dd)
             data[det] = np.array(dd, dtype=float).reshape(len(self.sigma),
                                                           len(self.ampl_range), 
                                                           len(self.freq_range),
