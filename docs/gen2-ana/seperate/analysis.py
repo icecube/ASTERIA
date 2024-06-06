@@ -4,7 +4,7 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import stft
 from scipy.stats import norm, skewnorm, lognorm
 
-from helper import argmax_lastNaxes, moving_average
+from helper import *
 from asteria.simulation import Simulation as sim
 
 class Analysis():
@@ -13,14 +13,12 @@ class Analysis():
                  sim, 
                  res_dt,
                  distance, 
-                 trials, 
                  temp_para):
 
         # define a few attributes
         self.sim = sim
         self.sim._res_dt = res_dt
         self.distance = distance
-        self.trials = trials
         self.tlength = len(self.sim.time)
         self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
 
@@ -602,16 +600,15 @@ class Analysis():
 
         return
 
-    def get_ts_stat(self, distribution, time_int = False):
+    def get_ts_stat(self, time_int = False):
 
-        if distribution == "lognorm":
-            distr = lognorm
-        elif distribution == "skewnorm":
-            distr = skewnorm
+        if self.bkg_distr != "hist" and self.bkg_distr != "data":
+            distr = get_distribution_by_name(self.bkg_distr)
+        elif self.bkg_distr == "hist" or self.bkg_distr == "data":
+            pass
         else:
-            raise ValueError('{} not supported. Choose from "lognorm" or "skewnorm"'.format(distribution)) 
+            raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
-        self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self.ts_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                         "signal" : {"ic86": None, "gen2": None, "wls": None}}
         
@@ -620,12 +617,15 @@ class Analysis():
             self.ts_stat_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                                  "signal" : {"ic86": None, "gen2": None, "wls": None}}
         
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            # fitted background TS distribution
-            self._ts_bkg_fit[det] = distr(*distr.fit(self.ts["null"][det]))
+        if self.bkg_distr != "hist" and self.bkg_distr != "data":
+            self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None}
 
-            if time_int:
-                self._ts_bkg_fit_tint[det] = distr(*distr.fit(self.ts_tint["null"][det]))
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                # fitted background TS distribution
+                self._ts_bkg_fit[det] = distr(*distr.fit(self.ts["null"][det]))
+
+                if time_int:
+                    self._ts_bkg_fit_tint[det] = distr(*distr.fit(self.ts_tint["null"][det]))
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -645,9 +645,13 @@ class Analysis():
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             z = []
             for i in range(3): # loop over median, 16% and 84% quantiles of TS distribution
-
-                # p-value of signal given a background distribution
-                p = self._ts_bkg_fit[det].sf(self.ts_stat["signal"][det][i])
+                
+                if self.bkg_distr != "hist" and self.bkg_distr != "data":
+                    p = self._ts_bkg_fit[det].sf(self.ts_stat["signal"][det][i])
+                elif self.bkg_distr == "data" or self.bkg_distr == "hist":
+                    p = np.sum(self.ts["null"][det] > self.ts_stat["signal"][det][i])/len(self.ts["null"][det])
+                else:
+                    raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
                 # two-sided Z score corresponding to the respective p-value, survival probability = 1 - cdf
                 zz = norm.isf(p/2)
@@ -657,7 +661,7 @@ class Analysis():
 
         return
   
-    def run(self, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None):
+    def run(self, mode, ft_para, trials, bkg_distr, model = "generic", smoothing = False):
         """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
         and short-time fourier transform (STF). It computes background and signal hits, 
         combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
@@ -665,14 +669,18 @@ class Analysis():
         Args:
             mode (str): analysis mode (FFT or STF)
             ft_para (dict): parameters of the fourier transform (FFT or STF)
-            trials (int, optional): Number of trials. Defaults to None.
-
+            trials (int, optional): Number of trials.
+            bkg_distr (str): null hypothesis distribution ("lognorm", "skewnorm", "hist", "data")
+            model (str): composition of signal trial ("generic", "model", "mix")
+            smoothing (bool): Applies high-pass (moving average) filter.
         Raises:
+            ValueError: model takes three valid values: "generic", "model" and "mix.
             ValueError: mode takes two valid values: "FFT" and "STF".
         """
 
-        if trials is not None:
-            self.trials = trials
+        self.mode = mode
+        self.trials = trials
+        self.bkg_distr = bkg_distr
 
         # load and combine data
         self._background()
@@ -687,23 +695,34 @@ class Analysis():
             raise ValueError('{} model type does not exist. Choose from "generic", "model", "mix".'.format(model))
         self._signal_sampled()
 
-        if mode == "FFT":
+        if self.mode == "FFT":
             self._hypothesis(hanning = ft_para["hanning"])
             self.fft(ft_para)
-            self.get_ts_stat(distribution)
+            self.get_ts_stat()
 
-        elif mode == "STF":
+        elif self.mode == "STF":
             self._hypothesis()
             self.stf(ft_para)
-            self.get_ts_stat(distribution, time_int=ft_para["time_int"])
+            self.get_ts_stat(time_int=ft_para["time_int"])
 
         else:
-            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
+            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
       
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, verbose = None):
-        
+    def dist_scan(self, distance_range, mode, ft_para, trials, bkg_distr, 
+                  model = "generic", smoothing = False, verbose = None):
+        """Calls run method for a range of distances and saves z-score and TS value for all detectors in an array.   
+
+        Args:
+            distance_range (np.ndarray): Distance range array
+            mode (str): analysis mode (FFT or STF)
+            ft_para (dict): parameters of the fourier transform (FFT or STF)
+            trials (int): Number of trials.
+            bkg_distr (str): null hypothesis distribution ("lognorm", "skewnorm", "hist", "data")
+            model (str): composition of signal trial ("generic", "model", "mix")
+            smoothing (bool): Applies high-pass (moving average) filter.
+        """
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
         ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
@@ -714,7 +733,7 @@ class Analysis():
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(mode, ft_para, distribution, model = model, smoothing = smoothing, trials = trials)
+            self.run(mode, ft_para, trials, bkg_distr, model = model, smoothing = smoothing)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
@@ -733,12 +752,3 @@ class Analysis():
                 Ts_stat[key][nested_key] = np.transpose(np.array(value))
 
         return Zscore, Ts_stat
-
-
-    """
-    ToDo
-    - implement SASI on lumi model basis, correct flat model
-    - write template loop, optimize fit
-    - test functions
-    - units: be consistent with time units e.g. always s, ms, distance kpc  
-    """

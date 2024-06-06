@@ -4,7 +4,7 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import stft
 from scipy.stats import norm, skewnorm, lognorm
 
-from helper import argmax_lastNaxes, moving_average
+from helper import *
 from asteria.simulation import Simulation as sim
 
 class Signal_Hypothesis():
@@ -13,14 +13,12 @@ class Signal_Hypothesis():
                  sim, 
                  res_dt,
                  distance, 
-                 trials, 
                  temp_para):
 
         # define a few attributes
         self.sim = sim
         self.sim._res_dt = res_dt
         self.distance = distance
-        self.trials = trials
         self.tlength = len(self.sim.time)
         self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
 
@@ -45,13 +43,13 @@ class Signal_Hypothesis():
         self.distance = distance
         self.sim.scale_result(distance=distance)
 
-    def set_trials(self, trials):
-        """Set number of trials
+    def set_sig_trials(self, sig_trials):
+        """Set number of signal trials
 
         Args:
-            trials (int): number of trials
+            sig_trials (int): number of signal trials
         """
-        self.trials = trials
+        self.sig_trials = sig_trials
 
     def set_temp_para(self, temp_para):
         """Set template parameter dictionary
@@ -69,13 +67,13 @@ class Signal_Hypothesis():
         """ 
         self._bkg = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
-        size = self.trials * self.tlength
+        size = self.sig_trials * self.tlength
 
         # pull random background for subdetectors
-        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
+        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(self.sig_trials, self.tlength)
+        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(self.sig_trials, self.tlength)
+        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(self.sig_trials, self.tlength)
+        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(self.sig_trials, self.tlength)
         
         # combine subdetector background into IC86 and Gen2 background rate
         bkg_ic86 = bkg_i3 + bkg_dc
@@ -312,7 +310,7 @@ class Signal_Hypothesis():
         """
         self._sig_sample = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         for det in ["ic86", "gen2", "wls"]: # loop over detector
-            self._sig_sample[det] = np.random.normal(self._sig[det], np.sqrt(np.abs(self._sig[det])), size=(self.trials, self.tlength))
+            self._sig_sample[det] = np.random.normal(self._sig[det], np.sqrt(np.abs(self._sig[det])), size=(self.sig_trials, self.tlength))
     
         return
               
@@ -490,7 +488,7 @@ class Signal_Hypothesis():
 
         # STFT is computationally expensive, batching will ensure that RAM is not completly used up
         bat_step = 5000 # size of batches
-        trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
+        trial_batch = np.arange(0, self.sig_trials, step=bat_step) #chunk data in batches of bat_step
 
         self._stf = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self.ts = {"ic86": None, "gen2": None, "wls": None}
@@ -528,7 +526,7 @@ class Signal_Hypothesis():
                 # take square of absolute for power
                 self._stf[det] = np.abs(self._stf[det]) ** 2
 
-                # maximum (hottest pixel) in array of 2D STF, returns array of length trials
+                # maximum (hottest pixel) in array of 2D STF, returns array of length sig_trials
                 # value used for ts distribution
                 ts.append(np.nanmax(self._stf[det], axis = (1,2)))
 
@@ -554,18 +552,14 @@ class Signal_Hypothesis():
 
         return
 
-    def get_ts_stat(self, time_int = False, distribution = None):
+    def get_ts_stat(self, time_int = False, fit_hist = False):
 
-        if distribution == "lognorm":
-            distr = lognorm
-        elif distribution == "skewnorm":
-            distr = skewnorm
-        elif distribution == "hist":
-            pass
-        elif distribution == "data":
+        if self.bkg_distr != "hist" and self.bkg_distr != "data":
+            distr = get_distribution_by_name(self.bkg_distr)
+        elif self.bkg_distr == "hist" or self.bkg_distr == "data":
             pass
         else:
-            raise ValueError('{} not supported. Choose from "lognorm", "skewnorm", "hist" and "data"'.format(distribution)) 
+            raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
         # from here on we carry along the null hypothesis
         self.ts_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
@@ -577,21 +571,29 @@ class Signal_Hypothesis():
         
 
         # Load the 50%, 16% and 84% quantiles for the signal hypothesis        
-        bkg_quan = np.load("./files/background/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_1e+07.npz".format(self.mode))
+        bkg_quan = np.load("./files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}.npz".format(self.mode, self.bkg_trials))
         
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             self.ts_stat["null"][det] = bkg_quan[det][bkg_quan["dist"] == self.distance.value][0]
 
             if time_int:
-                bkg_quan_tint = np.load("./files/background/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_1e+07_tint.npz".format(self.mode))
+                bkg_quan_tint = np.load("./files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_tint.npz".format(self.mode, self.bkg_trials))
                 self.ts_stat_tint["null"][det] = bkg_quan_tint[det][bkg_fit_tint["dist"] == self.distance.value][0]
 
         # load distributions if fitted option is chosen
-        if distribution == "lognorm" or distribution == "skewnorm":
+        if self.bkg_distr != "hist" and self.bkg_distr != "data":
             # load fit parameters, right now files name hardcoded
-            bkg_fit = np.load("./files/background/FIT_model_Sukhbold_2015_27_mode_{}_samples_1e+07_{}.npz".format(self.mode, distribution))
-            if time_int: bkg_fit_tint = np.load("./files/background/FIT_model_Sukhbold_2015_27_mode_{}_samples_1e+07_{}_tint.npz".format(self.mode, distribution))
+            if fit_hist:
+                bkg_fit = np.load("./files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+            else:
+                bkg_fit = np.load("./files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr)) 
             
+            if time_int: 
+                if fit_hist: 
+                    bkg_fit_tint = np.load("./files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+                else:
+                    bkg_fit_tint = np.load("./files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+
             self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 params = bkg_fit[det][bkg_fit["dist"] == self.distance.value][0]
@@ -615,18 +617,16 @@ class Signal_Hypothesis():
 
         return
 
-    def get_zscore(self, distribution = None, bins = None):
+    def get_zscore(self):
 
-        if distribution == "lognorm":
+        if self.bkg_distr != "hist" and self.bkg_distr != "data":
             pass
-        elif distribution == "skewnorm":
-            pass
-        elif distribution == "hist":
-            bkg_hist = np.load("./files/background/MAPPING_model_Sukhbold_2015_27_mode_{}_samples_1e+07_bins_{}_distance_{:.0f}kpc.npz".format(self.mode, bins, self.distance.value))
-        elif distribution == "data":
-            bkg_data = np.load("./files/background/GENERATE_model_Sukhbold_2015_27_mode_{}_samples_1e+07_distance_{:.0f}kpc.npz".format(self.mode, self.distance.value))
+        elif self.bkg_distr == "hist":
+            bkg_hist = np.load("./files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{}_distance_{:.0f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+        elif self.bkg_distr == "data":
+            bkg_data = np.load("./files/background/generate/GENERATE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_distance_{:.0f}kpc.npz".format(self.mode, self.bkg_trials, self.distance.value))
         else:
-            raise ValueError('{} not supported. Choose from "lognorm", "skewnorm", "hist" and "data"'.format(distribution)) 
+            raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
         self.zscore = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
@@ -635,11 +635,11 @@ class Signal_Hypothesis():
             for i in range(3): # loop over median, 16% and 84% quantiles of TS distribution
 
                 # p-value of signal given a background distribution                
-                if distribution == "lognorm" or distribution == "skewnorm":
+                if self.bkg_distr != "hist" and self.bkg_distr != "data":
                     p = self._ts_bkg_fit[det].sf(self.ts_stat["signal"][det][i])
-                elif distribution == "data":
+                elif self.bkg_distr == "data":
                     p = np.sum(bkg_data[det] > self.ts_stat["signal"][det][i])/len(bkg_data[det])
-                elif distribution == "hist": # normalization already applied by using density = True in histogram
+                elif self.bkg_distr == "hist": # normalization already applied by using density = True in histogram
                     p = np.sum(bkg_hist[det][1][bkg_hist[det][0] > self.ts_stat["signal"][det][i]])
 
                 # two-sided Z score corresponding to the respective p-value, survival probability = 1 - cdf
@@ -650,7 +650,8 @@ class Signal_Hypothesis():
 
         return
   
-    def run(self, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, bins = None):
+    def run(self, mode, ft_para, sig_trials, bkg_distr, bkg_trials, bkg_bins = None, fit_hist = False, 
+            model = "generic", smoothing = False):
         """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
         and short-time fourier transform (STF). It computes background and signal hits, 
         combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
@@ -658,18 +659,24 @@ class Signal_Hypothesis():
         Args:
             mode (str): analysis mode (FFT or STF)
             ft_para (dict): parameters of the fourier transform (FFT or STF)
-            distribution (str): null hypothesis distribution ("lognorm", "skewnorm", "hist", "data")
+            sig_trials (int): Number of signal trials.
+            bkg_distr (str): null hypothesis distribution ("lognorm", "skewnorm", "hist", "data")
+            bkg_trials (int): Number of background trials.
+            bkg_bins (int): Number of histogram bins if bkg_distr = "hist"
+            fit_hist (bool): Whether to use fit to histogram (fit_hist = True) or fit to full data (fit_hist = False) 
             model (str): composition of signal trial ("generic", "model", "mix")
-            trials (int, optional): Number of trials. Defaults to None.
+            smoothing (bool): Applies high-pass (moving average) filter.
 
         Raises:
+            ValueError: model takes three valid values: "generic", "model" and "mix.
             ValueError: mode takes two valid values: "FFT" and "STF".
         """
 
         self.mode = mode
-
-        if trials is not None:
-            self.trials = trials
+        self.sig_trials = sig_trials
+        self.bkg_distr = bkg_distr
+        self.bkg_bins = bkg_bins
+        self.bkg_trials = bkg_trials
 
         # load and combine data
         self._background()
@@ -687,22 +694,34 @@ class Signal_Hypothesis():
         if self.mode == "FFT":
             self._hypothesis(hanning = ft_para["hanning"])
             self.fft(ft_para)
-            self.get_ts_stat(distribution=distribution)
+            self.get_ts_stat()
 
         elif self.mode == "STF":
             self._hypothesis()
             self.stf(ft_para)
-            self.get_ts_stat(time_int=ft_para["time_int"], distribution=distribution)
+            self.get_ts_stat(time_int=ft_para["time_int"], fit_hist=fit_hist)
 
         else:
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
       
-        self.get_zscore(distribution=distribution, bins = bins)
+        self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, distribution, model = "generic", smoothing = False, trials = None, bins = None, verbose = None):
-        
-        self.mode = mode
+    def dist_scan(self, distance_range, mode, ft_para, sig_trials, bkg_distr, bkg_trials, bkg_bins, fit_hist = False, 
+                  model = "generic", smoothing = False, verbose = None):
+        """Calls run method for a range of distances and saves z-score and TS value for all detectors in an array.   
 
+        Args:
+            distance_range (np.ndarray): Distance range array
+            mode (str): analysis mode (FFT or STF)
+            ft_para (dict): parameters of the fourier transform (FFT or STF)
+            sig_trials: Number of signal trials.
+            bkg_distr (str): null hypothesis distribution ("lognorm", "skewnorm", "hist", "data")
+            bkg_trials (int): Number of background trials.
+            bkg_bins (int): Number of histogram bins if bkg_distr = "hist"
+            fit_hist (bool): Whether to use fit to histogram (fit_hist = True) or fit to full data (fit_hist = False) 
+            model (str): composition of signal trial ("generic", "model", "mix")
+            smoothing (bool): Applies high-pass (moving average) filter.
+        """
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
         ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
@@ -713,7 +732,7 @@ class Signal_Hypothesis():
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(self.mode, ft_para, distribution, model = model, smoothing = smoothing, trials = trials, bins = bins)
+            self.run(mode, ft_para, sig_trials, bkg_distr, bkg_trials, bkg_bins, fit_hist, model, smoothing)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
