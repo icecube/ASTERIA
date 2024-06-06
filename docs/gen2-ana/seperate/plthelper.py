@@ -304,14 +304,28 @@ def plot_significance(dist_range, zscore, ts_stat):
     ax[1].grid()
     plt.tight_layout()
 
-def plot_para_scan(freq_range, ampl_range, data):
+def plot_para_scan(freq_range, ampl_range, data, det, sig, quant):
+
+    if sig == 3:
+        isig = 0
+    elif sig == 5:
+        isig = 1
+    
+    if quant == 50:
+        iquant = 0
+    elif quant == 16:
+        iquant = 1
+    elif quant == 84:
+        iquant = 2
+
+    ddata = data[det][isig, :, :, iquant]
 
     fig, ax = plt.subplots(1,1, figsize = (10,4))
 
-    im = ax.pcolormesh(freq_range.value, ampl_range*100, data, cmap="viridis", shading="nearest")
+    im = ax.pcolormesh(freq_range.value, ampl_range*100, ddata, cmap="viridis", shading="nearest")
     cb = fig.colorbar(im)
     cb.ax.tick_params(labelsize=14)
-    cb.set_label(r"3 $\sigma$ Distance horizon [kpc]", size=14)
+    cb.set_label(r"{}$\sigma$ Signifiance horizon [kpc]".format(sig), size=14)
     ax.set_xlabel(r'Frequency in [Hz]', fontsize=14)
     ax.set_ylabel(r'Amplitude [%]', fontsize=14)
     ax.yaxis.get_offset_text().set_fontsize(14)
