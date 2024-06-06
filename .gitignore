@@ -7,6 +7,7 @@ data/processed/*
 !data/processed/.gitignore
 docs/gen2-ana/seperate/files/*
 docs/gen2-ana/seperate/plots/*
+docs/gen2-ana/seperate/test_bkg_fit.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
