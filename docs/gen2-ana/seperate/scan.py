@@ -3,6 +3,7 @@ from analysis import *
 from signal_hypothesis import *
 from scipy.optimize import minimize, brentq
 from helper import *
+from tqdm import tqdm
 
 from plthelper import plot_significance
 
@@ -18,9 +19,9 @@ def loss_dist_range_interpolate(dist, ana_para, sigma, det):
     return loss
 
 def loss_dist_range_fit(dist, ana_para, sigma, det):
-    sim, res_dt, trials, temp_para, mode, ft_para = ana_para
+    sim, res_dt, trials, temp_para, mode, ft_para, bkg_distr = ana_para
     ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, trials = trials, temp_para = temp_para)
-    ana.run(mode = mode, ft_para = ft_para, model = "generic")
+    ana.run(mode = mode, ft_para = ft_para, distribution = bkg_distr, model = "generic")
     loss = (ana.zscore[det][0] - sigma)
     return loss
 
@@ -31,17 +32,108 @@ class Scan():
                  scan_para,
                  ft_mode, 
                  ft_para,
+                 sig_trials,
                  bkg_distr,
-                 trials,
+                 bkg_trials,
+                 bkg_bins,
+                 fit_hist,
                  verbose = None):
         
         self.sim = sim
         self.scan_para = scan_para
         self.ft_mode = ft_mode
         self.ft_para = ft_para
+        self.sig_trials = sig_trials
         self.bkg_distr = bkg_distr
-        self.trials = trials
+        self.bkg_trials = bkg_trials
+        self.bkg_bins = bkg_bins
+        self.fit_hist = fit_hist
         self.verbose = verbose
+
+    def bias(self, bias_freq, bias_ampl, bias_reps = 100):
+
+        self.bias_freq = bias_freq
+        self.bias_ampl = bias_ampl
+        self.bias_reps = bias_reps
+
+        self.sigma = self.scan_para["sigma"]
+
+        self.dist = [{} for r in range(self.bias_reps)]
+        self.perc = [{} for r in range(self.bias_reps)]
+
+        # template dictionary uses fixed ampl, freq and scan_para values
+        temp_para = {"frequency": self.bias_freq, 
+                     "amplitude": self.bias_ampl, #in percent of max value
+                     "time_start": self.scan_para["time_start"],
+                     "time_end": self.scan_para["time_end"],
+                     "position": self.scan_para["position"]}
+        
+        if self.verbose is not None: print("Frequency: {}, Amplitude: {} % ".format(bias_freq, bias_ampl*100))
+
+        for r in tqdm(np.arange(self.bias_reps)): # loop over repetition
+
+            # 1) Find the distance bounds for which the significance falls from > 5 sigma to < 3 sigma for all subdetectors
+            # This is done to avoid scanning unnecessarily many distances for which the significance is either far too high
+            # or far too low.
+            trials = 1000 # use 1/10 of trials used in later distance scan to increase speed of convergence
+            ana_para = [self.sim, self.sim._res_dt, trials, temp_para, self.ft_mode, self.ft_para, self.bkg_distr]
+
+            # arguments for the minimizer
+            # The minimizer is defined above and initializes the Analysis class.
+            args_dist_low = (ana_para, 5.5, "ic86")
+            args_dist_high = (ana_para, 2.5, "wls")
+
+            # returns lower bound distance
+            root_low = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_low, xtol = 1e-2)
+            dist_low = root_low * u.kpc
+            # returns higher bound distance
+            root_high = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_high, xtol = 1e-2)
+            dist_high = root_high * u.kpc
+            if self.verbose == "debug": print("Distance range: {:.1f} - {:.1f}".format(dist_low, dist_high))
+
+            # 2) Distance scan
+
+            # distance search range
+            #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
+
+            d_low, d_high = np.floor(dist_low.value), np.ceil(dist_high.value)
+
+            # If difference between d_low and d_high is small (< 10 kpc) 5 steps should be enough, else 10 steps are used
+            if d_high-d_low < 10:
+                num_steps = int(d_high-d_low)
+            else:
+                num_steps = int(d_high-d_low) #10
+
+            self.dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
+
+            # initialize signal hypothesis instance for distance scan
+            sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
+                                    distance = dist_low, temp_para = temp_para)
+            
+            # returns z-score and ts statistics for all distances and all subdetectors
+            Zscore, Ts_stat = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
+                                            sig_trials = self.sig_trials, bkg_distr = self.bkg_distr, 
+                                            bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins, fit_hist = self.fit_hist,
+                                            model = "generic", verbose = self.verbose)              
+            
+            self.Zscore = Zscore
+            self.Ts_stat = Ts_stat
+
+            if self.verbose == "debug":
+                import matplotlib.pyplot as plt
+                plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
+                plt.show()
+
+            # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
+            self.quantiles = [0.5, 0.16, 0.84]
+            dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
+
+            # save data
+            self.dist[r] = dist
+            self.perc[r] = perc
+
+        return
+
 
     def run_interpolate(self):
         """The parameter scan is designed in five steps:
@@ -77,7 +169,7 @@ class Scan():
                 # 1) Find the distance bounds for which the significance falls from > 5 sigma to < 3 sigma for all subdetectors
                 # This is done to avoid scanning unnecessarily many distances for which the significance is either far too high
                 # or far too low.
-                trials = 1000
+                trials = 1000 # use 1/10 of trials used in later distance scan to increase speed of convergence
                 ana_para = [self.sim, self.sim._res_dt, trials, temp_para, self.ft_mode, self.ft_para, self.bkg_distr]
 
                 # arguments for the minimizer
@@ -86,8 +178,8 @@ class Scan():
                 # we search for significances slightly above (below) 5 (3) sigma.
                 # It turns out that for limits [2.5, 5.5] with a limited statistics of 1,000 trials there are cases in which the 
                 # e.g. the IC86 significance for 10,000 trials is slightly below 5 sigma. Therefore we increase the range to [2,6].
-                args_dist_low = (ana_para, 5.5, "ic86")
-                args_dist_high = (ana_para, 2.5, "wls")
+                args_dist_low = (ana_para, 5, "ic86")
+                args_dist_high = (ana_para, 3, "wls")
 
                 if 0:#self.verbose == "debug":
                     import matplotlib.pyplot as plt
@@ -116,36 +208,35 @@ class Scan():
                 # distance search range
                 #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
 
-                d_low, d_high = np.floor(dist_low.value), np.ceil(dist_high.value)
+                spkpc = 5 # steps per kpc
 
-                # If difference between d_low and d_high is small (< 10 kpc) 5 steps should be enough, else 10 steps are used
-                if d_high-d_low < 10:
-                    num_steps = 5
-                else:
-                    num_steps = 10
+                d_low = np.floor(dist_low.value * spkpc) / spkpc
+                d_high = np.ceil(dist_high.value * spkpc) / spkpc
 
-                dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
+                #self.dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
+                self.dist_range = np.arange(d_low, d_high + 1/spkpc, spkpc) * u.kpc
 
-                # initialize new Analysis instance for distance scan
+                # initialize signal hypothesis instance for distance scan
                 sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
-                                        distance = dist_low, trials = self.trials, 
-                                        temp_para = temp_para)
-                
+                                        distance = dist_low, temp_para = temp_para)
+            
                 # returns z-score and ts statistics for all distances and all subdetectors
-                Zscore, Ts_stat = sgh.dist_scan(dist_range, mode = self.ft_mode, ft_para = self.ft_para, distribution = self.bkg_distr,model = "generic", verbose = self.verbose)              
-                
-                self.dist_range = dist_range
+                Zscore, Ts_stat = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
+                                                sig_trials = self.sig_trials,
+                                                bkg_distr = self.bkg_distr, bkg_trials= self.bkg_trials, 
+                                                model = "generic", verbose = self.verbose)              
+
                 self.Zscore = Zscore
                 self.Ts_stat = Ts_stat
 
                 if self.verbose == "debug":
                     import matplotlib.pyplot as plt
-                    plot_significance(dist_range, Zscore, Ts_stat)
+                    plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
                     plt.show()
 
                 # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
                 self.quantiles = [0.5, 0.16, 0.84]
-                dist, perc = significance_horizon(dist_range, Zscore, self.sigma)
+                dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
 
                 # save data
                 self.dist[a][f] = dist
