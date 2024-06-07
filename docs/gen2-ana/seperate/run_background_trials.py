@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 # parsed arguments: distance and sample size
 distance = float(sys.argv[1]) * u.kpc
-samples = int(sys.argv[2])
+bkg_trials = int(sys.argv[2])
 output = int(sys.argv[3])
 
 print("SETTING UP SIMULATION AT {}".format(distance))
@@ -66,9 +66,13 @@ ana_para = {"model": model,
             "mode": ft_mode,
             "ft_para": fft_para}
 
+bkg_min = 0
+bkg_max = int(1E6)
+bkg_bins = int(2E7)
+
 ############################################################
 #####################BACKGROUND TRIALS######################
 ############################################################
 
-bgt = Background_Trials(sim, ana_para=ana_para, samples = samples, output = output, verbose=True)
-bgt.generate_data()
+bgt = Background_Trials(sim, ana_para=ana_para, bkg_trials = bkg_trials, output = output, verbose=True)
+bgt.generate_data(bkg_min, bkg_max, bkg_bins)
