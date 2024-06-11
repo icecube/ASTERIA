@@ -1,11 +1,11 @@
+import os
 import numpy as np
 import astropy.units as u
 from scipy.fft import fft, fftfreq
 from scipy.signal import stft
-from scipy.stats import norm, skewnorm, lognorm
+from scipy.stats import norm
 
 from helper import *
-from asteria.simulation import Simulation as sim
 
 class Signal_Hypothesis():
 
@@ -21,6 +21,8 @@ class Signal_Hypothesis():
         self.distance = distance
         self.tlength = len(self.sim.time)
         self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
+
+        self._file = os.path.dirname(os.path.abspath(__file__))
 
         # rescale result
         self.sim.rebin_result(dt = self.sim._res_dt)
@@ -571,28 +573,27 @@ class Signal_Hypothesis():
         
 
         # Load the 50%, 16% and 84% quantiles for the signal hypothesis        
-        bkg_quan = np.load("./files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}.npz".format(self.mode, self.bkg_trials))
-        
+        bkg_quan = np.load(self._file + "/files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}.npz".format(self.mode, self.bkg_trials))
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             self.ts_stat["null"][det] = bkg_quan[det][bkg_quan["dist"] == self.distance.value][0]
 
             if time_int:
-                bkg_quan_tint = np.load("./files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_tint.npz".format(self.mode, self.bkg_trials))
+                bkg_quan_tint = np.load(self._file + "/files/background/quantile/QUANTILE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_tint.npz".format(self.mode, self.bkg_trials))
                 self.ts_stat_tint["null"][det] = bkg_quan_tint[det][bkg_fit_tint["dist"] == self.distance.value][0]
 
         # load distributions if fitted option is chosen
         if self.bkg_distr != "hist" and self.bkg_distr != "data":
             # load fit parameters, right now files name hardcoded
             if fit_hist:
-                bkg_fit = np.load("./files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+                bkg_fit = np.load(self._file + "/files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
             else:
-                bkg_fit = np.load("./files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr)) 
+                bkg_fit = np.load(self._file + "/files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}.npz".format(self.mode, self.bkg_trials, self.bkg_distr)) 
             
             if time_int: 
                 if fit_hist: 
-                    bkg_fit_tint = np.load("./files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+                    bkg_fit_tint = np.load(self._file + "/files/background/fit/FIT_HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
                 else:
-                    bkg_fit_tint = np.load("./files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
+                    bkg_fit_tint = np.load(self._file + "/files/background/fit/FIT_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_{}_tint.npz".format(self.mode, self.bkg_trials, self.bkg_distr))
 
             self._ts_bkg_fit = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -622,9 +623,9 @@ class Signal_Hypothesis():
         if self.bkg_distr != "hist" and self.bkg_distr != "data":
             pass
         elif self.bkg_distr == "hist":
-            bkg_hist = np.load("./files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{}_distance_{:.0f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+            bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
         elif self.bkg_distr == "data":
-            bkg_data = np.load("./files/background/generate/GENERATE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_distance_{:.0f}kpc.npz".format(self.mode, self.bkg_trials, self.distance.value))
+            bkg_data = np.load(self._file + "/files/background/generate/GENERATE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.distance.value))
         else:
             raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
