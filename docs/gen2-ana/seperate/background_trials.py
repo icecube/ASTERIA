@@ -24,17 +24,19 @@ class Background_Trials():
         self.output = output
         self.verbose = verbose
 
+        self._file = os.path.dirname(os.path.abspath(__file__))
+
         np.random.seed(output)
 
-    def generate_data(self, bkg_min, bkg_max, bkg_bins, filename = None):
+    def generate_data(self, bkg_bins, filename = None):
         print("DATA GENERATION -- SAMPLES {}".format(self.bkg_trials))
 
         if not os.path.isdir("./files"):
             os.mkdir("./files")
         if filename is None:
-            path_to_folder = "./files/background/"
+            path_to_folder = self._file + "/files/background/"
             #filename = path_to_folder+"generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc_output_{}.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value, self.output)
-            filename = path_to_folder+"hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc_output_{}.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, bkg_bins, self.ana_para["distance"].value, self.output)
+            filename = path_to_folder+"hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, bkg_bins, self.ana_para["distance"].value)
 
         self.max_trials = 10000 # size of batches
         self.repetitions = np.round(self.bkg_trials/self.max_trials).astype(int)
@@ -48,7 +50,7 @@ class Background_Trials():
 
         self.ts = ts
         #self.reshape_and_save(self.ts, filename)
-        self.reshape_and_bin(self.ts, bkg_min, bkg_max, bkg_bins, filename)
+        self.reshape_and_bin(self.ts, bkg_bins, filename)
 
 
     def reshape_and_save(self, item, filename):
@@ -71,8 +73,13 @@ class Background_Trials():
                     wls = data["wls"])
         return data
     
-    def reshape_and_bin(self, item, bkg_min, bkg_max, bkg_bins, filename):
-        
+    def reshape_and_bin(self, item, bkg_bins, filename):
+
+        # load TS bounds data        
+        bkg_bounds = np.load(self._file + "/files/background/hist/BOUNDS_model_{}_{:.0f}_mode_{}_samples_1e+08.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials))
+        # interpolate TS bounds
+        bkg_inter_bounds = interpolate_bounds(bkg_bounds, self.ana_para["distance"].value)
+
         # 1) reshape data
         data = {"ic86" : [], "gen2" : [], "wls": []}
         for det in ["ic86", "gen2", "wls"]:
@@ -87,14 +94,14 @@ class Background_Trials():
         self.ts_binned = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         for det in ["ic86", "gen2", "wls"]: # loop over detectors
             # histogram TS distribution
-            hist_y, hist_bins = np.histogram(data[det] , bins = bkg_bins, range=(bkg_min , bkg_max), density=False)
+            bkg_min, bkg_max = bkg_inter_bounds[det] # load interpolated bounds
+            bkg_min = 0.5 * bkg_min # safety margin of 50 %
+            bkg_max = 1.5 * bkg_max
+            hist_y, hist_bins = np.histogram(data[det] , bins = bkg_bins, range = (bkg_min , bkg_max), density=True)
             hist_x = (hist_bins[1:]+hist_bins[:-1])/2
             self.ts_binned[det] = np.array([hist_x, hist_y])
 
         np.savez(file = filename, 
-                 ts_min = bkg_min,
-                 ts_max = bkg_max,
-                 ts_bins = bkg_bins,
                  ic86 = self.ts_binned["ic86"],
                  gen2 = self.ts_binned["gen2"],
                  wls = self.ts_binned["wls"])
@@ -163,7 +170,7 @@ class Background_Trials():
         mode = self.ana_para["mode"]
         pdict = {"ic86": [], "gen2": [], "wls": []}
         
-        path_to_folder = "./files/background/" # directory to save fit parameters and quantiles
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
 
         for dist in distance_range: # loop over all distances
             print("Distance: {}".format(dist))
@@ -208,7 +215,7 @@ class Background_Trials():
         mode = self.ana_para["mode"]
         qdict = {"ic86": [], "gen2": [], "wls": []}
         
-        path_to_folder = "./files/background/" # directory to save fit parameters and quantiles
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
 
         for dist in distance_range: # loop over all distances
             print("Distance: {}".format(dist))
@@ -245,7 +252,7 @@ class Background_Trials():
             self.ts_binned[det] = np.array([hist_x, hist_y])
 
         # save histogrammed TS distribution
-        path_to_folder = "./files/background/" # directory to save fit parameters and quantiles
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
         filename = path_to_folder+"hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(model["name"], model["param"]["progenitor_mass"].value, mode, self.bkg_trials, bkg_bins, self.ana_para["distance"].value)
 
         np.savez(file = filename, 
@@ -258,7 +265,7 @@ class Background_Trials():
     def ts_binned_fit(self, distance_range, bkg_distr, bkg_trials, bkg_bins, log_scale = None, verbose = None):
         model = self.ana_para["model"]
         mode = self.ana_para["mode"]
-        path_to_folder = "./files/background/" # directory to save fit parameters and quantiles
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
         
         distr = get_distribution_by_name(bkg_distr)
 
@@ -296,6 +303,33 @@ class Background_Trials():
                  ic86 = pdict["ic86"],
                  gen2 = pdict["gen2"],
                  wls = pdict["wls"])
+    
+    def ts_min_max(self, distance_range):
+        model = self.ana_para["model"]
+        mode = self.ana_para["mode"]
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
+        
+        mdict = {"ic86": [], "gen2": [], "wls": []}
+
+        for dist in distance_range: # loop over all distances
+            print("Distance: {}".format(dist))
+            data = self.load_data(path_to_folder+"generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc.npz"
+                               .format(model["name"], model["param"]["progenitor_mass"].value, mode, self.bkg_trials, dist.value))
+            
+            for det in ["ic86", "gen2", "wls"]: # loop over detectors
+                mdict[det](data[det].min(), data[det].max())
+
+                           
+        for det in ["ic86", "gen2", "wls"]: # transform list into np.array
+            mdict[det] = np.array(mdict[det]).reshape(len(distance_range, 2))
+
+        # save npz files
+        pfilename = path_to_folder+"hist/BOUNDS_model_{}_{:.0f}_mode_{}_samples_{:1.0e}.npz".format(model["name"], model["param"]["progenitor_mass"].value, mode, self.bkg_trials)
+        np.savez(file = pfilename, 
+                 dist = distance_range.value, 
+                 ic86 = mdict["ic86"],
+                 gen2 = mdict["gen2"],
+                 wls = mdict["wls"])
 
     def ts_to_pvalue(self, bkg_bins = 1000):
 
