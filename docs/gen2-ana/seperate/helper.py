@@ -156,6 +156,15 @@ def loss_lognorm(para, args):
     y_fit = call_distribution(bkg_distr, para, x_hist, log_scale)
     return np.sqrt(np.sum((y_fit-y_hist)**2))
 
+def interpolate_bounds(bounds, distance):
+    inter_bounds = {"ic86" : [], "gen2" : [], "wls": []}
+    for det in ["ic86", "gen2", "wls"]:
+        inter_bounds[det].append(InterpolatedUnivariateSpline(bounds["dist"], bounds[det][:,0], k = 3, ext = 0)(distance)) # lower bound interpolation
+        inter_bounds[det].append(InterpolatedUnivariateSpline(bounds["dist"], bounds[det][:,1], k = 3, ext = 0)(distance)) # higher bound interpolation
+
+    return inter_bounds
+
+
 # stellar distribution file, Adams 2013 model, returns CDF
 stellar_dist = StellarDensity(os.environ.get("ASTERIA") + '/data/stellar/sn_radial_distrib_adams.fits', add_LMC=False, add_SMC=False)
 # interpolated CDF
