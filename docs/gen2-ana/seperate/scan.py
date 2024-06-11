@@ -1,16 +1,15 @@
-from asteria.simulation import Simulation
+from tqdm import tqdm
 from analysis import *
 from signal_hypothesis import *
 from scipy.optimize import minimize, brentq
 from helper import *
-from tqdm import tqdm
 
 from plthelper import plot_significance
 
 def loss_dist_range_interpolate(dist, ana_para, sigma, det):
     sim, res_dt, trials, temp_para, mode, ft_para, bkg_distr = ana_para
-    ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, trials = trials, temp_para = temp_para)
-    ana.run(mode = mode, ft_para = ft_para, distribution = bkg_distr, model = "generic")
+    ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, temp_para = temp_para)
+    ana.run(mode = mode, ft_para = ft_para, trials = trials, bkg_distr = bkg_distr, model = "generic")
     if det == "ic86":
         ind = 1
     elif det == "wls":
@@ -20,8 +19,8 @@ def loss_dist_range_interpolate(dist, ana_para, sigma, det):
 
 def loss_dist_range_fit(dist, ana_para, sigma, det):
     sim, res_dt, trials, temp_para, mode, ft_para, bkg_distr = ana_para
-    ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, trials = trials, temp_para = temp_para)
-    ana.run(mode = mode, ft_para = ft_para, distribution = bkg_distr, model = "generic")
+    ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, temp_para = temp_para)
+    ana.run(mode = mode, ft_para = ft_para, trials = trials, bkg_distr = bkg_distr, model = "generic")
     loss = (ana.zscore[det][0] - sigma)
     return loss
 
@@ -222,9 +221,9 @@ class Scan():
             
                 # returns z-score and ts statistics for all distances and all subdetectors
                 Zscore, Ts_stat = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
-                                                sig_trials = self.sig_trials,
-                                                bkg_distr = self.bkg_distr, bkg_trials= self.bkg_trials, 
-                                                model = "generic", verbose = self.verbose)              
+                                                sig_trials = self.sig_trials, bkg_distr = self.bkg_distr, 
+                                                bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins, fit_hist = self.fit_hist,
+                                                model = "generic", verbose = self.verbose) 
 
                 self.Zscore = Zscore
                 self.Ts_stat = Ts_stat
