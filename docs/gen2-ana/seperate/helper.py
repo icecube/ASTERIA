@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from asteria.stellardist import StellarDensity
-from scipy.interpolate import PchipInterpolator, InterpolatedUnivariateSpline
+from scipy.interpolate import PchipInterpolator, InterpolatedUnivariateSpline, interp1d
 from scipy.optimize import brentq, minimize
 import scipy.stats as stats
 
@@ -164,6 +164,22 @@ def interpolate_bounds(bounds, distance):
 
     return inter_bounds
 
+def quantiles_histogram(hist, perc):
+    # get PDF and bin center
+    pdf, bin_edge = hist
+    bin_center = (bin_edge[1:]+bin_edge[:-1])/2
+
+    # calculate CDF
+    cdf = np.cumsum(pdf)
+    cdf = cdf / cdf[-1]
+
+    # interpolate CDF function for approx quantile
+    interp_cdf = interp1d(cdf, bin_center)
+
+    quant = []
+    for p in perc: quant.append(interp_cdf(p))
+
+    return np.array(quant)
 
 # stellar distribution file, Adams 2013 model, returns CDF
 stellar_dist = StellarDensity(os.environ.get("ASTERIA") + '/data/stellar/sn_radial_distrib_adams.fits', add_LMC=False, add_SMC=False)
