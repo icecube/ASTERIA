@@ -15,89 +15,114 @@ class Background_Trials():
                  sim,
                  ana_para,
                  bkg_trials,
-                 output,
+                 mode,
+                 output = None,
+                 bkg_bins = None,
                  verbose = None):
+        """Class responsible for simulating the background TS distribution. Methods allow to manipulate the data such as histogramming, 
+           fitting and quantiles of the distribution.
+
+        Args:
+            sim (asteria.simulation.Simulation): ASTERIA Simulation Class
+            ana_para (dict): Dictionary containing all analysis parameters.
+            bkg_trials (int): Number of background trials
+            mode (str): Use full data (mode = "data") or histgram data to reduce storage (mode = "hist").
+            output (int): Needed if simulation is split into several, shorter runs with different outputs.
+            bkg_bins (int, optional): Number of bakcground bins if mode = "hist". Defaults to None.
+            verbose (bool, optional): Verbose level. Defaults to None.
+
+        Raises:
+            ValueError: Valid values for mode are "data" and  "hist""
+        """
+        if mode != "data" and mode != "hist":
+            raise ValueError('{} mode does not exist. Choose from "data" and "hist".'.format(mode))
         
         self.sim = sim
         self.ana_para = ana_para
         self.bkg_trials = bkg_trials
+        self.mode = mode
         self.output = output
+        self.bkg_bins = bkg_bins
         self.verbose = verbose
 
         self._file = os.path.dirname(os.path.abspath(__file__))
 
         np.random.seed(output)
 
-    def generate_data(self, bkg_bins, filename = None):
+    def generate_data(self, filename = None):
+        """Simulates TS distribution for N=self.bkg_trials trials in batches of 10000. Finally, calls a method to reshape and save the data.
+
+        Args:
+            filename (str, optional): Name of simulation output file. Defaults to None.
+        """
         print("DATA GENERATION -- SAMPLES {}".format(self.bkg_trials))
 
-        if not os.path.isdir("./files"):
-            os.mkdir("./files")
+        # filename for simulation output
         if filename is None:
-            path_to_folder = self._file + "/files/background/"
-            #filename = path_to_folder+"generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc_output_{}.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value, self.output)
-            filename = path_to_folder+"hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, bkg_bins, self.ana_para["distance"].value)
+            if self.mode == "data":
+                filename = self._file + "/files/background/generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value)
+            elif self.mode == "hist":
+                filename = self._file + "/files/background/hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.bkg_bins, self.ana_para["distance"].value)
 
+        if self.output is not None:
+            filename = os.path.splitext(filename)[0] + "_output_{}.npz".format(self.output)
+
+        # number of maximum trials, number of repetitions needed to fill bkg_trials
         self.max_trials = 10000 # size of batches
         self.repetitions = np.round(self.bkg_trials/self.max_trials).astype(int)
 
-        ts = []
+        TS = {"ic86" : np.empty(self.bkg_trials, dtype=np.float64), "gen2" : np.empty(self.bkg_trials, dtype=np.float64), "wls": np.empty(self.bkg_trials, dtype=np.float64)}
         for r in tqdm(range(self.repetitions)):
             # Initialize analysis class and run analysis
             ana = Null_Hypothesis(self.sim, res_dt = self.ana_para["res_dt"], distance=self.ana_para["distance"], trials = self.max_trials)
             ana.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], model = "generic", smoothing = False)
-            ts.append(ana.ts)
+            for det in ["ic86", "gen2", "wls"]:
+                TS[det][r*self.max_trials:(r+1)*self.max_trials] = ana.ts[det]
 
-        self.ts = ts
-        #self.reshape_and_save(self.ts, filename)
-        self.reshape_and_bin(self.ts, bkg_bins, filename)
+        self.ts = TS
+        # saving mode
+        if self.mode == "data":
+            self.save_data(filename)
+        elif self.mode == "hist":
+            self.save_bin(filename)
 
 
-    def reshape_and_save(self, item, filename):
-        data = {"ic86" : [], "gen2" : [], "wls": []}
+    def save_data(self, filename):
+        """Saves all TS values in filename.
 
-        #quantiles = [0.5, 0.16, 0.84]
-        for det in ["ic86", "gen2", "wls"]:
-            dd = []
-            #for q in np.arange(len(quantiles)):
-            for r in range(self.repetitions):
-                d = item[r][det]
-                dd.append(d)
-            data[det] = np.array(dd, dtype=float).reshape(self.repetitions*self.max_trials)
+        Args:
+            filename (str): Name of simulation output file.
+        """
 
         np.savez(file = filename, 
-                    reps = self.repetitions, 
-                    trials = self.max_trials, 
-                    ic86 = data["ic86"],
-                    gen2 = data["gen2"],
-                    wls = data["wls"])
-        return data
+                 reps = self.repetitions, 
+                 trials = self.max_trials, 
+                 ic86 = self.ts["ic86"],
+                 gen2 = self.ts["gen2"],
+                 wls = self.ts["wls"])
     
-    def reshape_and_bin(self, item, bkg_bins, filename):
+    def save_bin(self, filename):
+        """Saves as histogram in filename. To reduce size of the histogram, the bounds
+        of the histograms based on simulations with less statistics are loaded and interpolated. It is therefore recommended to run the 
+        simulation with less statistics and use the method ts_bounds().
+
+        Args:
+            filename (str): Name of simulation output file.
+        """
 
         # load TS bounds data        
         bkg_bounds = np.load(self._file + "/files/background/hist/BOUNDS_model_{}_{:.0f}_mode_{}_samples_1e+08.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials))
         # interpolate TS bounds
         bkg_inter_bounds = interpolate_bounds(bkg_bounds, self.ana_para["distance"].value)
-
-        # 1) reshape data
-        data = {"ic86" : [], "gen2" : [], "wls": []}
-        for det in ["ic86", "gen2", "wls"]:
-            dd = []
-            #for q in np.arange(len(quantiles)):
-            for r in range(self.repetitions):
-                d = item[r][det]
-                dd.append(d)
-            data[det] = np.array(dd, dtype=float).reshape(self.repetitions*self.max_trials)
-
-        # 2) bin data in histograms to reduce storage, density = False, normalization is done after datasets are combined
+        
+        # bin data in histograms to reduce storage, density = False, normalization is done after datasets are combined
         self.ts_binned = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         for det in ["ic86", "gen2", "wls"]: # loop over detectors
             # histogram TS distribution
             bkg_min, bkg_max = bkg_inter_bounds[det] # load interpolated bounds
             bkg_min = 0.5 * bkg_min # safety margin of 50 %
             bkg_max = 1.5 * bkg_max
-            hist_y, hist_bins = np.histogram(data[det] , bins = bkg_bins, range = (bkg_min , bkg_max), density=True)
+            hist_y, hist_bins = np.histogram(self.ts[det] , bins = self.bkg_bins, range = (bkg_min , bkg_max), density=True)
             hist_x = (hist_bins[1:]+hist_bins[:-1])/2
             self.ts_binned[det] = np.array([hist_x, hist_y])
 
@@ -105,10 +130,13 @@ class Background_Trials():
                  ic86 = self.ts_binned["ic86"],
                  gen2 = self.ts_binned["gen2"],
                  wls = self.ts_binned["wls"])
-        
-        return
-    
+            
     def load_data(self, filename):
+        """Load data.
+
+        Args:
+            filename (str): Filename.
+        """
         data = np.load(filename, allow_pickle=True)
         data_new = {}
         for key in ["ic86", "gen2", "wls"]:
@@ -119,31 +147,58 @@ class Background_Trials():
         self.ts = data_new
 
     def combine_data(self, num_output, filebase = None, save = False):
+        """Combine data or histogram.
+
+        Args:
+            num_output (int): Number of output files.
+            filebase (str): Filename base. Defaults to None.
+            save (bool, optional): Save combined file. Defaults to False.
+        """
 
         if filebase is None:
-            filebase = "./files/background/generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value)
+            if self.mode == "data":
+                filebase = self._file + "/files/background/generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value)
+            elif self.mode == "hist":
+                filebase = self._file + "/files/background/hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.bkg_bins, self.ana_para["distance"].value)
 
-        data_new = {"ic86": [], "gen2": [], "wls": []}
+        if self.mode == "data":
+            data_new = {"ic86": [], "gen2": [], "wls": []}
 
-        for i in range(num_output):
-            filename = filebase + "_output_{}.npz".format(i)
+            for o in range(num_output):
+                filename = filebase + "_output_{}.npz".format(o)
 
-            data = np.load(filename, allow_pickle=True)
+                data = np.load(filename, allow_pickle=True)
+                
+                for det in ["ic86", "gen2", "wls"]:
+                    data_new[det].append(data[det])
+            
+            for det in ["ic86", "gen2", "wls"]:
+                data_new[det] = np.array(data_new[det]).flatten() 
+                
+        elif self.mode == "hist":
+            data_new = {"ic86": np.zeros(self.bkg_bins), "gen2": np.zeros(self.bkg_bins), "wls": np.zeros(self.bkg_bins)}
+
+            for o in range(num_output):
+                filename = filebase + "_output_{}.npz".format(o)
+
+                data = np.load(filename, allow_pickle=True)
+                
+                for det in ["ic86", "gen2", "wls"]:
+                    data_new[det] += data[det][1] # sum y-values of histgram
 
             for det in ["ic86", "gen2", "wls"]:
-                data_new[det].append(data[det])
-        
-        for det in ["ic86", "gen2", "wls"]:
-            data_new[det] = np.array(data_new[det]).flatten() 
+                data_new[det] = 1/(np.sum(data_new[det]) * (data[det][0][1]-data[det][0][0])) # normalize sum of histgram  
 
         self.repetitions = data["reps"]
         self.max_trials = data["trials"]
         self.num_output = num_output
         self.bkg_trials = self.num_output * self.max_trials * self.repetitions
-        self.ts = data_new
 
         if save:
-            filename = "./files/background/generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value)
+            if self.mode == "data":
+                filename = self._file + "/files/background/generate/GENERATE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.ana_para["distance"].value)
+            elif self.mode == "hist":
+                filename = self._file + "/files/background/hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.bkg_bins, self.ana_para["distance"].value)
 
             np.savez(file = filename, 
                     reps = self.repetitions * self.num_output, 
@@ -151,8 +206,6 @@ class Background_Trials():
                     ic86 = data_new["ic86"],
                     gen2 = data_new["gen2"],
                     wls = data_new["wls"])
-        return data
-
         
     def ts_fit(self, distance_range, bkg_distr, verbose = None):
         """Fit background distribution to TS data for all data specified in distance_range. As opposed to the method ts_binned_fit
@@ -304,7 +357,37 @@ class Background_Trials():
                  gen2 = pdict["gen2"],
                  wls = pdict["wls"])
     
-    def ts_min_max(self, distance_range):
+    def ts_binned_quant(self, distance_range, bkg_trials, bkg_bins):
+        model = self.ana_para["model"]
+        mode = self.ana_para["mode"]
+        path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
+        
+        qdict = {"ic86": [], "gen2": [], "wls": []}
+
+        for dist in distance_range: # loop over all distances
+            print("Distance: {}".format(dist))
+            data = np.load(path_to_folder+"hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz"
+                           .format(model["name"], model["param"]["progenitor_mass"].value, mode, bkg_trials, bkg_bins, dist.value))
+            
+            for det in ["ic86", "gen2", "wls"]: # loop over detectors
+                perc = [0.5, 0.16, 0.84]
+                quant = quantiles_histogram(data[det], perc)
+                
+                qdict[det].append(quant)
+        
+        for det in ["ic86", "gen2", "wls"]: # loop over detectors
+            qdict[det] = np.array(qdict[det])
+
+        # save npz files
+        qfilename = path_to_folder+"quantile/QUANTILE_model_{}_{:.0f}_mode_{}_samples_{:1.0e}.npz".format(model["name"], model["param"]["progenitor_mass"].value, mode, bkg_trials)
+        np.savez(file = qfilename, 
+                 dist = distance_range.value, 
+                 ic86 = qdict["ic86"],
+                 gen2 = qdict["gen2"],
+                 wls = qdict["wls"])
+    
+
+    def ts_bounds(self, distance_range):
         model = self.ana_para["model"]
         mode = self.ana_para["mode"]
         path_to_folder = self._file + "/files/background/" # directory to save fit parameters and quantiles
