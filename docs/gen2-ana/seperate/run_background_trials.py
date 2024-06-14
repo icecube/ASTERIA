@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # parsed arguments: distance and sample size
 ind_dist = int(sys.argv[1])
 bkg_trials = int(sys.argv[2])
-output = int(sys.argv[3])
+output = None #int(sys.argv[3])
 
 dist_min, dist_max, dist_step = 1, 60, 0.2
 dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
@@ -71,10 +71,10 @@ ana_para = {"model": model,
             "ft_para": fft_para}
 
 bkg_bins = int(2E4)
-
+mode = "hist"
 ############################################################
 #####################BACKGROUND TRIALS######################
 ############################################################
 
-bgt = Background_Trials(sim, ana_para=ana_para, bkg_trials = bkg_trials, output = output, verbose=True)
+bgt = Background_Trials(sim, ana_para=ana_para, mode = mode, bkg_trials = bkg_trials, output = output, bkg_bins = bkg_bins, verbose=True)
 bgt.generate_data(bkg_bins)
