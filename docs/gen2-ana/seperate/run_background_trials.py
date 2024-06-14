@@ -76,5 +76,5 @@ mode = "hist"
 #####################BACKGROUND TRIALS######################
 ############################################################
 
-bgt = Background_Trials(sim, ana_para=ana_para, mode = mode, bkg_trials = bkg_trials, output = output, bkg_bins = bkg_bins, verbose=True)
+bgt = Background_Trials(sim, ana_para=ana_para, bkg_trials = bkg_trials, mode = mode, output = output, bkg_bins = bkg_bins, verbose=True)
 bgt.generate_data(bkg_bins)
