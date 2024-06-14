@@ -488,7 +488,8 @@ class Analysis():
                        "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.ffit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                          "signal" : {"ic86": None, "gen2": None, "wls": None}}
-
+        self.freq_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                         "signal" : {"ic86": None, "gen2": None, "wls": None}}
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
@@ -502,6 +503,7 @@ class Analysis():
                 # max of FFT is used to build TS distribution
                 self.ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
                 self.ffit[hypo][det] = self._freq_new[np.argmax(self._fft[hypo][det], axis=-1)].value
+                self.freq_stat[hypo][det] = np.array([np.median(self.ffit[hypo][det]), np.quantile(self.ffit[hypo][det], 0.16), np.quantile(self.ffit[hypo][det], 0.84)]) # median and quantiles of ffit distribution
 
         return
 
@@ -535,7 +537,11 @@ class Analysis():
                      "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.tfit = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}}
-        
+        self.freq_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        self.time_stat = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
+
         # extra variables if time integration is selected
         if time_int:
             self._stf_tint = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
@@ -592,6 +598,8 @@ class Analysis():
                 
                 self.ts[hypo][det] = np.array(ts).flatten()
                 self.ffit[hypo][det], self.tfit[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
+                self.freq_stat[hypo][det] = np.array([np.median(self.ffit[hypo][det]), np.quantile(self.ffit[hypo][det], 0.16), np.quantile(self.ffit[hypo][det], 0.84)]) # median and quantiles of ffit distribution
+                self.time_stat[hypo][det] = np.array([np.median(self.tfit[hypo][det]), np.quantile(self.tfit[hypo][det], 0.16), np.quantile(self.tfit[hypo][det], 0.84)]) # median and quantiles of tfit distribution
 
                 if time_int:
                     self.ts_tint[hypo][det] = np.array(ts_tint).flatten()
@@ -726,6 +734,8 @@ class Analysis():
         # prepare empty lists for distance loop
         zscore = {"ic86": [], "gen2": [], "wls": []}
         ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
+        freq_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
+        if self.mode == "SFT": time_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
 
         for dist in distance_range:
 
@@ -737,18 +747,23 @@ class Analysis():
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 zscore[det].append(self.zscore[det])
-                ts_stat["null"][det].append(self.ts_stat["null"][det])
-                ts_stat["signal"][det].append(self.ts_stat["signal"][det])
+                for hypo in ["null", "signal"]:
+                    ts_stat[hypo][det].append(self.ts_stat[hypo][det])
+                    freq_stat[hypo][det].append(self.freq_stat[hypo][det])
+                    if self.mode == "SFT": time_stat[hypo][det].append(self.time_stat[hypo][det])
 
         # for each key return array of length (3, len(dist_range))
-        Zscore = {}
-        for key, value in zscore.items():
-            Zscore[key] = np.transpose(np.array(value))
+        Zscore = {"ic86": [], "gen2": [], "wls": []}
+        Ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
+        Freq_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
+        if self.mode == "SFT": Time_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
 
-        Ts_stat = {}
-        for key, nested_dict in ts_stat.items():
-            Ts_stat[key] = {}
-            for nested_key, value in nested_dict.items():
-                Ts_stat[key][nested_key] = np.transpose(np.array(value))
-
-        return Zscore, Ts_stat
+        for det in ["ic86", "gen2", "wls"]: # loop over detector  
+            Zscore[det] = np.transpose(np.array(zscore[det]))
+            for hypo in ["null", "signal"]: # loop over hypothesis
+                Ts_stat[hypo][det] = np.transpose(np.array(ts_stat[hypo][det]))
+                Freq_stat[hypo][det] = np.transpose(np.array(freq_stat[hypo][det]))
+                if self.mode == "SFT": Time_stat[hypo][det] = np.transpose(np.array(time_stat[hypo][det]))
+        
+        if self.mode == "SFT": return Zscore, Ts_stat, Freq_stat, Time_stat
+        elif self.mode == "FFT": return Zscore, Ts_stat, Freq_stat
