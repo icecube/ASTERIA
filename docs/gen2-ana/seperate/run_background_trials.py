@@ -52,23 +52,46 @@ sim.run()
 #######################ANALYSIS SETUP#######################
 ############################################################
 
-time_win = [0, 0.35] * u.s # time independent
-freq_res = 1 * u.Hz 
-freq_win = [75, 1E6] * u.Hz # freq independent
-hanning = False
+ft_mode = "SFT"
 
-ft_mode = "FFT"
-fft_para = {"time_res": res_dt, 
-            "time_win": time_win,
-            "freq_res": freq_res,
-            "freq_win": freq_win,
-            "hanning": hanning}
+### FFT ###
+if ft_mode == "FFT":
+    time_win = [0, 0.35] * u.s # time independent
+    freq_res = 1 * u.Hz 
+    freq_win = [75, 1E6] * u.Hz # freq independent
+    hanning = False
+    ft_mode = "FFT"
+
+    ft_para = {"time_res": res_dt, 
+                "time_win": time_win,
+                "freq_res": freq_res,
+                "freq_win": freq_win,
+                "hanning": hanning}
+
+### STF ###
+elif ft_mode == "STF":
+    hann_len = 100*u.ms # length of Hann window
+    hann_res = 5*u.Hz # relates to frequency resolution from hanning, mfft = freq_sam/freq_sam
+    hann_hop = 20*u.ms # offset by which Hann window is slided over signal
+    freq_sam = (1/res_dt).to(u.Hz) # = 1/time_res
+    time_int = True
+    time_win = [0, 100] * u.s # time independent
+    freq_win = [50, 1E6] * u.Hz # 
+    ft_mode = "STF"
+
+    ft_para = {"hann_len": hann_len,
+                "hann_res": hann_res,
+                "hann_hop": hann_hop, 
+                "freq_sam": freq_sam,
+                "time_int": time_int,
+                "time_win": time_win,
+                "freq_win": freq_win}
 
 ana_para = {"model": model,
             "distance": distance,
             "res_dt": res_dt,
             "mode": ft_mode,
-            "ft_para": fft_para}
+            "ft_para": ft_para}
 
 bkg_bins = int(2E4)
 mode = "hist"
