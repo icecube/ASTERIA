@@ -385,13 +385,12 @@ class Analysis():
 
         return
     
-    def apply_tmask(self, time_win, mode, hypo = None, det = None):
+    def apply_tmask(self, time_win, hypo = None, det = None):
         """ Applies time mask. Cuts signal window to values given in time_win for both FFT and STF method. 
         This method overwrites the content of _comb. If keywords hypo and det are set to None, the cut is applied to all
         hypothesis and subdetectors. The new, cut time is _time_new with length tlength_new.
         Args:
             time_win (list of astropy.units.quantity.Quantity): lower and higher time cut
-            mode (str): analysis mode (FFT or STF)
             hypo (str): hypothesis ("null" or "signal"), default None
             det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """
@@ -399,41 +398,34 @@ class Analysis():
         tmask = np.logical_and(self._time>=time_low, self._time<=time_high) # time mask
 
         if hypo is None and det is None:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 for hypo in ["null", "signal"]: # loop over hypothesis
                     for det in ["ic86", "gen2", "wls"]: # loop over detector
                         self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 for hypo in ["null", "signal"]: # loop over hypothesis
                     for det in ["ic86", "gen2", "wls"]: # loop over detector
                         self._stf[hypo][det] = self._stf[hypo][det][:,:,tmask]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         else:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 self._comb[hypo][det] = self._comb[hypo][det][:,tmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 self._stf[hypo][det] = self._stf[hypo][det][:,:,tmask]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         self._time_new = self._time[tmask]
         self.tlength_new = len(self._time_new) # new length of time array
 
         return
 
-    def apply_fmask(self, freq_win, mode, hypo = None, det = None):
+    def apply_fmask(self, freq_win, hypo = None, det = None):
         """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win for both FFT and STF method. 
         This method overwrites the content of _fft or _stf. If keywords hypo and det are set to None, the cut is applied to all
         hypothesis and subdetectors. The new, cut frequency is _freq_new with length flength_new.
         Args:
             freq_win (list of astropy.units.quantity.Quantity): lower and higher frequency cut
-            mode (str): analysis mode (FFT or STF)
             hypo (str): hypothesis ("null" or "signal"), default None
             det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """        
@@ -441,29 +433,23 @@ class Analysis():
         fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high) # frequency mask
 
         if hypo is None and det is None:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 for hypo in ["null", "signal"]: # loop over hypothesis
                     for det in ["ic86", "gen2", "wls"]: # loop over detector
                         self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 for hypo in ["null", "signal"]: # loop over hypothesis
                     for det in ["ic86", "gen2", "wls"]: # loop over detector
                         self._stf[hypo][det] = self._stf[hypo][det][:,fmask,:]
-            
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
 
         else:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 self._fft[hypo][det] = self._fft[hypo][det][:,fmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 self._stf[hypo][det] = self._stf[hypo][det][:,fmask,:]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         self._freq_new = self._freq[fmask] # new frequency array
         self.flength_new = len(self._freq_new) # new length of frequency array
 
@@ -480,7 +466,7 @@ class Analysis():
             raise ValueError('fft_para["time_res"] = {} but ana.sim._res_dt = {}. Make sure to execute ana.run with the same resolution as you set in fft_para'.format(time_res, self.sim._res_dt))
         
         self._time = self.sim.time
-        self.apply_tmask(time_win, mode = "FFT") # apply time mask   
+        self.apply_tmask(time_win) # apply time mask   
 
         self._fft = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
@@ -498,7 +484,7 @@ class Analysis():
                 # return frequencies
                 self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
-                self.apply_fmask(freq_win, mode = "FFT", hypo = hypo, det = det) # apply frequency mask
+                self.apply_fmask(freq_win, hypo = hypo, det = det) # apply frequency mask
         
                 # max of FFT is used to build TS distribution
                 self.ts[hypo][det] = np.nanmax(self._fft[hypo][det], axis = -1)
@@ -573,8 +559,8 @@ class Analysis():
                     self._freq *= u.Hz
                     self._time = (self._time * u.s).to(u.ms) # time in units of ms
                     
-                    self.apply_tmask(time_win, mode = "STF", hypo = hypo, det = det)
-                    self.apply_fmask(freq_win, mode = "STF", hypo = hypo, det = det)
+                    self.apply_tmask(time_win, hypo = hypo, det = det)
+                    self.apply_fmask(freq_win, hypo = hypo, det = det)
 
                     # take square of absolute for power
                     self._stf[hypo][det] = np.abs(self._stf[hypo][det]) ** 2
@@ -690,6 +676,9 @@ class Analysis():
         self.trials = trials
         self.bkg_distr = bkg_distr
 
+        if self.mode != "FFT" and self.mode != "STF":
+            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
+
         # load and combine data
         self._background()
         self._average_background()
@@ -712,9 +701,6 @@ class Analysis():
             self._hypothesis()
             self.stf(ft_para)
             self.get_ts_stat(time_int=ft_para["time_int"])
-
-        else:
-            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
       
         self.get_zscore()
         

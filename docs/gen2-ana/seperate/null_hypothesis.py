@@ -12,14 +12,12 @@ class Null_Hypothesis():
     def __init__(self, 
                  sim, 
                  res_dt,
-                 distance, 
-                 trials):
+                 distance):
 
         # define a few attributes
         self.sim = sim
         self.sim._res_dt = res_dt
         self.distance = distance
-        self.trials = trials
         self.tlength = len(self.sim.time)
 
         # rescale result
@@ -43,13 +41,13 @@ class Null_Hypothesis():
         self.distance = distance
         self.sim.scale_result(distance=distance)
 
-    def set_trials(self, trials):
-        """Set number of trials
+    def set_bkg_trials(self, bkg_trials):
+        """Set number of background trials
 
         Args:
-            trials (int): number of trials
+            bkg_trials (int): number of background trials
         """
-        self.trials = trials
+        self.bkg_trials = bkg_trials
 
     def _background(self):
         """Calculates the background hits in res_dt time steps for all sensors and combines the hits into three detector scopes
@@ -59,13 +57,13 @@ class Null_Hypothesis():
         """ 
         self._bkg = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
-        size = self.trials * self.tlength
+        size = self.bkg_trials * self.tlength
 
         # pull random background for subdetectors
-        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
+        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(self.bkg_trials, self.tlength)
+        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(self.bkg_trials, self.tlength)
+        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(self.bkg_trials, self.tlength)
+        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(self.bkg_trials, self.tlength)
         
         # combine subdetector background into IC86 and Gen2 background rate
         bkg_ic86 = bkg_i3 + bkg_dc
@@ -139,7 +137,7 @@ class Null_Hypothesis():
         """
         self._sig_sample = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         for det in ["ic86", "gen2", "wls"]: # loop over detector
-            self._sig_sample[det] = np.random.normal(self._sig[det], np.sqrt(np.abs(self._sig[det])), size=(self.trials, self.tlength))
+            self._sig_sample[det] = np.random.normal(self._sig[det], np.sqrt(np.abs(self._sig[det])), size=(self.bkg_trials, self.tlength))
         
         return
               
@@ -187,78 +185,64 @@ class Null_Hypothesis():
 
         return
     
-    def apply_tmask(self, time_win, mode, det = None):
+    def apply_tmask(self, time_win, det = None):
         """ Applies time mask. Cuts signal window to values given in time_win for both FFT and STF method. 
         This method overwrites the content of _comb. If keyword det is set to None, the cut is applied to all
         subdetectors. The new, cut time is _time_new with length tlength_new.
         Args:
             time_win (list of astropy.units.quantity.Quantity): lower and higher time cut
-            mode (str): analysis mode (FFT or STF)
             det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """
         time_low, time_high = time_win
         tmask = np.logical_and(self._time>=time_low, self._time<=time_high) # time mask
 
         if det is None:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 for det in ["ic86", "gen2", "wls"]: # loop over detector
                     self._comb[det] = self._comb[det][:,tmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 for det in ["ic86", "gen2", "wls"]: # loop over detector
                     self._stf[det] = self._stf[det][:,:,tmask]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         else:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 self._comb[det] = self._comb[det][:,tmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 self._stf[det] = self._stf[det][:,:,tmask]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         self._time_new = self._time[tmask]
         self.tlength_new = len(self._time_new) # new length of time array
 
         return
 
-    def apply_fmask(self, freq_win, mode, det = None):
+    def apply_fmask(self, freq_win, det = None):
         """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win for both FFT and STF method. 
         This method overwrites the content of _fft or _stf. If keyword det is set to None, the cut is applied to all
         subdetectors. The new, cut frequency is _freq_new with length flength_new.
         Args:
             freq_win (list of astropy.units.quantity.Quantity): lower and higher frequency cut
-            mode (str): analysis mode (FFT or STF)
             det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """        
         freq_low, freq_high = freq_win
         fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high) # frequency mask
 
         if det is None:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 for det in ["ic86", "gen2", "wls"]: # loop over detector
                     self._fft[det] = self._fft[det][:,fmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 for det in ["ic86", "gen2", "wls"]: # loop over detector
                     self._stf[det] = self._stf[det][:,fmask,:]
             
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
-
         else:
-            if mode == "FFT":
+            if self.mode == "FFT":
                 self._fft[det] = self._fft[det][:,fmask]
                 
-            elif mode == "STF":
+            elif self.mode == "STF":
                 self._stf[det] = self._stf[det][:,fmask,:]
-            
-            else:
-                raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
 
         self._freq_new = self._freq[fmask] # new frequency array
         self.flength_new = len(self._freq_new) # new length of frequency array
@@ -276,7 +260,7 @@ class Null_Hypothesis():
             raise ValueError('fft_para["time_res"] = {} but ana.sim._res_dt = {}. Make sure to execute ana.run with the same resolution as you set in fft_para'.format(time_res, self.sim._res_dt))
         
         self._time = self.sim.time
-        self.apply_tmask(time_win, mode = "FFT") # apply time mask   
+        self.apply_tmask(time_win) # apply time mask   
 
         self._fft = {"ic86": None, "gen2": None, "wls": None}
         self.ts = {"ic86": None, "gen2": None, "wls": None}
@@ -288,7 +272,7 @@ class Null_Hypothesis():
             # return frequencies
             self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
-            self.apply_fmask(freq_win, mode = "FFT", det = det) # apply frequency mask
+            self.apply_fmask(freq_win, det = det) # apply frequency mask
     
             # max of FFT is used to build TS distribution
             self.ts[det] = np.nanmax(self._fft[det], axis = -1)
@@ -316,7 +300,7 @@ class Null_Hypothesis():
 
         # STFT is computationally expensive, batching will ensure that RAM is not completly used up
         bat_step = 5000 # size of batches
-        trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
+        trial_batch = np.arange(0, self.bkg_trials, step=bat_step) #chunk data in batches of bat_step
 
         self._stf = {"ic86": None, "gen2": None, "wls": None}
         self.ts = {"ic86": None, "gen2": None, "wls": None}
@@ -348,13 +332,13 @@ class Null_Hypothesis():
                 self._freq *= u.Hz
                 self._time = (self._time * u.s).to(u.ms) # time in units of ms
                 
-                self.apply_tmask(time_win, mode = "STF", det = det)
-                self.apply_fmask(freq_win, mode = "STF", det = det)
+                self.apply_tmask(time_win, det = det)
+                self.apply_fmask(freq_win, det = det)
 
                 # take square of absolute for power
                 self._stf[det] = np.abs(self._stf[det]) ** 2
 
-                # maximum (hottest pixel) in array of 2D STF, returns array of length trials
+                # maximum (hottest pixel) in array of 2D STF, returns array of length bkg_trials
                 # value used for ts distribution
                 ts.append(np.nanmax(self._stf[det], axis = (1,2)))
 
@@ -380,7 +364,7 @@ class Null_Hypothesis():
 
         return
   
-    def run(self, mode, ft_para, model = "generic", smoothing = False, trials = None):
+    def run(self, mode, ft_para, bkg_trials, model = "generic", smoothing = False):
         """Runs complete analysis chain for the background distribution for both
         time-integrated fast fourier transform (FFT) and short-time fourier transform (STF). 
         It computes background and flat signal hits, combines them, performs either FFT or STFT 
@@ -389,16 +373,19 @@ class Null_Hypothesis():
         Args:
             mode (str): analysis mode (FFT or STF)
             ft_para (dict): parameters of the fourier transform (FFT or STF)
-            trials (int, optional): Number of trials. Defaults to None.
+            bkg_trials (int): Number of background trials.
+            model (str): composition of signal trial ("generic", "model", "mix")
+            smoothing (bool): Applies high-pass (moving average) filter.
 
         Raises:
             ValueError: mode takes two valid values: "FFT" and "STF".
         """
 
         self.mode = mode
+        self.bkg_trials = bkg_trials
 
-        if trials is not None:
-            self.trials = trials
+        if self.mode != "FFT" and self.mode != "STF":
+            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
 
         # load and combine data
         self._background()
@@ -413,6 +400,3 @@ class Null_Hypothesis():
         elif self.mode == "STF":
             self._hypothesis()
             self.stf(ft_para)
-
-        else:
-            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(mode))
