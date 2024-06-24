@@ -49,18 +49,20 @@ class Background_Trials():
 
         np.random.seed(output)
 
-    def generate_data(self, filename = None):
+    def generate_data(self, filename = None, load_bounds = None):
         """Simulates TS distribution for N=self.bkg_trials trials in batches of 10000. Finally, calls a method to reshape and save the data.
 
         Args:
             filename (str, optional): Name of simulation output file. Defaults to None.
+            load_bounds (bool, optional): Use bounds if file exists. Defaults to None
         """
         print("DATA GENERATION -- SAMPLES {}".format(self.bkg_trials))
 
-        # load TS bounds data        
-        bkg_bounds = np.load(self._file + "/files/background/hist/BOUNDS_model_{}_{:.0f}_mode_{}_samples_1e+08.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials))
-        # interpolate TS bounds
-        bkg_inter_bounds = interpolate_bounds(bkg_bounds, self.ana_para["distance"].value)
+        if load_bounds:
+            # load TS bounds data        
+            bkg_bounds = np.load(self._file + "/files/background/hist/BOUNDS_model_{}_{:.0f}_mode_{}_samples_1e+08.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials))
+            # interpolate TS bounds
+            bkg_bounds_inter = interpolate_bounds(bkg_bounds, self.ana_para["distance"].value)
 
         # filename for simulation output
         filename = self._file + "/files/background/hist/HIST_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(self.ana_para["model"]["name"], self.ana_para["model"]["param"]["progenitor_mass"].value, self.ana_para["mode"], self.bkg_trials, self.bkg_bins, self.ana_para["distance"].value)
@@ -76,21 +78,28 @@ class Background_Trials():
                      "gen2" : np.array([np.zeros(self.bkg_bins, dtype=np.float64), np.zeros(self.bkg_bins, dtype=np.float64)]), 
                      "wls": np.array([np.zeros(self.bkg_bins, dtype=np.float64), np.zeros(self.bkg_bins, dtype=np.float64)])}
         
+        bounds = {"ic86": None, "gen2": None, "wls": None}
+        
         for r in tqdm(range(self.repetitions)): # loop over batches
-            # Initialize analysis class and run analysis
-            ana = Null_Hypothesis(self.sim, res_dt = self.ana_para["res_dt"], distance=self.ana_para["distance"], trials = self.max_trials)
-            ana.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], model = "generic", smoothing = False)
+            # Initialize null hypothsis class and run analysis
+            nlh = Null_Hypothesis(self.sim, res_dt = self.ana_para["res_dt"], distance=self.ana_para["distance"])
+            nlh.run(mode = self.ana_para["mode"], ft_para = self.ana_para["ft_para"], bkg_trials = self.max_trials, model = "generic", smoothing = False)
+
             for det in ["ic86", "gen2", "wls"]: # loop over subdetectors
-                bkg_min, bkg_max = bkg_inter_bounds[det] # interpolated bounds for subdetector
-                bkg_min = 0.5 * bkg_min # safety margin of 50 %
-                bkg_max = 1.5 * bkg_max
-                hist_y, hist_bins = np.histogram(ana.ts[det] , bins = self.bkg_bins, range = (bkg_min , bkg_max), density=True)
-                
+                if load_bounds and r == 0: 
+                    bkg_min, bkg_max = bkg_bounds_inter[det] # interpolated bounds for subdetector
+                    bounds[det] = (0.1 * bkg_min, 1.9 * bkg_max)
+                elif load_bounds is not True and r == 0: 
+                    bkg_min, bkg_max = nlh.ts[det].min(), nlh.ts[det].max()
+                    bounds[det] = (0.1 * bkg_min, 1.9 * bkg_max)
+
+                hist_y, hist_bins = np.histogram(nlh.ts[det] , bins = self.bkg_bins, range = bounds[det], density=True)
+
                 if r == 0: # x values are always the same
                     hist_x = (hist_bins[1:]+hist_bins[:-1])/2
                     self.ts_binned[det][0] = hist_x
                 self.ts_binned[det][1] += hist_y # add y value for each batch to previous
-
+        
         for det in ["ic86", "gen2", "wls"]: # loop over subdetectors
             self.ts_binned[det][1] *= 1/(np.sum(self.ts_binned[det][1]) * (self.ts_binned[det][0][1] - self.ts_binned[det][0][0])) # normalize sum of histgram  
 
@@ -219,7 +228,7 @@ class Background_Trials():
 
         for det in ["ic86", "gen2", "wls"]: # transform list into np.array
             pdict[det] = np.array(pdict[det])
-
+        
         # save npz files
         pfilename = path_to_folder+"fit/FIT_model_{}_{:.0f}_mode_{}_samples_{:1.0e}_{}.npz".format(model["name"], model["param"]["progenitor_mass"].value, mode, self.bkg_trials, str(distr.name))
         np.savez(file = pfilename, 
@@ -324,7 +333,7 @@ class Background_Trials():
                  ic86 = pdict["ic86"],
                  gen2 = pdict["gen2"],
                  wls = pdict["wls"])
-    
+
     def ts_binned_quant(self, distance_range, bkg_trials, bkg_bins):
         model = self.ana_para["model"]
         mode = self.ana_para["mode"]
@@ -352,8 +361,7 @@ class Background_Trials():
                  dist = distance_range.value, 
                  ic86 = qdict["ic86"],
                  gen2 = qdict["gen2"],
-                 wls = qdict["wls"])
-    
+                 wls = qdict["wls"]) 
 
     def ts_bounds(self, distance_range):
         model = self.ana_para["model"]
