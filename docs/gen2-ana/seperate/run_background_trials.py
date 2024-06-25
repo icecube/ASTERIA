@@ -52,7 +52,7 @@ sim.run()
 #######################ANALYSIS SETUP#######################
 ############################################################
 
-ft_mode = "SFT"
+ft_mode = "STF"
 
 ### FFT ###
 if ft_mode == "FFT":
@@ -99,5 +99,5 @@ mode = "hist"
 #####################BACKGROUND TRIALS######################
 ############################################################
 
-bgt = Background_Trials(sim, ana_para=ana_para, bkg_trials = bkg_trials, mode = mode, output = output, bkg_bins = bkg_bins, verbose=True)
-bgt.generate_data(bkg_bins)
+bgt = Background_Trials(sim, ana_para = ana_para, bkg_trials = bkg_trials, mode = mode, output = output, bkg_bins = bkg_bins, verbose = True)
+bgt.generate_data(filename = None, load_bounds = None)
