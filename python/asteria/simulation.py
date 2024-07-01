@@ -312,11 +312,14 @@ class Simulation:
             idx = 0
 
             # Perform integration over spectrum
-            if part_size < self.time.size:
+            if part_size <= self.time.size:
                 for idx in np.arange(0, self.time.size, part_size):
                     spectrum = self.get_combined_spectrum(self.time[idx:idx + part_size], self.energy, flavor,
                                                           self._mixing)
                     result[idx:idx + part_size] = np.trapz(spectrum, self.energy.value, axis=1)
+            else:
+                spectrum = self.get_combined_spectrum(self.time, self.energy, flavor, self._mixing)
+                result = np.trapz(spectrum, self.energy.value, axis=1)
 
             result *= (
                 H2O_in_ice *  # Target Molecule (H2O) density
