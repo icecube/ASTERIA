@@ -243,7 +243,9 @@ def plot_significance(dist_range, zscore, ts_stat):
     mask = np.where(np.isinf(zscore["ic86"][2])==True, False, True)
 
     for i, det in enumerate(["ic86", "gen2", "wls"]):
-
+        for j in range(3):
+            m = np.isinf(zscore[det][j])
+            zscore[det][j][m] = zscore[det][j][np.isfinite(zscore[det][j])].max()
         ax[0].plot(dist_range, zscore[det][0], label=labels[i], color = colors[i])
         ax[0].fill_between(dist_range.value, zscore[det][2], zscore[det][1], color = colors[i], alpha = 0.15)
     
@@ -271,11 +273,11 @@ def plot_significance(dist_range, zscore, ts_stat):
 
     ax[0].axhline(3, color='k', ls = ':')
     ax[0].axhline(5, color='k', ls = '-.')
-    ax[0].text(dist_range[mask][0].value, 3, r"3$\sigma$", size=12,
+    ax[0].text(dist_range[mask][-1].value, 3, r"3$\sigma$", size=12,
             ha="center", va="center",
             bbox=dict(boxstyle="square", ec='k', fc='white'))
 
-    ax[0].text(dist_range[mask][0].value, 5, r"5$\sigma$", size=12,
+    ax[0].text(dist_range[mask][-1].value, 5, r"5$\sigma$", size=12,
             ha="center", va="center",
             bbox=dict(boxstyle="square", ec='k', fc='white'))
 
@@ -337,6 +339,7 @@ def plot_resolution(dist_range, quant, q0, zscore):
     ax[1].set_yscale("symlog", linthresh = 1)
     ax[1].set_xticks([1,2,3,4,5])
     ax[1].get_xaxis().set_major_formatter(ScalarFormatter())
+    ax[1].tick_params(labelsize = 12)
 
     ax[1].axvline(3, color = "k", ls = "--")
     ax[1].axvline(5, color = "k", ls = "--")
