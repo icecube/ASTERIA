@@ -447,13 +447,14 @@ class Signal_Hypothesis():
             # calculate FFT, power = (fourier modes) ** 2
             self._fft[det] = (2.0/self.tlength_new * np.abs(fft(self._comb[det], axis = -1)[:,1:self.tlength_new//2]))**2
             # return frequencies
-            self._freq = fftfreq(self.tlength_new,self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
+            self._freq = fftfreq(self.tlength_new, self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
             self.apply_fmask(freq_win, det = det) # apply frequency mask
     
             # max of FFT is used to build TS distribution
             self.ts[det] = np.nanmax(self._fft[det], axis = -1)
             self.ffit[det] = self._freq_new[np.argmax(self._fft[det], axis=-1)].value
+            self.ffit[det] = np.round(self.ffit[det]) # round fit freq, if time window is applied, the fft freq are not integer
             self.freq_stat[det] = np.array([np.median(self.ffit[det]), np.quantile(self.ffit[det], 0.16), np.quantile(self.ffit[det], 0.84)]) # median and quantiles of ffit distribution
 
         return
@@ -530,7 +531,7 @@ class Signal_Hypothesis():
 
                 if time_int:
                     self._stf_tint[det] = np.sum(self._stf[det], axis = -1)
-                    ts_tint.append(np.nanmax(self._sft_tint[det], axis = -1))
+                    ts_tint.append(np.nanmax(self._stf_tint[det], axis = -1))
                     ind_freq_tint = np.nanargmax(self._stf_tint[det], axis = -1)
                     fit_freq_tint.append(self._freq_new[ind_freq_tint])
             
@@ -538,11 +539,10 @@ class Signal_Hypothesis():
             self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
             self.freq_stat[det] = np.array([np.median(self.ffit[det]), np.quantile(self.ffit[det], 0.16), np.quantile(self.ffit[det], 0.84)]) # median and quantiles of ffit distribution
             self.time_stat[det] = np.array([np.median(self.tfit[det]), np.quantile(self.tfit[det], 0.16), np.quantile(self.tfit[det], 0.84)]) # median and quantiles of tfit distribution
-
+    
             if time_int:
                 self.ts_tint[det] = np.array(ts_tint).flatten()
                 self.ffit_tint[det] = np.array(fit_freq_tint).flatten()
-
 
         return
 
@@ -615,30 +615,35 @@ class Signal_Hypothesis():
         if self.bkg_distr != "hist" and self.bkg_distr != "data":
             pass
         elif self.bkg_distr == "hist":
-            bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+            bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
         elif self.bkg_distr == "data":
             bkg_data = np.load(self._file + "/files/background/generate/GENERATE_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.distance.value))
         else:
             raise ValueError('{} not supported. Choose from scipy.stats, "hist" or "data"'.format(self.bkg_distr)) 
 
+        self.pvalue = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self.zscore = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
 
         for det in ["ic86", "gen2", "wls"]: # loop over detector
-            z = []
+            p, z = [], []
             for i in range(3): # loop over median, 16% and 84% quantiles of TS distribution
 
                 # p-value of signal given a background distribution                
                 if self.bkg_distr != "hist" and self.bkg_distr != "data":
-                    p = self._ts_bkg_fit[det].sf(self.ts_stat["signal"][det][i])
+                    pp = self._ts_bkg_fit[det].sf(self.ts_stat["signal"][det][i])
                 elif self.bkg_distr == "data":
-                    p = np.sum(bkg_data[det] > self.ts_stat["signal"][det][i])/len(bkg_data[det])
-                elif self.bkg_distr == "hist": # normalization already applied by using density = True in histogram
-                    p = np.sum(bkg_hist[det][1][bkg_hist[det][0] > self.ts_stat["signal"][det][i]])
+                    pp = np.sum(bkg_data[det] > self.ts_stat["signal"][det][i])/len(bkg_data[det])
+                elif self.bkg_distr == "hist": # bkg_hist data is normalized, np.sum != 1 because bin size needs to be take care of
+                    pp = np.sum(bkg_hist[det][1][bkg_hist[det][0] > self.ts_stat["signal"][det][i]]) * (bkg_hist[det][0][1]-bkg_hist[det][0][0])
 
                 # two-sided Z score corresponding to the respective p-value, survival probability = 1 - cdf
-                zz = norm.isf(p/2)
+                #zz = norm.isf(p/2)
+                # one-side Z score corresponding to the respective p-value, ppf = inverse cdf
+                zz = norm.ppf(1-pp)
+                p.append(pp)
                 z.append(zz)
 
+            self.pvalue[det] = np.array(p)
             self.zscore[det] = np.array(z)
 
         return
@@ -716,10 +721,11 @@ class Signal_Hypothesis():
             smoothing (bool): Applies high-pass (moving average) filter.
         """
         # prepare empty lists for distance loop
+        pvalue = {"ic86": [], "gen2": [], "wls": []}
         zscore = {"ic86": [], "gen2": [], "wls": []}
         ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
         freq_stat = {"ic86": [], "gen2": [], "wls": []}
-        if self.mode == "SFT": time_stat = {"ic86": [], "gen2": [], "wls": []}
+        if mode == "STF": time_stat = {"ic86": [], "gen2": [], "wls": []}
 
         for dist in distance_range:
 
@@ -730,21 +736,24 @@ class Signal_Hypothesis():
             self.run(mode, ft_para, sig_trials, bkg_distr, bkg_trials, bkg_bins, fit_hist, model, smoothing)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
+                pvalue[det].append(self.pvalue[det])
                 zscore[det].append(self.zscore[det])
                 ts_stat["null"][det].append(self.ts_stat["null"][det])
                 ts_stat["signal"][det].append(self.ts_stat["signal"][det])
                 freq_stat[det].append(self.freq_stat[det])
-                if self.mode == "SFT": time_stat[det].append(self.time_stat[det])
+                if mode == "STF": time_stat[det].append(self.time_stat[det])
 
         # for each key return array of length (3, len(dist_range))
+        Pvalue = {"ic86": [], "gen2": [], "wls": []}
         Zscore = {"ic86": [], "gen2": [], "wls": []}
         Freq_stat = {"ic86": [], "gen2": [], "wls": []}
-        if self.mode == "SFT": Time_stat = {"ic86": [], "gen2": [], "wls": []}
+        if mode == "STF": Time_stat = {"ic86": [], "gen2": [], "wls": []}
 
         for det in ["ic86", "gen2", "wls"]: 
-            Zscore[key] = np.transpose(np.array(zscore[det]))
-            Freq_stat[key] = np.transpose(np.array(freq_stat[det]))
-            if self.mode == "SFT": Time_stat[key] = np.transpose(np.array(time_stat[det]))
+            Pvalue[det] = np.transpose(np.array(pvalue[det]))
+            Zscore[det] = np.transpose(np.array(zscore[det]))
+            Freq_stat[det] = np.transpose(np.array(freq_stat[det]))
+            if mode == "STF": Time_stat[det] = np.transpose(np.array(time_stat[det]))
 
         Ts_stat = {}
         for key, nested_dict in ts_stat.items():
@@ -752,5 +761,5 @@ class Signal_Hypothesis():
             for nested_key, value in nested_dict.items():
                 Ts_stat[key][nested_key] = np.transpose(np.array(value))
 
-        if self.mode == "SFT": return Zscore, Ts_stat, Freq_stat, Time_stat
-        elif self.mode == "FFT": return Zscore, Ts_stat, Freq_stat
+        if mode == "STF": return Pvalue, Zscore, Ts_stat, Freq_stat, Time_stat
+        elif mode == "FFT": return Pvalue, Zscore, Ts_stat, Freq_stat
