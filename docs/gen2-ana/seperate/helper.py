@@ -74,33 +74,52 @@ def significance_horizon(dist_range, Zscore, sigma = [3,5]):
 
         dist_min = 0.5 * u.kpc
 
-        # cutoff distance for interpolation, inf values need to be excluded, take 86% and first distance
-        dist_cutoff = dist_range[np.logical_and(dist_range>dist_min, np.where(np.isinf(Zscore[det][2])==True, 0, 1))][0]
-        
+        # cutoff distance for interpolation, no infs, no nans?
+        dm50 = np.logical_and(dist_range>dist_min, ~np.isinf(Zscore[det][0]))
+        dm16 = np.logical_and(dist_range>dist_min, ~np.isinf(Zscore[det][1]))
+        dm84 = np.logical_and(dist_range>dist_min, ~np.isinf(Zscore[det][2]))
+
         # cubic spline (k = 3) with constant values outside boundaries
-        q50 = InterpolatedUnivariateSpline(x = dist_range[dist_range>=dist_cutoff], y = Zscore[det][0][dist_range>=dist_cutoff], k = 3, ext = 3)
-        q16 = InterpolatedUnivariateSpline(x = dist_range[dist_range>=dist_cutoff], y = Zscore[det][1][dist_range>=dist_cutoff], k = 3, ext = 3)
-        q84 = InterpolatedUnivariateSpline(x = dist_range[dist_range>=dist_cutoff], y = Zscore[det][2][dist_range>=dist_cutoff], k = 3, ext = 3)
-        
+        q50 = InterpolatedUnivariateSpline(x = dist_range[dm50], y = Zscore[det][0][dm50], k = 3, ext = 3)
+        q16 = InterpolatedUnivariateSpline(x = dist_range[dm16], y = Zscore[det][1][dm16], k = 3, ext = 3)
+        q84 = InterpolatedUnivariateSpline(x = dist_range[dm84], y = Zscore[det][2][dm84], k = 3, ext = 3) 
         quantiles = [q50, q16, q84]
 
         for sig in sigma: # loop over confidence level (e.g. 3, 5 sigma)
             di, pe = [], [] # temporary lists to store distance and percentage
 
             for quan in quantiles: # loop over quantiles
-
-                root = brentq(loss_dist_horizon, a = 1, b = 100, args = (quan, sig), xtol = 1e-2)
+                root = brentq(loss_dist_horizon, a = 0.1, b = 100, args = (quan, sig), xtol = 1e-2)
                 di.append(root)
                 if root >= 25:
                     pe.append(1)
                 else:
                     pe.append(stellar_inter(root))
-                
             dist[det].append(np.array(di) * u.kpc)
             perc[det].append(np.array(pe)*100)
         
     return dist, perc
 
+def resolution_at_horizon(dist_range, quant, horizon, sigma = [3,5]):
+
+    reso =  {"ic86": [], "gen2": [], "wls": []} # empty dictionary
+
+    for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+        # cubic spline (k = 3) with constant values outside boundaries
+        q50 = InterpolatedUnivariateSpline(x = dist_range, y = quant[det][0], k = 3, ext = 3)
+        q16 = InterpolatedUnivariateSpline(x = dist_range, y = quant[det][1], k = 3, ext = 3)
+        q84 = InterpolatedUnivariateSpline(x = dist_range, y = quant[det][2], k = 3, ext = 3) 
+        quantiles = [q50, q16, q84]
+
+        for s, sig in enumerate(sigma): # loop over confidence level (e.g. 3, 5 sigma)
+            re = [] # temporary lists to store resolution
+            
+            for q, quan in enumerate(quantiles): # loop over quantiles
+                re.append(quan(horizon[det][s][q]))
+            reso[det].append(np.array(re))
+
+    return reso
 
 def get_distribution_by_name(name):
     distribution = getattr(stats, name, None)
