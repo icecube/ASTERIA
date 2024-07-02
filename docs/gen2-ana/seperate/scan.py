@@ -4,7 +4,7 @@ from signal_hypothesis import *
 from scipy.optimize import minimize, brentq
 from helper import *
 
-from plthelper import plot_significance
+from plthelper import plot_significance, plot_resolution
 
 def loss_dist_range_interpolate(dist, ana_para, sigma, det):
     sim, res_dt, trials, temp_para, mode, ft_para, bkg_distr = ana_para
@@ -49,91 +49,6 @@ class Scan():
         self.fit_hist = fit_hist
         self.verbose = verbose
 
-    def bias(self, bias_freq, bias_ampl, bias_reps = 100):
-
-        self.bias_freq = bias_freq
-        self.bias_ampl = bias_ampl
-        self.bias_reps = bias_reps
-
-        self.sigma = self.scan_para["sigma"]
-
-        self.dist = [{} for r in range(self.bias_reps)]
-        self.perc = [{} for r in range(self.bias_reps)]
-
-        # template dictionary uses fixed ampl, freq and scan_para values
-        temp_para = {"frequency": self.bias_freq, 
-                     "amplitude": self.bias_ampl, #in percent of max value
-                     "time_start": self.scan_para["time_start"],
-                     "time_end": self.scan_para["time_end"],
-                     "position": self.scan_para["position"]}
-        
-        if self.verbose is not None: print("Frequency: {}, Amplitude: {} % ".format(bias_freq, bias_ampl*100))
-
-        for r in tqdm(np.arange(self.bias_reps)): # loop over repetition
-
-            # 1) Find the distance bounds for which the significance falls from > 5 sigma to < 3 sigma for all subdetectors
-            # This is done to avoid scanning unnecessarily many distances for which the significance is either far too high
-            # or far too low.
-            trials = 1000 # use 1/10 of trials used in later distance scan to increase speed of convergence
-            ana_para = [self.sim, self.sim._res_dt, trials, temp_para, self.ft_mode, self.ft_para, self.bkg_distr]
-
-            # arguments for the minimizer
-            # The minimizer is defined above and initializes the Analysis class.
-            args_dist_low = (ana_para, 5.5, "ic86")
-            args_dist_high = (ana_para, 2.5, "wls")
-
-            # returns lower bound distance
-            root_low = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_low, xtol = 1e-2)
-            dist_low = root_low * u.kpc
-            # returns higher bound distance
-            root_high = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_high, xtol = 1e-2)
-            dist_high = root_high * u.kpc
-            if self.verbose == "debug": print("Distance range: {:.1f} - {:.1f}".format(dist_low, dist_high))
-
-            # 2) Distance scan
-
-            # distance search range
-            #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
-
-            d_low, d_high = np.floor(dist_low.value), np.ceil(dist_high.value)
-
-            # If difference between d_low and d_high is small (< 10 kpc) 5 steps should be enough, else 10 steps are used
-            if d_high-d_low < 10:
-                num_steps = int(d_high-d_low)
-            else:
-                num_steps = int(d_high-d_low) #10
-
-            self.dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
-
-            # initialize signal hypothesis instance for distance scan
-            sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
-                                    distance = dist_low, temp_para = temp_para)
-            
-            # returns z-score and ts statistics for all distances and all subdetectors
-            Zscore, Ts_stat = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
-                                            sig_trials = self.sig_trials, bkg_distr = self.bkg_distr, 
-                                            bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins, fit_hist = self.fit_hist,
-                                            model = "generic", verbose = self.verbose)              
-            
-            self.Zscore = Zscore
-            self.Ts_stat = Ts_stat
-
-            if self.verbose == "debug":
-                import matplotlib.pyplot as plt
-                plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
-                plt.show()
-
-            # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
-            self.quantiles = [0.5, 0.16, 0.84]
-            dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
-
-            # save data
-            self.dist[r] = dist
-            self.perc[r] = perc
-
-        return
-
-
     def run_interpolate(self):
         """The parameter scan is designed in five steps:
         1) A loop over all amplitudes.
@@ -149,8 +64,10 @@ class Scan():
         self.sigma = self.scan_para["sigma"]
 
         # create empty 2D list with each entry being a dictionary
-        self.dist = [[{} for f in range(len(self.freq_range))] for a in range(len(self.ampl_range))]
-        self.perc = [[{} for f in range(len(self.freq_range))] for a in range(len(self.ampl_range))]
+        self.dist = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
+        self.perc = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
+        self.fres = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
+        if self.ft_mode == "STF": self.tres = [[{} for f in range(len(self.freq_range))] for a in range(len(self.ampl_range))]
 
         for a, ampl in enumerate(self.ampl_range): # loop over scan amplitude
             for f, freq in enumerate(self.freq_range): # loop over scan frequency
@@ -195,12 +112,12 @@ class Scan():
                     plt.show()    
 
                 # returns lower bound distance
-                root_low = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_low, xtol = 1e-2)
+                root_low = brentq(loss_dist_range_interpolate, a = 0.1, b = 100, args = args_dist_low, xtol = 1e-2)
                 dist_low = root_low * u.kpc
                 # returns higher bound distance
-                root_high = brentq(loss_dist_range_interpolate, a = 1, b = 100, args = args_dist_high, xtol = 1e-2)
+                root_high = brentq(loss_dist_range_interpolate, a = 0.1, b = 100, args = args_dist_high, xtol = 1e-2)
                 dist_high = root_high * u.kpc
-                if self.verbose == "debug": print("Distance range: {:.1f} - {:.1f}".format(dist_low, dist_high))
+                if self.verbose == "debug": print("Distance estimate: {:.3f} - {:.3f}".format(dist_low, dist_high))
 
                 # 2) Distance scan
 
@@ -208,47 +125,64 @@ class Scan():
                 #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
 
                 spkpc = 5 # steps per kpc
+                mar_low, mar_high = 5, 2 # extra margin to lower/higher side in kpc
+                d_low = np.max((np.floor(dist_low.value * spkpc) / spkpc - mar_low, 0.2)) # max between dist_low and 0.2 kpc (lowest sim bkg)
+                d_high = np.min((np.ceil(dist_high.value * spkpc) / spkpc + mar_high, 60)) # min between dist_high and 60 kpc (highest sim bkg)
 
-                d_low = np.floor(dist_low.value * spkpc) / spkpc
-                d_high = np.ceil(dist_high.value * spkpc) / spkpc
+                if self.verbose == "debug": print("Distance scan range: {:.1f} - {:.1f}".format(d_low, d_high))
 
                 #self.dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
-                self.dist_range = np.arange(d_low, d_high + 1/spkpc, spkpc) * u.kpc
+                self.dist_range = np.round(np.arange(d_low, d_high + 1/spkpc, 1/spkpc), 1) * u.kpc
 
                 # initialize signal hypothesis instance for distance scan
                 sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
                                         distance = dist_low, temp_para = temp_para)
             
                 # returns z-score and ts statistics for all distances and all subdetectors
-                Zscore, Ts_stat = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
+                sgh_out = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
                                                 sig_trials = self.sig_trials, bkg_distr = self.bkg_distr, 
                                                 bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins, fit_hist = self.fit_hist,
                                                 model = "generic", verbose = self.verbose) 
+                
+                if self.ft_mode == "STF": Pvalue, Zscore, Ts_stat, Freq_stat, Time_stat = sgh_out
+                elif self.ft_mode == "FFT": Pvalue, Zscore, Ts_stat, Freq_stat = sgh_out
 
+                self.Pvalue = Pvalue
                 self.Zscore = Zscore
                 self.Ts_stat = Ts_stat
+                self.Freq_stat = Freq_stat
+                if self.ft_mode == "STF": self.Time_stat = Time_stat
 
-                if self.verbose == "debug":
+                if self.verbose is not None:
                     import matplotlib.pyplot as plt
                     plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
                     plt.show()
+                    plot_resolution(self.dist_range, self.Freq_stat, freq, self.Zscore)
+                    plt.show()
+                    if self.ft_mode == "STF":
+                        time = (self.scan_para["time_start"] + self.scan_para["time_end"])/2
+                        plot_resolution(self.dist_range, self.Time_stat, time, self.Zscore)
 
                 # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
                 self.quantiles = [0.5, 0.16, 0.84]
                 dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
+                fres = resolution_at_horizon(self.dist_range, self.Freq_stat, dist, self.sigma)
+                if self.ft_mode == "STF": tres = resolution_at_horizon(self.dist_range, self.Time_stat, dist, self.sigma)
 
                 # save data
                 self.dist[a][f] = dist
                 self.perc[a][f] = perc
+                self.fres[a][f] = fres
+                if self.ft_mode == "STF": self.tres[a][f] = tres
 
-                if self.verbose == "debug":
-                    print("3sig distance horizon IC86: {:.1f}".format(dist["ic86"][0][0]))
-                    print("3sig distance horizon Gen2: {:.1f}".format(dist["gen2"][0][0]))
-                    print("3sig distance horizon Gen2+WLS: {:.1f}".format(dist["wls"][0][0]))
+                if self.verbose is not None:
+                    print("3sig distance horizon IC86: {:.1f} - {:.1f} + {:.1f}".format(dist["ic86"][0][0], dist["ic86"][0][0]-dist["ic86"][0][1], dist["ic86"][0][2]-dist["ic86"][0][0]))
+                    print("3sig distance horizon Gen2: {:.1f} - {:.1f} + {:.1f}".format(dist["gen2"][0][0], dist["gen2"][0][0]-dist["gen2"][0][1], dist["gen2"][0][2]-dist["gen2"][0][0]))
+                    print("3sig distance horizon Gen2+WLS: {:.1f} - {:.1f} + {:.1f}".format(dist["wls"][0][0], dist["wls"][0][0]-dist["wls"][0][1], dist["wls"][0][2]-dist["wls"][0][0]))
 
-                    print("5sig distance horizon IC86: {:.1f}".format(dist["ic86"][1][0]))
-                    print("5sig distance horizon Gen2: {:.1f}".format(dist["gen2"][1][0]))
-                    print("5sig distance horizon Gen2+WLS: {:.1f}".format(dist["wls"][1][0]))
+                    print("5sig distance horizon IC86: {:.1f} - {:.1f} + {:.1f}".format(dist["ic86"][1][0], dist["ic86"][1][0]-dist["ic86"][1][1], dist["ic86"][1][2]-dist["ic86"][1][0]))
+                    print("5sig distance horizon Gen2: {:.1f} - {:.1f} + {:.1f}".format(dist["gen2"][1][0], dist["gen2"][1][0]-dist["gen2"][1][1], dist["gen2"][1][2]-dist["gen2"][1][0]))
+                    print("5sig distance horizon Gen2+WLS: {:.1f} - {:.1f} + {:.1f}".format(dist["wls"][1][0], dist["wls"][1][0]-dist["wls"][1][1], dist["wls"][1][2]-dist["wls"][1][0]))
 
     def run_fit(self):
 
@@ -298,7 +232,7 @@ class Scan():
                     print("5sig distance horizon Gen2: {:.1f}".format(dist["5sig"]["gen2"]))
                     print("5sig distance horizon Gen2+WLS: {:.1f}".format(dist["5sig"]["wls"]))
 
-    def reshape_data(self, item, filename):
+    def reshape_data(self, item):
 
         data = {"ic86": [], "gen2": [], "wls": []}
 
@@ -309,7 +243,10 @@ class Scan():
                     for f in np.arange(len(self.freq_range)):
                         if item[a][f] != {}:
                             for q in np.arange(len(self.quantiles)):
-                                d = item[a][f][det][s][q].value
+                                if isinstance(item[a][f][det][s][q], u.Quantity):
+                                    d = item[a][f][det][s][q].value
+                                else:
+                                    d = item[a][f][det][s][q]
                                 dd.append(d)
                         else:
                             # Handle the case where the key is not found
@@ -320,6 +257,8 @@ class Scan():
                                                           len(self.quantiles))
         self.data = data
 
+    def save(self, filename):
+
         np.savez(file = filename, 
                  ampl = self.ampl_range, 
                  freq = self.freq_range, 
@@ -328,5 +267,3 @@ class Scan():
                  ic86 = self.data["ic86"],
                  gen2 = self.data["gen2"],
                  wls = self.data["wls"])
-
-        return data
