@@ -14,6 +14,7 @@ output = None #int(sys.argv[3])
 
 dist_min, dist_max, dist_step = 1, 60, 0.2
 dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
+dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
 
 print("SETTING UP SIMULATION AT {}".format(distance))
