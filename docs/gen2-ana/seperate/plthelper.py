@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib.ticker import ScalarFormatter
 from scipy.stats import norm, lognorm, skewnorm
 
 from helper import *
@@ -26,8 +27,8 @@ def plot_fft(freq, power, det = "ic86"):
     freq = freq.value
 
     fig, ax = plt.subplots(1,1)
-    ax.step(freq, power["null"][det][0], color = 'C0', ls = '-', label=r'$H_{0}$', zorder = 0)
-    ax.step(freq, power["signal"][det][0], color = 'C1', ls = '-', alpha = 0.5, label=r'$H_{1}$', zorder = 10)
+    ax.step(freq, power["null"][det][0], color = 'C0', ls = '-', label=r'$H_{0}$', zorder = 0, where = "mid")
+    ax.step(freq, power["signal"][det][0], color = 'C1', ls = '-', alpha = 0.5, label=r'$H_{1}$', zorder = 10, where = "mid")
     ax.set_xlabel('Frequency [Hz]', fontsize = 14)
     ax.set_ylabel('Power [au]', fontsize = 14)
     ax.set_xlim(0,500)
@@ -169,12 +170,12 @@ def plot_fit_freq(fit_freq, det = "ic86"):
     # Data
     fit_freq_null, fit_freq_signal = fit_freq["null"][det], fit_freq["signal"][det]
 
-    bins = 50
+    bins = 499
 
     fig, ax = plt.subplots()
 
-    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C0", label=r"$H_0$", align='left')
-    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (0, 500), lw = 2, color="C1", label=r"$H_1$", align='left')
+    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (1, 499), lw = 2, color="C0", label=r"$H_0$", align='left')
+    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (1, 499), lw = 2, color="C1", label=r"$H_1$", align='left')
     ax.axvline(np.median(fit_freq_null), color="C0")
     ax.axvline(np.median(fit_freq_signal), color="C1")
     ax.set_xlabel("Frequency [Hz]", fontsize=14)
@@ -302,6 +303,44 @@ def plot_significance(dist_range, zscore, ts_stat):
     ax[1].tick_params(labelsize = 12)
     ax[1].legend(handles, labels, ncol = 3, fontsize = 12, bbox_to_anchor=(0.13, 1))
     ax[1].grid()
+    plt.tight_layout()
+
+def plot_resolution(dist_range, quant, q0, zscore):
+
+    q0 = q0.value
+    
+    fig, ax = plt.subplots(1,2, figsize = (14,4))
+    ax = ax.ravel()
+
+    labels = [r'$IceCube$', r'$Gen2$', r'$Gen2+WLS$']
+    colors = ['C0', 'C1', 'C2']
+
+    for i, det in enumerate(["ic86", "gen2", "wls"]):
+
+        ax[0].plot(dist_range, 100 * np.abs(quant[det][0]-q0)/q0, label=labels[i], color = colors[i])
+        ax[0].fill_between(dist_range.value, 100 * (quant[det][1]-q0)/q0, 100 * (quant[det][2]-q0)/q0, color = colors[i], alpha = 0.2)
+
+        ax[1].plot(zscore[det][0], 100 * np.abs(quant[det][0]-q0)/q0, label=labels[i], color = colors[i])
+        ax[1].fill_between(zscore[det][0], 100 * (quant[det][1]-q0)/q0, 100 * (quant[det][2]-q0)/q0, color = colors[i], alpha = 0.2)
+
+
+    ax[0].set_xlabel('Distance d [kpc]', fontsize = 12)
+    ax[0].set_ylabel(r'$H_1: (q_{reco} - q_{true})/q_{true}$ [%]' , fontsize = 12)
+    ax[0].set_yscale("symlog")
+    ax[0].tick_params(labelsize = 12)
+    ax[0].grid()
+
+    ax[1].set_xlabel(r'SASI detection significance [$\sigma$]' , fontsize = 12)
+    ax[1].set_ylabel(r'$H_1: (q_{reco} - q_{true})/q_{true}$ [%]' , fontsize = 12)
+    ax[1].legend()
+
+    ax[1].set_yscale("symlog", linthresh = 1)
+    ax[1].set_xticks([1,2,3,4,5])
+    ax[1].get_xaxis().set_major_formatter(ScalarFormatter())
+
+    ax[1].axvline(3, color = "k", ls = "--")
+    ax[1].axvline(5, color = "k", ls = "--")
+
     plt.tight_layout()
 
 def plot_para_scan(freq_range, ampl_range, data, det, sig, quant):
