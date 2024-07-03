@@ -12,7 +12,7 @@ ind_dist = int(sys.argv[1])
 bkg_trials = int(sys.argv[2])
 output = None #int(sys.argv[3])
 
-dist_min, dist_max, dist_step = 1, 60, 0.2
+dist_min, dist_max, dist_step = 0.2, 60, 0.2
 dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
 dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
@@ -102,3 +102,4 @@ mode = "hist"
 
 bgt = Background_Trials(sim, ana_para = ana_para, bkg_trials = bkg_trials, mode = mode, output = output, bkg_bins = bkg_bins, verbose = True)
 bgt.generate_data(filename = None, load_bounds = None)
+#bgt.ts_binned_quant(distance_range = dist_range, bkg_trials = bkg_trials, bkg_bins = bkg_bins)

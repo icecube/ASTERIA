@@ -184,9 +184,8 @@ def interpolate_bounds(bounds, distance):
     return inter_bounds
 
 def quantiles_histogram(hist, perc):
-    # get PDF and bin center
-    pdf, bin_edge = hist
-    bin_center = (bin_edge[1:]+bin_edge[:-1])/2
+    # get PDF and bin center, for pre-binned hist in files/background/hist
+    bin_center, pdf = hist
 
     # calculate CDF
     cdf = np.cumsum(pdf)
