@@ -71,8 +71,7 @@ def significance_horizon(dist_range, Zscore, sigma = [3,5]):
                         
 
     for det in ["ic86", "gen2", "wls"]: # loop over detector
-
-        dist_min = 0.5 * u.kpc
+        dist_min = 0.1 * u.kpc
 
         # cutoff distance for interpolation, no infs, no nans?
         dm50 = np.logical_and(dist_range>dist_min, ~np.isinf(Zscore[det][0]))
@@ -89,7 +88,10 @@ def significance_horizon(dist_range, Zscore, sigma = [3,5]):
             di, pe = [], [] # temporary lists to store distance and percentage
 
             for quan in quantiles: # loop over quantiles
-                root = brentq(loss_dist_horizon, a = 0.1, b = 100, args = (quan, sig), xtol = 1e-2)
+                try:
+                    root = brentq(loss_dist_horizon, a = 0.1, b = 100, args = (quan, sig), xtol = 1e-2)
+                except ValueError:
+                    root = np.nan
                 di.append(root)
                 if root >= 25:
                     pe.append(1)
