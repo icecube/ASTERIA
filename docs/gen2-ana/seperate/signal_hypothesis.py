@@ -6,6 +6,7 @@ from scipy.signal import stft
 from scipy.stats import norm
 
 from helper import *
+from plthelper import plot_summary_fft, plot_summary_stf
 
 class Signal_Hypothesis():
 
@@ -438,6 +439,7 @@ class Signal_Hypothesis():
         self.apply_tmask(time_win) # apply time mask   
 
         self._fft = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
+        self._fft0 = {"ic86": None, "gen2": None, "wls": None} # just for monitoring, no cuts applied        
         self.ts = {"ic86": None, "gen2": None, "wls": None}
         self.ffit = {"ic86": None, "gen2": None, "wls": None}
         self.freq_stat = {"ic86": None, "gen2": None, "wls": None}
@@ -446,6 +448,7 @@ class Signal_Hypothesis():
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             # calculate FFT, power = (fourier modes) ** 2
             self._fft[det] = (2.0/self.tlength_new * np.abs(fft(self._comb[det], axis = -1)[:,1:self.tlength_new//2]))**2
+            self._fft0[det] = self._fft[det]
             # return frequencies
             self._freq = fftfreq(self.tlength_new, self.sim._res_dt)[1:self.tlength_new//2].to(u.Hz)
 
@@ -454,8 +457,9 @@ class Signal_Hypothesis():
             # max of FFT is used to build TS distribution
             self.ts[det] = np.nanmax(self._fft[det], axis = -1)
             self.ffit[det] = self._freq_new[np.argmax(self._fft[det], axis=-1)].value
-            self.ffit[det] = np.round(self.ffit[det]) # round fit freq, if time window is applied, the fft freq are not integer
-            self.freq_stat[det] = np.array([np.median(self.ffit[det]), np.quantile(self.ffit[det], 0.16), np.quantile(self.ffit[det], 0.84)]) # median and quantiles of ffit distribution
+            #self.ffit[det] = np.round(self.ffit[det]) # round fit freq, if time window is applied, the fft freq are not integer
+            f0 = self.temp_para["frequency"].value
+            self.freq_stat[det] = np.array([np.median((self.ffit[det]-f0)/f0), np.quantile((self.ffit[det]-f0)/f0, 0.16), np.quantile((self.ffit[det]-f0)/f0, 0.84)]) # median and quantiles of ffit distribution
 
         return
 
@@ -482,6 +486,7 @@ class Signal_Hypothesis():
         trial_batch = np.arange(0, self.sig_trials, step=bat_step) #chunk data in batches of bat_step
 
         self._stf = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
+        self._stf0 = {"ic86": None, "gen2": None, "wls": None}
         self.ts = {"ic86": None, "gen2": None, "wls": None}
         self.ffit = {"ic86": None, "gen2": None, "wls": None}
         self.tfit = {"ic86": None, "gen2": None, "wls": None}
@@ -513,6 +518,8 @@ class Signal_Hypothesis():
                 self._freq *= u.Hz
                 self._time = (self._time * u.s).to(u.ms) # time in units of ms
                 
+                self._stf0[det] = np.abs(self._stf[det]) ** 2
+
                 self.apply_tmask(time_win, det = det)
                 self.apply_fmask(freq_win, det = det)
 
@@ -536,10 +543,11 @@ class Signal_Hypothesis():
                     fit_freq_tint.append(self._freq_new[ind_freq_tint])
             
             self.ts[det] = np.array(ts).flatten()
-            self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
-            self.freq_stat[det] = np.array([np.median(self.ffit[det]), np.quantile(self.ffit[det], 0.16), np.quantile(self.ffit[det], 0.84)]) # median and quantiles of ffit distribution
-            self.time_stat[det] = np.array([np.median(self.tfit[det]), np.quantile(self.tfit[det], 0.16), np.quantile(self.tfit[det], 0.84)]) # median and quantiles of tfit distribution
-    
+            self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten() # reconstructed parameters
+            f0, t0 = self.temp_para["frequency"].value, (self.temp_para["time_start"].value + self.temp_para["time_end"].value)/2 # true parameters
+            self.freq_stat[det] = np.array([np.median((self.ffit[det]-f0)/f0), np.quantile((self.ffit[det]-f0)/f0, 0.16), np.quantile((self.ffit[det]-f0)/f0, 0.84)]) # median and quantiles of ffit-f0/f0 distribution
+            self.time_stat[det] = np.array([np.median((self.tfit[det]-t0)/t0), np.quantile((self.tfit[det]-t0)/t0, 0.16), np.quantile((self.tfit[det]-t0)/t0, 0.84)]) # median and quantiles of tfit-t0/t0 distribution
+   
             if time_int:
                 self.ts_tint[det] = np.array(ts_tint).flatten()
                 self.ffit_tint[det] = np.array(fit_freq_tint).flatten()
@@ -642,7 +650,6 @@ class Signal_Hypothesis():
                 zz = norm.ppf(1-pp)
                 p.append(pp)
                 z.append(zz)
-
             self.pvalue[det] = np.array(p)
             self.zscore[det] = np.array(z)
 
@@ -734,6 +741,11 @@ class Signal_Hypothesis():
 
             self.set_distance(distance=dist) # set simulation to distance
             self.run(mode, ft_para, sig_trials, bkg_distr, bkg_trials, bkg_bins, fit_hist, model, smoothing)
+
+            if verbose == "debug":
+
+                if self.mode == "FFT": plot_summary_fft(self, relative = True)
+                if self.mode == "STF": plot_summary_stf(self, relative = True)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 pvalue[det].append(self.pvalue[det])
