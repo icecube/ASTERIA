@@ -589,7 +589,7 @@ def plot_summary_fft(self, relative = True, det = "ic86"):
     ax_right.grid()
     ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
     
-    rel_file = "/plots/scan/test_noround/TEST_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
+    rel_file = "/plots/scan/SUM_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
     abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
     plt.savefig(abs_file, bbox_inches='tight')
     plt.close()
