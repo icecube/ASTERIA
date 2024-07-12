@@ -2,7 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 from matplotlib.ticker import ScalarFormatter
-from scipy.stats import norm, lognorm, skewnorm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+from scipy.stats import norm, lognorm, skewnorm  
 
 from helper import *
 
@@ -307,9 +308,7 @@ def plot_significance(dist_range, zscore, ts_stat):
     ax[1].grid()
     plt.tight_layout()
 
-def plot_resolution(dist_range, quant, q0, zscore):
-
-    q0 = q0.value
+def plot_resolution(dist_range, quant, zscore):
     
     fig, ax = plt.subplots(1,2, figsize = (14,4))
     ax = ax.ravel()
@@ -319,12 +318,11 @@ def plot_resolution(dist_range, quant, q0, zscore):
 
     for i, det in enumerate(["ic86", "gen2", "wls"]):
 
-        ax[0].plot(dist_range, 100 * np.abs(quant[det][0]-q0)/q0, label=labels[i], color = colors[i])
-        ax[0].fill_between(dist_range.value, 100 * (quant[det][1]-q0)/q0, 100 * (quant[det][2]-q0)/q0, color = colors[i], alpha = 0.2)
+        ax[0].plot(dist_range, 100 * quant[det][0], label=labels[i], color = colors[i])
+        ax[0].fill_between(dist_range.value, 100 * quant[det][1], 100 * quant[det][2], color = colors[i], alpha = 0.2)
 
-        ax[1].plot(zscore[det][0], 100 * np.abs(quant[det][0]-q0)/q0, label=labels[i], color = colors[i])
-        ax[1].fill_between(zscore[det][0], 100 * (quant[det][1]-q0)/q0, 100 * (quant[det][2]-q0)/q0, color = colors[i], alpha = 0.2)
-
+        ax[1].plot(zscore[det][0], 100 * quant[det][0], label=labels[i], color = colors[i])
+        ax[1].fill_between(zscore[det][0], 100 * quant[det][1], 100 * quant[det][2], color = colors[i], alpha = 0.2)
 
     ax[0].set_xlabel('Distance d [kpc]', fontsize = 12)
     ax[0].set_ylabel(r'$H_1: (q_{reco} - q_{true})/q_{true}$ [%]' , fontsize = 12)
@@ -346,7 +344,7 @@ def plot_resolution(dist_range, quant, q0, zscore):
 
     plt.tight_layout()
 
-def plot_para_scan(freq_range, ampl_range, data, det, sig, quant):
+def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, relative = False):
 
     if sig == 3:
         isig = 0
@@ -360,18 +358,52 @@ def plot_para_scan(freq_range, ampl_range, data, det, sig, quant):
     elif quant == 84:
         iquant = 2
 
-    ddata = data[det][isig, :, :, iquant]
+    if relative:
+        ddata = data[det][isig, :, :, iquant]-np.tile(np.nanmedian(data[det][isig, :, :, iquant], axis = 0), reps = freq_range.size).reshape(freq_range.size, ampl_range.size)
+    else:
+        ddata = data[det][isig, :, :, iquant]
 
     fig, ax = plt.subplots(1,1, figsize = (10,4))
 
-    im = ax.pcolormesh(freq_range.value, ampl_range*100, ddata, cmap="viridis", shading="nearest")
+    cmap = plt.get_cmap('viridis')  # viridis is the default colormap for imshow
+    cmap.set_bad(color='grey')
+    im = ax.pcolormesh(freq_range.value, ampl_range*100, np.transpose(ddata), cmap=cmap, shading="nearest")
     cb = fig.colorbar(im)
     cb.ax.tick_params(labelsize=14)
-    cb.set_label(r"{}$\sigma$ Signifiance horizon [kpc]".format(sig), size=14)
+    if relative:
+        cb.set_label(r"deviation {}$\sigma$ signifiance horizon across frequencies [kpc]".format(sig), size=14)
+    else:
+        cb.set_label(r"{}$\sigma$ signifiance horizon [kpc]".format(sig), size=14)
     ax.set_xlabel(r'Frequency in [Hz]', fontsize=14)
     ax.set_ylabel(r'Amplitude [%]', fontsize=14)
     ax.yaxis.get_offset_text().set_fontsize(14)
     ax.tick_params(labelsize=14)
+
+    plt.tight_layout()
+
+def significance_vs_amplitude(ampl_range, data, sig):
+
+    if sig == 3:
+        isig = 0
+    elif sig == 5:
+        isig = 1
+
+    labels = [r'IceCube', r'Gen2', r'Gen2+WLS']
+    colors = ['C0', 'C1', 'C2']
+
+    fig, ax = plt.subplots(1,1)
+
+    for i, det in enumerate(["ic86", "gen2", "wls"]):
+        mean, std = np.nanmean(data[det][isig,:,:,0], axis = 0), np.nanstd(data[det][isig,:,:,0], axis = 0)
+        q16, q84 = np.nanmean(data[det][isig,:,:,1], axis = 0), np.nanmean(data[det][isig,:,:,2], axis = 0)
+        ax.plot(ampl_range * 100, mean, color = colors[i], label  = labels[i])
+        ax.fill_between(ampl_range * 100, mean-std, mean+std, color = colors[i], alpha = 0.25)
+        ax.fill_between(ampl_range * 100, q16, q84, color = colors[i], alpha = 0.1)
+
+    ax.set_xlabel("Amplitude [%]")
+    ax.set_ylabel("{}$\sigma$ Significance horizon [kpc]".format(sig))
+    ax.legend()
+    ax.grid()
 
     plt.tight_layout()
 
@@ -471,3 +503,204 @@ def plot_hist_fit(ts_binned, fit_func, pvalue, bins, det = "ic86"):
 
     plt.tight_layout()
     plt.show()
+
+def plot_summary_fft(self, relative = True, det = "ic86"):
+                
+    bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+    fs = 12 # fontsize
+    fig, ax = plt.subplots(2,2, figsize = (10,10))
+    ax = ax.ravel()
+
+    # plot hit rate over time
+    ax[0].plot(self._time_new, self._comb[det][0])
+    ax[0].text(0.5, 0.9, s = r"$d$ = {:.1f} kpc".format(self.distance.value), transform = ax[0].transAxes, fontsize = fs)
+    ax[0].set_xlabel("Time [ms]", fontsize = fs)                    
+    ax[0].set_ylabel("Counts", fontsize = fs)
+    ax[0].tick_params(labelsize = fs)
+    ax[0].grid()  
+
+    # plot fourier spectrum                  
+    ax[1].plot(self._freq_new, self._fft[det][0], marker = "x")
+    ax[1].plot(self._freq[self._freq <= 75 * u.Hz], self._fft0[det][0][self._freq <= 75 * u.Hz], marker="o")
+    ax[1].axvspan(0, 75, color = "grey", alpha = 0.15)
+    ax[1].set_xlabel("Frequency [Hz]", fontsize = fs)                    
+    ax[1].set_ylabel("Power [a.u.]", fontsize = fs) 
+    ax[1].set_yscale("log")
+    ax[1].tick_params(labelsize = fs)
+    ax[1].grid() 
+
+    # plot inset around true frequency
+    axins = ax[1].inset_axes([0.4, 0.7, 0.5, 0.2])
+    axins.plot(self._freq_new, self._fft[det][0], color = "C0", marker="x")
+    axins.set_xlim(self.temp_para["frequency"].value - 5, self.temp_para["frequency"].value + 5)
+    axins.grid()
+    axins.set_xticks(np.arange(self.temp_para["frequency"].value - 5, self.temp_para["frequency"].value + 6, 1))
+    axins.tick_params(labelsize = fs)
+    axins.tick_params(axis='x', labelrotation=90)
+
+    # plot TS distribution for signal (H1) and null (H0) hypo
+    ax[2].hist(self.ts[det], bins = 100, density = True, label = "H1")
+    ax[2].step(bkg_hist[det][0], bkg_hist[det][1], label = "H0")
+    ax[2].text(0.5, 0.9, s = r"$\sigma$ = {:.2f}".format(self.zscore[det][0]), transform = ax[2].transAxes, fontsize = fs)
+    ax[2].set_xlabel("TS value", fontsize = fs)                    
+    ax[2].set_ylabel("Counts", fontsize = fs) 
+    ax[2].legend(loc = "upper right", fontsize = fs)
+    ax[2].tick_params(labelsize = fs)
+    ax[2].grid()              
+
+    # plot TS value and relative best fit frequency with marginal distribitions to the side
+    if relative: ffit = (self.ffit[det] - self.temp_para["frequency"].value)/self.temp_para["frequency"].value * 100
+    else: ffit = self.ffit[det]
+    ax[3].scatter(self.ts[det], ffit, alpha=0.2)
+    ax[3].set_xlabel("TS value", fontsize = fs)
+    ax[3].set_ylabel(r"$(f_{reco} - f_{true})/f_{true}$ [%]", fontsize = fs)
+    ax[3].tick_params(labelsize = fs)
+    ax[3].grid() 
+
+    # add marginal plots to ax[3]
+    divider = make_axes_locatable(ax[3])
+    ax_top = divider.append_axes("top", 0.4, pad=0.3, sharex=ax[3])
+    ax_right = divider.append_axes("right", 0.4, pad=0.3, sharey=ax[3])
+
+    # histogram for TS above the scatter plot
+    ax_top.hist(self.ts[det], bins=100, density=True, color='grey', orientation='vertical')
+    ax_top.grid()
+    ax_top.set_ylabel("%", fontsize = fs)
+    ax_top.tick_params(labelsize=fs)
+
+    # histogram for best fit frequency to the right of the scatter plot
+    # for unrounded ffit
+    #mask = np.logical_and(self._freq_new.value >= ffit_min, self._freq_new.value <= ffit_max)
+    #ffit_range = np.round(self._freq_new.value)[mask]
+
+    ffit_min, ffit_max, dffit = self.ffit[det].min(), self.ffit[det].max(), np.diff(self._freq_new.value)[0]
+    ffit_range = np.arange(ffit_min, ffit_max + 2*dffit, dffit)
+    
+    f0 = self.temp_para["frequency"].value
+    if relative:
+        ffit_range = (ffit_range - self.temp_para["frequency"].value)/self.temp_para["frequency"].value * 100
+        f0 = 0
+
+    ax_right.hist(ffit, bins = ffit_range, density=True, color='grey', orientation='horizontal', align = "left")
+    ax_right.axhline(np.median(ffit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
+    ax_right.axhline(f0, color="C1", lw = 2, label = r"$f_{true}$")
+    ax_right.set_xlabel("%", fontsize = fs)
+    ax_right.tick_params(labelsize = fs)
+    ax_right.grid()
+    ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
+    
+    rel_file = "/plots/scan/test_noround/TEST_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
+    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
+    plt.savefig(abs_file, bbox_inches='tight')
+    plt.close()
+
+def plot_summary_stf(self, relative = True, det = "ic86"):
+                
+    bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+    fs = 12 # fontsize
+    fig, ax = plt.subplots(2,2, figsize = (10,10))
+    ax = ax.ravel()
+
+    f0 = self.temp_para["frequency"].value
+    t0 = (self.temp_para["time_start"].value + self.temp_para["time_end"].value)/2
+    df, dt = np.diff(self._freq.value)[0], np.diff(self._time.value)[0]
+
+    # plot hit rate over time
+    ax[0].plot(self.sim.time.value * 1000, self._comb[det][0]) # time in ms
+    ax[0].text(0.5, 0.9, s = r"$d$ = {:.1f} kpc".format(self.distance.value), transform = ax[0].transAxes, fontsize = fs)
+    ax[0].set_xlabel("Time [ms]", fontsize = fs)                    
+    ax[0].set_ylabel("Counts", fontsize = fs)
+    ax[0].tick_params(labelsize = fs)
+    ax[0].grid()  
+
+    # plot fourier spectrum
+    vmin = np.min(self._stf[det][0])
+    vmax = np.max(self._stf[det][0])
+    im = ax[1].pcolormesh(self._time.value, self._freq.value, self._stf0[det][0], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
+    cb = fig.colorbar(im)
+    cb.ax.tick_params(labelsize = fs)
+    cb.set_label(label=r"Power [a.u.]",size = fs)
+    ax[1].axhline(self._freq_new[0].value, color = "red", ls = "--")
+    ax[1].set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize = fs)
+    ax[1].set_ylabel(f"Frequency $f$ in [Hz]", fontsize = fs)
+    ax[1].yaxis.get_offset_text().set_fontsize(fs)
+    ax[1].tick_params(labelsize = fs)   
+    
+    # plot inset around true frequency
+    axins = ax[1].inset_axes([0.7, 0.7, 0.2, 0.2])
+    im = axins.pcolormesh(self._time.value, self._freq.value, self._stf0[det][0], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
+    axins.set_xlim(t0 - 3*dt, t0 + 3*dt)
+    axins.set_ylim(f0 - 3*df, f0 + 3*df)
+
+    axins.set_xticks(np.arange(t0 - 3*dt, t0 + 4*dt, dt)[::3])
+    axins.set_yticks(np.arange(f0 - 3*df, f0 + 4*df, df)[::3])
+    axins.tick_params(labelsize = fs)
+    
+    # plot TS distribution for signal (H1) and null (H0) hypo
+    ax[2].hist(self.ts[det], bins = 100, density = True, label = "H1")
+    ax[2].step(bkg_hist[det][0], bkg_hist[det][1], label = "H0")
+    ax[2].text(0.5, 0.9, s = r"$\sigma$ = {:.2f}".format(self.zscore[det][0]), transform = ax[2].transAxes, fontsize = fs)
+    ax[2].set_xlabel("TS value", fontsize = fs)                    
+    ax[2].set_ylabel("Counts", fontsize = fs) 
+    ax[2].legend(loc = "upper right", fontsize = fs)
+    ax[2].tick_params(labelsize = fs)
+    ax[2].grid()              
+
+    # plot TS value and relative best fit frequency with marginal distribitions to the side
+    if relative: 
+        ffit = (self.ffit[det] - f0)/f0 * 100
+        tfit = (self.tfit[det] - t0)/t0 * 100
+    else: 
+        ffit = self.ffit[det]
+        tfit = self.tfit[det]
+
+    im = ax[3].scatter(x = tfit, y = ffit, c = self.ts[det], cmap = "viridis", alpha=0.1)
+    ax[3].set_xlabel(r"$(t_{reco} - t_{true})/t_{true}$ [%]", fontsize = fs)
+    ax[3].set_ylabel(r"$(f_{reco} - f_{true})/f_{true}$ [%]", fontsize = fs)
+    ax[3].tick_params(labelsize = fs)
+    ax[3].grid() 
+
+    cb = fig.colorbar(im)
+    cb.ax.tick_params(labelsize = fs)
+    cb.solids.set(alpha=1)
+    cb.set_label(label=r"TS value",size = fs)
+
+    # add marginal plots to ax[3]
+    divider = make_axes_locatable(ax[3])
+    ax_top = divider.append_axes("top", 0.4, pad=0.3, sharex=ax[3])
+    ax_right = divider.append_axes("right", 0.4, pad=0.3, sharey=ax[3])
+
+    # histogram for best fit frequency to the right of the scatter plot
+    ffit_min, ffit_max, dffit = self.ffit[det].min(), self.ffit[det].max(), np.diff(self._freq_new.value)[0]
+    ffit_range = np.arange(ffit_min, ffit_max + 2*dffit, dffit)
+
+    tfit_min, tfit_max, dtfit = self.tfit[det].min(), self.tfit[det].max(), np.diff(self._time_new.value)[0]
+    tfit_range = np.arange(tfit_min, tfit_max + 2*dtfit, dtfit)
+
+    f0 = self.temp_para["frequency"].value
+    if relative:
+        ffit_range = (ffit_range - f0)/f0 * 100
+        tfit_range = (tfit_range - t0)/t0 * 100
+        f0, t0 = 0, 0
+
+    # histogram for reco time above the scatter plot
+    ax_top.hist(tfit, bins = tfit_range, density=True, color='grey', orientation='vertical', align = "left")
+    ax_top.axvline(np.median(tfit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
+    ax_top.axvline(t0, color="C1", lw = 2, label = r"$f_{true}$")
+    ax_top.set_xlabel("%", fontsize = fs)
+    ax_top.tick_params(labelsize = fs)
+    ax_top.grid()
+
+    # histogram for reco freq above the scatter plot
+    ax_right.hist(ffit, bins = ffit_range, density=True, color='grey', orientation='horizontal', align = "left")
+    ax_right.axhline(np.median(ffit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
+    ax_right.axhline(f0, color="C1", lw = 2, label = r"$f_{true}$")
+    ax_right.set_xlabel("%", fontsize = fs)
+    ax_right.tick_params(labelsize = fs)
+    ax_right.grid()
+    ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
+    
+    rel_file = "/plots/scan/test_nocut/TEST_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
+    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
+    plt.savefig(abs_file, bbox_inches='tight')
+    plt.close()
