@@ -171,21 +171,24 @@ class Scan():
                     import matplotlib.pyplot as plt
 
                     plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
-                    rel_file = "/plots/scan/SIG_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, self.scan_para["amplitude"] * 100, self.scan_para["frequency"].value)
+                    rel_file = "/plots/scan/SIG_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
                     abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
                     plt.savefig(abs_file)
+                    plt.close()
 
                     plot_resolution(self.dist_range, self.Freq_stat, self.Zscore)
-                    rel_file = "/plots/scan/FRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, self.scan_para["amplitude"] * 100, self.scan_para["frequency"].value)
+                    rel_file = "/plots/scan/FRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
                     abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
                     plt.savefig(abs_file)
+                    plt.close()
 
                     if self.ft_mode == "STF":
 
                         plot_resolution(self.dist_range, self.Time_stat, self.Zscore)
-                        rel_file = "/plots/scan/TRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, self.scan_para["amplitude"] * 100, self.scan_para["frequency"].value)
+                        rel_file = "/plots/scan/TRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
                         abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
                         plt.savefig(abs_file)
+                        plt.close()
 
                 # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
                 dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
@@ -206,7 +209,7 @@ class Scan():
                     print("5sig distance horizon IC86: {:.1f} - {:.1f} + {:.1f}".format(dist["ic86"][1][0], dist["ic86"][1][0]-dist["ic86"][1][1], dist["ic86"][1][2]-dist["ic86"][1][0]))
                     print("5sig distance horizon Gen2: {:.1f} - {:.1f} + {:.1f}".format(dist["gen2"][1][0], dist["gen2"][1][0]-dist["gen2"][1][1], dist["gen2"][1][2]-dist["gen2"][1][0]))
                     print("5sig distance horizon Gen2+WLS: {:.1f} - {:.1f} + {:.1f}".format(dist["wls"][1][0], dist["wls"][1][0]-dist["wls"][1][1], dist["wls"][1][2]-dist["wls"][1][0]))
-
+                a = 1/0
     def reshape_data(self, item):
 
         data = {"ic86": [], "gen2": [], "wls": []}
