@@ -10,7 +10,6 @@ docs/gen2-ana/seperate/plots/*
 docs/gen2-ana/seperate/tests/*
 docs/gen2-ana/seperate/output/*
 docs/gen2-ana/seperate/*.sh
-docs/gen2-ana/seperate/plot_scan.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
