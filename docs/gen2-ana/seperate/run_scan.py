@@ -96,7 +96,7 @@ elif ft_mode == "STF":
     hann_res = 5*u.Hz # relates to frequency resolution from hanning, mfft = freq_sam/freq_sam
     hann_hop = 20*u.ms # offset by which Hann window is slided over signal
     freq_sam = (1/res_dt).to(u.Hz) # = 1/time_res
-    time_int = True
+    time_int = False
 
     ft_para = {"hann_len": hann_len,
                "hann_res": hann_res,
@@ -124,7 +124,7 @@ print("signal trials: {}, background trials: {}, background bins {}".format(sig_
 print("fourier mode: {}".format(ft_mode))
 print("-------------------------")
 
-scan = Scan(sim, scan_para, ft_mode = "FFT", ft_para = ft_para, sig_trials = sig_trials, 
+scan = Scan(sim, scan_para, ft_mode = ft_mode, ft_para = ft_para, sig_trials = sig_trials, 
             bkg_distr = bkg_distr, bkg_trials = bkg_trials, bkg_bins = bkg_bins, fit_hist = False, verbose = "debug")
 # SCAN
 #scan.run_interpolate()
