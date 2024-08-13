@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib.colors import LogNorm
 from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.stats import norm, lognorm, skewnorm  
@@ -344,7 +345,9 @@ def plot_resolution(dist_range, quant, zscore):
 
     plt.tight_layout()
 
-def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, relative = False):
+def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, type = "sign", scale = None, relative = False):
+
+    fs = 14
 
     if sig == 3:
         isig = 0
@@ -358,30 +361,47 @@ def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, relative = Fal
     elif quant == 84:
         iquant = 2
 
+    if scale == "log":
+        norm = LogNorm()
+    else:
+        norm = None
+
     if relative:
         ddata = data[det][isig, :, :, iquant]-np.tile(np.nanmedian(data[det][isig, :, :, iquant], axis = 0), reps = freq_range.size).reshape(freq_range.size, ampl_range.size)
     else:
         ddata = data[det][isig, :, :, iquant]
 
+    ddata = np.abs(ddata)
+    if type == "fres" or type == "tres": ddata *= 100
+
     fig, ax = plt.subplots(1,1, figsize = (10,4))
 
     cmap = plt.get_cmap('viridis')  # viridis is the default colormap for imshow
     cmap.set_bad(color='grey')
-    im = ax.pcolormesh(freq_range.value, ampl_range*100, np.transpose(ddata), cmap=cmap, shading="nearest")
+    im = ax.pcolormesh(freq_range.value, ampl_range*100, np.transpose(ddata), cmap=cmap, shading="nearest", norm = norm)
     cb = fig.colorbar(im)
-    cb.ax.tick_params(labelsize=14)
-    if relative:
-        cb.set_label(r"deviation {}$\sigma$ signifiance horizon across frequencies [kpc]".format(sig), size=14)
-    else:
-        cb.set_label(r"{}$\sigma$ signifiance horizon [kpc]".format(sig), size=14)
-    ax.set_xlabel(r'Frequency in [Hz]', fontsize=14)
-    ax.set_ylabel(r'Amplitude [%]', fontsize=14)
-    ax.yaxis.get_offset_text().set_fontsize(14)
-    ax.tick_params(labelsize=14)
+    cb.ax.tick_params(labelsize=fs)
+        
+    if type == "sign":
+        if relative:
+            cb.set_label(r"deviation {}$\sigma$ signifiance horizon across frequencies [kpc]".format(sig), size=fs)
+        else:
+            cb.set_label(r"{}$\sigma$ signifiance horizon [kpc]".format(sig), size=fs)
+    elif type == "fres":
+        cb.set_label(r"{}$\sigma$ rel. frequency resolution [%]".format(sig), size=fs)
+    elif type == "tres":
+        cb.set_label(r"{}$\sigma$ rel. time resolution [%]".format(sig), size=fs)
+
+    ax.set_xlabel(r'Frequency in [Hz]', fontsize=fs)
+    ax.set_ylabel(r'Amplitude [%]', fontsize=fs)
+    ax.yaxis.get_offset_text().set_fontsize(fs)
+    ax.tick_params(labelsize=fs)
 
     plt.tight_layout()
 
-def significance_vs_amplitude(ampl_range, data, sig):
+def plot_para_vs_amplitude(ampl_range, data, sig, type = "sign", scale = None):
+
+    fs = 14
 
     if sig == 3:
         isig = 0
@@ -394,14 +414,31 @@ def significance_vs_amplitude(ampl_range, data, sig):
     fig, ax = plt.subplots(1,1)
 
     for i, det in enumerate(["ic86", "gen2", "wls"]):
-        mean, std = np.nanmean(data[det][isig,:,:,0], axis = 0), np.nanstd(data[det][isig,:,:,0], axis = 0)
-        q16, q84 = np.nanmean(data[det][isig,:,:,1], axis = 0), np.nanmean(data[det][isig,:,:,2], axis = 0)
+
+        mean, std = np.nanmean(np.abs(data[det][isig,:,:,0]), axis = 0), np.nanstd(np.abs(data[det][isig,:,:,0]), axis = 0)
+        q16, q84 = np.nanmean(np.abs(data[det][isig,:,:,1]), axis = 0), np.nanmean(np.abs(data[det][isig,:,:,2]), axis = 0)
+
+        if type == "fres" or type == "tres": 
+            mean *= 100
+            std *= 100
+            q16 *= 100
+            q84 *= 100
+
         ax.plot(ampl_range * 100, mean, color = colors[i], label  = labels[i])
         ax.fill_between(ampl_range * 100, mean-std, mean+std, color = colors[i], alpha = 0.25)
         ax.fill_between(ampl_range * 100, q16, q84, color = colors[i], alpha = 0.1)
 
-    ax.set_xlabel("Amplitude [%]")
-    ax.set_ylabel("{}$\sigma$ Significance horizon [kpc]".format(sig))
+    ax.set_xlabel("Amplitude [%]", size=fs)
+
+    if type == "sign":
+        ax.set_ylabel(r"{}$\sigma$ significance horizon [kpc]".format(sig), size=fs)
+    elif type == "fres":
+        ax.set_ylabel(r"{}$\sigma$ rel. frequency resolution [%]".format(sig), size=fs)
+    elif type == "tres":
+        ax.set_ylabel(r"{}$\sigma$ rel. time resolution [%]".format(sig), size=fs)
+
+    if scale == "log": ax.set_yscale("log")
+    ax.tick_params(labelsize=fs)
     ax.legend()
     ax.grid()
 
