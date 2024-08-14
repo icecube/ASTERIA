@@ -209,7 +209,7 @@ class Scan():
                     print("5sig distance horizon IC86: {:.1f} - {:.1f} + {:.1f}".format(dist["ic86"][1][0], dist["ic86"][1][0]-dist["ic86"][1][1], dist["ic86"][1][2]-dist["ic86"][1][0]))
                     print("5sig distance horizon Gen2: {:.1f} - {:.1f} + {:.1f}".format(dist["gen2"][1][0], dist["gen2"][1][0]-dist["gen2"][1][1], dist["gen2"][1][2]-dist["gen2"][1][0]))
                     print("5sig distance horizon Gen2+WLS: {:.1f} - {:.1f} + {:.1f}".format(dist["wls"][1][0], dist["wls"][1][0]-dist["wls"][1][1], dist["wls"][1][2]-dist["wls"][1][0]))
-                a = 1/0
+
     def reshape_data(self, item):
 
         data = {"ic86": [], "gen2": [], "wls": []}
