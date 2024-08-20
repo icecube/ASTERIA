@@ -6,6 +6,7 @@ from matplotlib.ticker import ScalarFormatter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.stats import norm, lognorm, skewnorm  
 
+import copy
 from helper import *
 
 
@@ -234,7 +235,11 @@ def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_significance(dist_range, zscore, ts_stat):
+def plot_significance(self, save = False):
+
+    dist_range = copy.deepcopy(self.dist_range)
+    zscore = copy.deepcopy(self.Zscore)
+    ts_stat = copy.deepcopy(self.Ts_stat)
 
     fig, ax = plt.subplots(1,2, figsize = (16,6))
     ax = ax.ravel()
@@ -309,8 +314,30 @@ def plot_significance(dist_range, zscore, ts_stat):
     ax[1].grid()
     plt.tight_layout()
 
-def plot_resolution(dist_range, quant, zscore):
-    
+    if save:
+        filename = self._file + "/plots/scan/{}/{}/SIG_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_bins_{:1.0e}.pdf".format(
+                   self.ft_mode, self.scan_dir_name, 
+                   self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+                   self.ft_mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
+                   self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
+                   self.mixing_scheme, self.hierarchy,
+                   self.sig_var * 100, self.bkg_var * 100,
+                   self.sig_trials, self.bkg_trials, self.bkg_bins)
+        plt.savefig(filename)
+        plt.close()
+
+def plot_resolution(self, type, save = False):
+
+    dist_range = copy.deepcopy(self.dist_range)
+    zscore = copy.deepcopy(self.Zscore)
+
+    if type == "freq":
+        quant = copy.deepcopy(self.Freq_stat)
+        qstring = "FRES"
+    elif type == "time":
+        quant = copy.deepcopy(self.Time_stat)
+        qstring = "TRES"
+
     fig, ax = plt.subplots(1,2, figsize = (14,4))
     ax = ax.ravel()
 
@@ -344,6 +371,18 @@ def plot_resolution(dist_range, quant, zscore):
     ax[1].axvline(5, color = "k", ls = "--")
 
     plt.tight_layout()
+
+    if save:
+        filename = self._file + "/plots/scan/{}/{}/{}_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_bins_{:1.0e}.pdf".format(
+                   self.ft_mode, self.scan_dir_name, qstring,
+                   self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+                   self.ft_mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
+                   self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
+                   self.mixing_scheme, self.hierarchy,
+                   self.sig_var * 100, self.bkg_var * 100,
+                   self.sig_trials, self.bkg_trials, self.bkg_bins)
+        plt.savefig(filename)
+        plt.close()
 
 def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, type = "sign", scale = None, relative = False):
 
@@ -542,8 +581,14 @@ def plot_hist_fit(ts_binned, fit_func, pvalue, bins, det = "ic86"):
     plt.show()
 
 def plot_summary_fft(self, relative = True, det = "ic86"):
-                
-    bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+    
+    filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.mode, self.bkg_dir_name, self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+            self.mode, self.mixing_scheme, self.hierarchy,
+            self.sig_var * 100, self.bkg_var * 100,
+            self.bkg_trials, self.bkg_bins, self.distance.value)
+    bkg_hist = np.load(filename_in)
+
     fs = 12 # fontsize
     fig, ax = plt.subplots(2,2, figsize = (10,10))
     ax = ax.ravel()
@@ -558,7 +603,7 @@ def plot_summary_fft(self, relative = True, det = "ic86"):
 
     # plot fourier spectrum                  
     ax[1].plot(self._freq_new, self._fft[det][0], marker = "x")
-    ax[1].plot(self._freq[self._freq <= 75 * u.Hz], self._fft0[det][0][self._freq <= 75 * u.Hz], marker="o")
+    ax[1].plot(self._freq[self._freq <= 75 * u.Hz], self._fft0[det][self._freq <= 75 * u.Hz], marker="o")
     ax[1].axvspan(0, 75, color = "grey", alpha = 0.15)
     ax[1].set_xlabel("Frequency [Hz]", fontsize = fs)                    
     ax[1].set_ylabel("Power [a.u.]", fontsize = fs) 
@@ -626,14 +671,32 @@ def plot_summary_fft(self, relative = True, det = "ic86"):
     ax_right.grid()
     ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
     
-    rel_file = "/plots/scan/SUM_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
-    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
-    plt.savefig(abs_file, bbox_inches='tight')
+    # filename of summary plot
+    model_str = "ampl_{:.1f}%_freq_{:.0f}Hz".format(self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value) # each model is saved in its own directory
+    filename_out = self._file + "/plots/scan/{}/{}/{}/SUM_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.pdf".format(
+            self.mode, self.scan_dir_name, model_str, 
+            self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+            self.mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
+            self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
+            self.mixing_scheme, self.hierarchy,
+            self.sig_var * 100, self.bkg_var * 100,
+            self.bkg_trials, self.bkg_bins, self.distance.value)
+    
+    if not os.path.exists(os.path.dirname(filename_out)):  # Check if directory already exists, if not, make directory
+        os.mkdir(os.path.dirname(filename_out))
+
+    plt.savefig(filename_out)
     plt.close()
 
 def plot_summary_stf(self, relative = True, det = "ic86"):
                 
-    bkg_hist = np.load(self._file + "/files/background/hist/HIST_model_Sukhbold_2015_27_mode_{}_samples_{:.0e}_bins_{:.0e}_distance_{:.1f}kpc.npz".format(self.mode, self.bkg_trials, self.bkg_bins, self.distance.value))
+    filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.mode, self.bkg_dir_name, self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+            self.mode, self.mixing_scheme, self.hierarchy,
+            self.sig_var * 100, self.bkg_var * 100,
+            self.bkg_trials, self.bkg_bins, self.distance.value)
+    bkg_hist = np.load(filename_in)
+    
     fs = 12 # fontsize
     fig, ax = plt.subplots(2,2, figsize = (10,10))
     ax = ax.ravel()
@@ -653,7 +716,7 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
     # plot fourier spectrum
     vmin = np.min(self._stf[det][0])
     vmax = np.max(self._stf[det][0])
-    im = ax[1].pcolormesh(self._time.value, self._freq.value, self._stf0[det][0], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
+    im = ax[1].pcolormesh(self._time.value, self._freq.value, self._stf0[det], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
     cb = fig.colorbar(im)
     cb.ax.tick_params(labelsize = fs)
     cb.set_label(label=r"Power [a.u.]",size = fs)
@@ -665,7 +728,7 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
     
     # plot inset around true frequency
     axins = ax[1].inset_axes([0.7, 0.7, 0.2, 0.2])
-    im = axins.pcolormesh(self._time.value, self._freq.value, self._stf0[det][0], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
+    im = axins.pcolormesh(self._time.value, self._freq.value, self._stf0[det], cmap='plasma', shading = "nearest", vmin = vmin, vmax = vmax)    
     axins.set_xlim(t0 - 3*dt, t0 + 3*dt)
     axins.set_ylim(f0 - 3*df, f0 + 3*df)
 
@@ -737,7 +800,19 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
     ax_right.grid()
     ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
     
-    rel_file = "/plots/scan/SUM_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz_distance_{:.1f}kpc.pdf".format(self.mode, self.temp_para["time_start"].value, self.temp_para["time_end"].value, self.bkg_trials, self.sig_trials, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value, self.distance.value)
-    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
-    plt.savefig(abs_file, bbox_inches='tight')
+    # filename of summary plot
+    model_str = "ampl_{:.1f}%_freq_{:.0f}Hz".format(self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value) # each model is saved in its own directory
+    filename_out = self._file + "/plots/scan/{}/{}/{}/SUM_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.pdf".format(
+            self.mode, self.scan_dir_name, model_str, 
+            self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+            self.mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
+            self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
+            self.mixing_scheme, self.hierarchy,
+            self.sig_var * 100, self.bkg_var * 100,
+            self.bkg_trials, self.bkg_bins, self.distance.value)
+    
+    if not os.path.exists(os.path.dirname(filename_out)): # Check if directory already exists, if not, make directory
+        os.mkdir(os.path.dirname(filename_out))
+
+    plt.savefig(filename_out)
     plt.close()
