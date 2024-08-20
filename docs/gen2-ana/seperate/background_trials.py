@@ -70,7 +70,6 @@ class Background_Trials():
         """
         
         self.get_dir_name()
-        print(self.bkg_dir_name)
 
         # filename for simulation output
         filename = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
