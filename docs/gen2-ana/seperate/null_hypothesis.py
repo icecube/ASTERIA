@@ -2,10 +2,8 @@ import numpy as np
 import astropy.units as u
 from scipy.fft import fft, fftfreq
 from scipy.signal import stft
-from scipy.stats import skewnorm, norm
 
 from helper import argmax_lastNaxes, moving_average
-from asteria.simulation import Simulation as sim
 
 class Null_Hypothesis():
 
@@ -70,9 +68,9 @@ class Null_Hypothesis():
         bkg_gen2 = bkg_i3 + bkg_dc + bkg_md
         bkg_wls  = bkg_i3 + bkg_dc + bkg_md + bkg_ws
 
-        self._bkg["ic86"] = bkg_ic86
-        self._bkg["gen2"] = bkg_gen2
-        self._bkg["wls"] = bkg_wls
+        self._bkg["ic86"] = bkg_ic86 * (1 + self.bkg_var)
+        self._bkg["gen2"] = bkg_gen2* (1 + self.bkg_var)
+        self._bkg["wls"] = bkg_wls* (1 + self.bkg_var)
 
         return
     
@@ -92,15 +90,17 @@ class Null_Hypothesis():
                         self.sim.detector.n_md * self.sim.detector.md_bg_mu + 
                         self.sim.detector.n_ws * self.sim.detector.ws_bg_mu) * 1/u.s * self.sim._res_dt.to(u.s)
 
-        self._avg_bkg["ic86"] = avg_bkg_ic86
-        self._avg_bkg["gen2"] = avg_bkg_gen2
-        self._avg_bkg["wls"] = avg_bkg_wls
+        self._avg_bkg["ic86"] = avg_bkg_ic86 * (1 + self.bkg_var)
+        self._avg_bkg["gen2"] = avg_bkg_gen2 * (1 + self.bkg_var)
+        self._avg_bkg["wls"] = avg_bkg_wls * (1 + self.bkg_var)
 
         return
     
-    def _signal_generic(self, smoothing = False):
+    def _signal_generic(self, smoothing = False,):
         """Calculates the signal hits for a flat (null hypothesis).
-        
+                
+        Args:
+            smoothing (bool, optional): Smooth lightcurve. Defaults to False.
         """
         self._sig = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         
@@ -116,9 +116,9 @@ class Null_Hypothesis():
         sig_gen2 = sig_i3 + sig_dc + sig_md
         sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
 
-        self._sig["ic86"] = sig_ic86
-        self._sig["gen2"] = sig_gen2
-        self._sig["wls"] = sig_wls
+        self._sig["ic86"] = sig_ic86 * (1 + self.sig_var)
+        self._sig["gen2"] = sig_gen2 * (1 + self.sig_var)
+        self._sig["wls"] = sig_wls * (1 + self.sig_var)
 
         if smoothing:
             # binning needed to smoothen a frequency f, low frequency cut of 100 Hz
@@ -286,7 +286,6 @@ class Null_Hypothesis():
         hann_res = stf_para["hann_res"] # desired frequency resolution in Hann window
         hann_hop = stf_para["hann_hop"] # hann hop = number of time bins the window is moved
         freq_sam = stf_para["freq_sam"] # sampling frequency of entire signal (1 kHz for 1 ms binning)
-        time_int = stf_para["time_int"] # should power be summed over time?, True or False
         time_win = stf_para["time_win"]
         freq_win = stf_para["freq_win"]
 
@@ -306,14 +305,6 @@ class Null_Hypothesis():
         self.ts = {"ic86": None, "gen2": None, "wls": None}
         self.ffit = {"ic86": None, "gen2": None, "wls": None}
         self.tfit = {"ic86": None, "gen2": None, "wls": None}
-        
-        # extra variables if time integration is selected
-        if time_int:
-            self._stf_tint = {"ic86": None, "gen2": None, "wls": None}
-            self.ts_tint = {"ic86": None, "gen2": None, "wls": None}
-            self.ffit_tint = {"ic86": None, "gen2": None, "wls": None}
-            ts_tint = []
-            fit_freq_tint = []
 
         for det in ["ic86", "gen2", "wls"]: # loop over detector
 
@@ -347,24 +338,13 @@ class Null_Hypothesis():
                 # get corresponding time and freq of bin
                 fit_freq.append(self._freq_new[ind_freq])
                 fit_time.append(self._time_new[ind_time])
-
-                if time_int:
-                    self._stf_tint[det] = np.sum(self._stf[det], axis = -1)
-                    ts_tint.append(np.nanmax(self._stf_tint[det], axis = -1))
-                    ind_freq_tint = np.nanargmax(self._stf_tint[det], axis = -1)
-                    fit_freq_tint.append(self._freq_new[ind_freq_tint])
             
             self.ts[det] = np.array(ts).flatten()
             self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten()
 
-            if time_int:
-                self.ts_tint[det] = np.array(ts_tint).flatten()
-                self.ffit_tint[det] = np.array(fit_freq_tint).flatten()
-
-
         return
   
-    def run(self, mode, ft_para, bkg_trials, model = "generic", smoothing = False):
+    def run(self, mode, ft_para, sig_var, bkg_var, bkg_trials, model = "generic", smoothing = False):
         """Runs complete analysis chain for the background distribution for both
         time-integrated fast fourier transform (FFT) and short-time fourier transform (STF). 
         It computes background and flat signal hits, combines them, performs either FFT or STFT 
@@ -373,6 +353,8 @@ class Null_Hypothesis():
         Args:
             mode (str): analysis mode (FFT or STF)
             ft_para (dict): parameters of the fourier transform (FFT or STF)
+            sig_var (float): percentage variation of signal rate
+            bkg_var (float): percentage variation of background rate            
             bkg_trials (int): Number of background trials.
             model (str): composition of signal trial ("generic", "model", "mix")
             smoothing (bool): Applies high-pass (moving average) filter.
@@ -383,6 +365,8 @@ class Null_Hypothesis():
 
         self.mode = mode
         self.bkg_trials = bkg_trials
+        self.sig_var = sig_var
+        self.bkg_var = bkg_var
 
         if self.mode != "FFT" and self.mode != "STF":
             raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
