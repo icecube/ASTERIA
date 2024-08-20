@@ -1,15 +1,14 @@
-from tqdm import tqdm
 from analysis import *
 from signal_hypothesis import *
-from scipy.optimize import minimize, brentq
+from scipy.optimize import brentq
 from helper import *
 
 from plthelper import plot_significance, plot_resolution
 
 def loss_dist_range_interpolate(dist, ana_para, sigma, det, quant):
-    sim, res_dt, trials, temp_para, mode, ft_para, bkg_distr = ana_para
+    sim, res_dt, trials, temp_para, mode, ft_para, sig_var, bkg_var = ana_para
     ana = Analysis(sim, res_dt = res_dt, distance = dist*u.kpc, temp_para = temp_para)
-    ana.run(mode = mode, ft_para = ft_para, trials = trials, bkg_distr = bkg_distr, model = "generic")
+    ana.run(mode = mode, ft_para = ft_para, sig_var = sig_var, bkg_var = bkg_var, trials = trials, model = "generic")
     loss = (ana.zscore[det][quant] - sigma)
     return loss
 
@@ -17,33 +16,72 @@ class Scan():
     
     def __init__(self,
                  sim,
-                 scan_para,
-                 ft_mode, 
-                 ft_para,
-                 sig_trials,
-                 bkg_distr,
-                 bkg_trials,
-                 bkg_bins,
-                 fit_hist,
+                 para,
                  verbose = None):
         
         self.sim = sim
-        self.scan_para = scan_para
-        self.ft_mode = ft_mode
-        self.ft_para = ft_para
-        self.sig_trials = sig_trials
-        self.bkg_distr = bkg_distr
-        self.bkg_trials = bkg_trials
-        self.bkg_bins = bkg_bins
-        self.fit_hist = fit_hist
+        self.para = para
         self.verbose = verbose
 
+        # read in keywords of para
+        self.model = self.para["model"]
+        self.hierarchy = self.para["hierarchy"]
+        self.mixing_scheme = self.para["mixing_scheme"]
+        self.scan_para = self.para["scan_para"]
+        self.ft_mode = self.para["ft_mode"]
+        self.ft_para = self.para["ft_para"]
+        self.sig_trials = self.para["sig_trials"]
+        self.bkg_trials = self.para["bkg_trials"]
+        self.bkg_bins = self.para["bkg_bins"]
+        self.sig_var = self.para["sig_var"]
+        self.bkg_var = self.para["bkg_var"]
+
+        # read in kewords of scan_para
         self.ampl_range = self.scan_para["ampl_range"]
         self.freq_range = self.scan_para["freq_range"]
         self.sigma = self.scan_para["sigma"]
         self.quantiles = [0.5, 0.16, 0.84]
 
-    def run_interpolate(self):
+        self._file = os.path.dirname(os.path.abspath(__file__))
+
+    def get_dir_name(self):
+        
+        self.mixing_scheme = self.sim.mixing_scheme
+        if self.sim.hierarchy.name == "NORMAL":
+            self.hierarchy = "normal"
+        elif self.sim.hierarchy.name == "INVERTED":
+            self.hierarchy = "inverted"
+
+        # select correct directory for systemics
+        if self.mixing_scheme == "NoTransformation":
+            self.bkg_dir_name = "default"
+
+            if self.temp_para["time_start"] == 150 * u.ms and self.temp_para["time_end"] == 300 * u.ms:
+                self.scan_dir_name = "default"
+            else:
+                self.scan_dir_name = "syst_time_{:.0f}_{:.0f}ms".format(self.temp_para["time_start"].value, self.temp_para["time_end"].value)
+
+            if self.sig_var != 0:
+                self.bkg_dir_name = "syst_det_sig_{:+.0f}%".format(self.sig_var*100)
+                self.scan_dir_name = self.bkg_dir_name
+            elif self.bkg_var != 0:
+                self.bkg_dir_name = "syst_det_bkg_{:+.0f}%".format(self.bkg_var*100)
+                self.scan_dir_name = self.bkg_dir_name
+
+        elif self.mixing_scheme == "CompleteExchange":
+            self.bkg_dir_name = "syst_mix_comp_exch"
+            self.scan_dir_name = self.bkg_dir_name
+
+        elif self.mixing_scheme == "AdiabaticMSW":
+            if self.hierarchy == "normal":
+                self.bkg_dir_name = "syst_mix_MSW_NH"
+                self.scan_dir_name = self.bkg_dir_name
+
+            elif self.hierarchy == "inverted":
+                self.bkg_dir_name = "syst_mix_MSW_IH"
+                self.scan_dir_name = self.bkg_dir_name
+
+    def run(self):
         """The parameter scan is designed in five steps:
         1) A loop over all amplitudes.
         2) A loop over all frequencies.
@@ -65,18 +103,20 @@ class Scan():
                 if self.verbose is not None: print("Frequency: {}, Amplitude: {} % ".format(freq, ampl*100))
 
                 # template dictionary uses loop ampl, freq and scan_para values
-                temp_para = {"frequency": freq, 
-                            "amplitude": ampl, #in percent of max value
-                            "time_start": self.scan_para["time_start"],
-                            "time_end": self.scan_para["time_end"],
-                            "position": self.scan_para["position"]}
+                self.temp_para = {"model": self.model,
+                                  "frequency": freq, 
+                                  "amplitude": ampl, #in percent of max value
+                                  "time_start": self.scan_para["time_start"],
+                                  "time_end": self.scan_para["time_end"],
+                                  "position": self.scan_para["position"]}
                 
+                self.get_dir_name() # get scan_dir_name and bkg_dir_name
 
                 # 1) Find the distance bounds for which the significance falls from > 5 sigma to < 3 sigma for all subdetectors
                 # This is done to avoid scanning unnecessarily many distances for which the significance is either far too high
                 # or far too low.
                 trials = 1000 # use 1/10 of trials used in later distance scan to increase speed of convergence
-                ana_para = [self.sim, self.sim._res_dt, trials, temp_para, self.ft_mode, self.ft_para, self.bkg_distr]
+                ana_para = [self.sim, self.sim._res_dt, trials, self.temp_para, self.ft_mode, self.ft_para, self.sig_var, self.bkg_var]
 
                 # arguments for the minimizer
                 # The minimizer is defined above and initializes the Analysis class.
@@ -150,12 +190,12 @@ class Scan():
 
                 # initialize signal hypothesis instance for distance scan
                 sgh = Signal_Hypothesis(self.sim, res_dt = self.sim._res_dt, 
-                                        distance = dist_low, temp_para = temp_para)
+                                        distance = dist_low, temp_para = self.temp_para)
             
                 # returns z-score and ts statistics for all distances and all subdetectors
                 sgh_out = sgh.dist_scan(self.dist_range, mode = self.ft_mode, ft_para = self.ft_para, 
-                                                sig_trials = self.sig_trials, bkg_distr = self.bkg_distr, 
-                                                bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins, fit_hist = self.fit_hist,
+                                                sig_var = self.sig_var, bkg_var = self.bkg_var,
+                                                sig_trials = self.sig_trials, bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins,
                                                 model = "generic", verbose = self.verbose) 
                 
                 if self.ft_mode == "STF": Pvalue, Zscore, Ts_stat, Freq_stat, Time_stat = sgh_out
@@ -168,28 +208,11 @@ class Scan():
                 if self.ft_mode == "STF": self.Time_stat = Time_stat
 
                 if self.verbose is not None:
-                    import matplotlib.pyplot as plt
-
-                    plot_significance(self.dist_range, self.Zscore, self.Ts_stat)
-                    rel_file = "/plots/scan/SIG_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
-                    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
-                    plt.savefig(abs_file)
-                    plt.close()
-
-                    plot_resolution(self.dist_range, self.Freq_stat, self.Zscore)
-                    rel_file = "/plots/scan/FRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
-                    abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
-                    plt.savefig(abs_file)
-                    plt.close()
-
-                    if self.ft_mode == "STF":
-
-                        plot_resolution(self.dist_range, self.Time_stat, self.Zscore)
-                        rel_file = "/plots/scan/TRES_model_Sukhbold_2015_27_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:.0e}_sig_trials_{:.0e}_ampl_{:.1f}%_freq_{:.0f}Hz.pdf".format(self.ft_mode, self.scan_para["time_start"].value, self.scan_para["time_end"].value, self.bkg_trials, self.sig_trials, ampl * 100, freq.value)
-                        abs_file = os.path.dirname(os.path.abspath(__file__)) + rel_file
-                        plt.savefig(abs_file)
-                        plt.close()
-
+                    
+                    plot_significance(self, save = True)
+                    plot_resolution(self, type = "freq", save = True)
+                    if self.ft_mode == "STF": plot_resolution(self, type = "time", save = True)
+               
                 # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
                 dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
                 fres = resolution_at_horizon(self.dist_range, self.Freq_stat, dist, self.sigma)
@@ -268,7 +291,6 @@ class Scan():
         return
             
     def combine(self, filebase, ampl_range, item):
-        print(item)
         self.ampl_range = ampl_range
 
         ic86 = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
