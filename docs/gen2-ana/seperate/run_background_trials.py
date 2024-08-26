@@ -35,18 +35,18 @@ model = {'name': 'Sukhbold_2015',
         }
 
 # neutrino flavor mixing scheme and hierarchy
-mixing_scheme = "NoTransformation" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
+mixing_scheme = "AdiabaticMSW" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
 hierarchy = "normal" #"normal", "inverted"
 
 # detector signal and background count variation
-sig_var = 0.1 # signal variation of +-10%
+sig_var = 0 # signal variation of +-10%
 bkg_var = 0 # background variation of +-10%
 
 sim = Simulation(model=model,
                 distance=distance, 
                 res_dt=res_dt,
                 Emin=0*u.MeV, Emax=100*u.MeV, dE=1*u.MeV,
-                tmin=0.000*u.s, tmax=1*u.s, dt=sim_dt,
+                tmin=0.000*u.s, tmax=0.999*u.s, dt=sim_dt,
                 hierarchy = hierarchy,
                 mixing_scheme = mixing_scheme,
                 detector_scope = detector_scope,
@@ -109,7 +109,7 @@ para = {"model": model,
 print("BACKGROUND TRIALS")
 print("-------------------------")
 print("distance: {}".format(distance))
-print("background trials: {}, background bins {}".format(bkg_trials, bkg_bins))
+print("background trials: {}, background bins: {}".format(bkg_trials, bkg_bins))
 print("fourier mode: {}".format(ft_mode))
 print("signal variation: {}%".format(sig_var*100))
 print("background variation: {}%".format(bkg_var*100))
@@ -118,4 +118,4 @@ print("-------------------------")
 
 bgt = Background_Trials(sim = sim, para = para, verbose = True)
 bgt.generate(filename = None)
-#bgt.quantiles(distance_range = dist_range, bkg_trials = bkg_trials, bkg_bins = bkg_bins)
+#bgt.quantiles(distance_range = dist_range)
