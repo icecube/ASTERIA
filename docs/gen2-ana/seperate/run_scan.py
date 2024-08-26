@@ -156,33 +156,39 @@ print("SCAN")
 print("-------------------------")
 print("amplitude: {} %".format(amplitude * 100))
 print("frequency: {} ".format(freq_range))
-print("start time: {}, end time {}".format(time_start, time_end))
+print("start time: {}, end time: {}".format(time_start, time_end))
 print("-------------------------")
-print("signal trials: {}, background trials: {}, background bins {}".format(sig_trials, bkg_trials, bkg_bins))
+print("signal trials: {}, background trials: {}, background bins: {}".format(sig_trials, bkg_trials, bkg_bins))
 print("fourier mode: {}".format(ft_mode))
 print("signal variation: {}%".format(sig_var*100))
 print("background variation: {}%".format(bkg_var*100))
 print("mixing scheme: {}, hierarchy: {}".format(mixing_scheme, hierarchy))
 print("-------------------------")
 
-scan = Scan(sim, para = para, verbose = "debug")
-# SCAN
-scan.run()
-scan.dist = scan.reshape_data(item = scan.dist)
-scan.fres = scan.reshape_data(item = scan.fres)
-if ft_mode == "STF": scan.tres = scan.reshape_data(item = scan.tres)
-
 scan_dir_name = get_dir_name(para)
+MODE = "COMBINE"
 
-filename = "./files/scan/{}/{}/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_ampl_{:.1f}%.npz".format(
-    ft_mode, scan_dir_name, model["name"], model["param"]["progenitor_mass"].value, 
-    ft_mode, time_start.value, time_end.value, mixing_scheme, hierarchy,
-    sig_var * 100, bkg_var * 100, sig_trials, bkg_trials, amplitude[0]*100)
-print(scan_dir_name, filename)
-scan.save(filename = filename)
+scan = Scan(sim, para = para, verbose = "debug")
 
-# COMBINE DATA
-#filebase = "./files/scan/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_bkg_trials_{:1.0e}_sig_trials_{:1.0e}".format(model["name"], model["param"]["progenitor_mass"].value, ft_mode, time_start.value, time_end.value, bkg_trials, sig_trials)
-#scan.combine(filebase = filebase, ampl_range = ampl_range, item = "dist")
-#scan.combine(filebase = filebase, ampl_range = ampl_range, item = "fres")
-#if ft_mode == "STF": scan.combine(filebase = filebase, ampl_range = ampl_range, item = "dist")
+if MODE == "RUN":
+    # SCAN
+    scan.run()
+    scan.dist = scan.reshape_data(item = scan.dist)
+    scan.fres = scan.reshape_data(item = scan.fres)
+    if ft_mode == "STF": scan.tres = scan.reshape_data(item = scan.tres)
+
+    filename = "./files/scan/{}/{}/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_ampl_{:.1f}%.npz".format(
+        ft_mode, scan_dir_name, model["name"], model["param"]["progenitor_mass"].value, 
+        ft_mode, time_start.value, time_end.value, mixing_scheme, hierarchy,
+        sig_var * 100, bkg_var * 100, sig_trials, bkg_trials, amplitude[0]*100)
+    scan.save(filename = filename)
+
+elif MODE == "COMBINE":
+    # COMBINE DATA
+    filebase = "./files/scan/{}/{}/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}".format(
+        ft_mode, scan_dir_name, model["name"], model["param"]["progenitor_mass"].value, 
+        ft_mode, time_start.value, time_end.value, mixing_scheme, hierarchy,
+        sig_var * 100, bkg_var * 100, sig_trials, bkg_trials)
+    scan.combine(filebase = filebase, ampl_range = ampl_range, item = "dist")
+    scan.combine(filebase = filebase, ampl_range = ampl_range, item = "fres")
+    if ft_mode == "STF": scan.combine(filebase = filebase, ampl_range = ampl_range, item = "tres")
