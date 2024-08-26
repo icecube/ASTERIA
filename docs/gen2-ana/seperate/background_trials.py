@@ -40,6 +40,8 @@ class Background_Trials():
         self.sig_var = self.para["sig_var"]
         self.bkg_var = self.para["bkg_var"]
 
+        self.get_dir_name()
+
         self._file = os.path.dirname(os.path.abspath(__file__))
 
         np.random.seed(0)
@@ -68,8 +70,6 @@ class Background_Trials():
         Args:
             filename (str, optional): Name of simulation output file. Defaults to None.
         """
-        
-        self.get_dir_name()
 
         # filename for simulation output
         filename = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
