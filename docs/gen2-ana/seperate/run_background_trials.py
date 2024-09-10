@@ -94,7 +94,6 @@ para = {"model": model,
         "hierarchy": hierarchy,
         "mixing_scheme": mixing_scheme,
         "distance": distance,
-        "res_dt": res_dt,
         "ft_mode": ft_mode,
         "ft_para": ft_para,
         "bkg_trials": bkg_trials,
@@ -116,6 +115,10 @@ print("background variation: {}%".format(bkg_var*100))
 print("mixing scheme: {}, hierarchy: {}".format(mixing_scheme, hierarchy))
 print("-------------------------")
 
+MODE = "QUANTILE"
 bgt = Background_Trials(sim = sim, para = para, verbose = True)
-bgt.generate(filename = None)
-#bgt.quantiles(distance_range = dist_range)
+
+if MODE == "GENERATE":
+    bgt.generate(filename = None)
+elif MODE == "QUANTILE":
+    bgt.quantiles(distance_range = dist_range)
