@@ -32,7 +32,6 @@ class Background_Trials():
         self.hierarchy = self.para["hierarchy"]
         self.mixing_scheme = self.para["mixing_scheme"]
         self.distance = self.para["distance"]
-        self.res_dt = self.para["res_dt"]
         self.ft_mode = self.para["ft_mode"]
         self.ft_para = self.para["ft_para"]
         self.bkg_trials = self.para["bkg_trials"]
@@ -41,9 +40,7 @@ class Background_Trials():
         self.bkg_var = self.para["bkg_var"]
 
         self.get_dir_name()
-
         self._file = os.path.dirname(os.path.abspath(__file__))
-
         np.random.seed(0)
 
     def get_dir_name(self):
@@ -90,7 +87,7 @@ class Background_Trials():
         
         for r in tqdm(range(self.repetitions)): # loop over batches
             # Initialize null hypothsis class and run analysis
-            nlh = Null_Hypothesis(self.sim, res_dt = self.res_dt, distance=self.distance)
+            nlh = Null_Hypothesis(self.sim, res_dt = self.sim._res_dt, distance=self.distance)
             nlh.run(mode = self.ft_mode, ft_para = self.ft_para, 
                     sig_var = self.sig_var, bkg_var = self.bkg_var, 
                     bkg_trials = self.max_trials, 
