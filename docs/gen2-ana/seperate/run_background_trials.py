@@ -35,7 +35,7 @@ model = {'name': 'Sukhbold_2015',
         }
 
 # neutrino flavor mixing scheme and hierarchy
-mixing_scheme = "AdiabaticMSW" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
+mixing_scheme = "NoTransformation" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
 hierarchy = "normal" #"normal", "inverted"
 
 # detector signal and background count variation
