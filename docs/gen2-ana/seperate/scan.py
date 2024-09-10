@@ -43,6 +43,7 @@ class Scan():
         self.quantiles = [0.5, 0.16, 0.84]
 
         self._file = os.path.dirname(os.path.abspath(__file__))
+        np.random.seed(0)
 
     def get_dir_name(self):
         
@@ -147,7 +148,7 @@ class Scan():
                     try:
                         arg = list(args_dist_low) # if IC86 is too low, try Gen2
                         arg[2] = "gen2"
-                        args_dist_low = list(arg)
+                        args_dist_low = tuple(arg)
                         root_low = brentq(loss_dist_range_interpolate, a = 0.1, b = 100, args = args_dist_low, xtol = 1e-2)
                         dist_low = root_low * u.kpc
                     except ValueError:
@@ -155,7 +156,7 @@ class Scan():
                         try:
                             arg = list(args_dist_low) # if Gen2 is too low, try WLS
                             arg[2] = "wls"
-                            args_dist_low = list(arg)
+                            args_dist_low = tuple(arg)
                             root_low = brentq(loss_dist_range_interpolate, a = 0.1, b = 100, args = args_dist_low, xtol = 1e-2)
                             dist_low = root_low * u.kpc
                         except ValueError:
