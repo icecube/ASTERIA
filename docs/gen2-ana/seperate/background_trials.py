@@ -1,7 +1,6 @@
 import os
 import sys
 from tqdm import tqdm
-os.environ['ASTERIA'] = '/home/jakob/software/ASTERIA/ASTERIA'
 from asteria.simulation import Simulation
 from null_hypothesis import *
 import scipy.stats as stats
