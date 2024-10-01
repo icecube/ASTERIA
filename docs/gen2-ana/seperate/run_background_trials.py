@@ -1,6 +1,5 @@
 import os
 import sys
-os.environ['ASTERIA'] = '/home/jakob/software/ASTERIA/ASTERIA'
 from asteria.simulation import Simulation
 from background_trials import *
 
@@ -115,7 +114,7 @@ print("background variation: {}%".format(bkg_var*100))
 print("mixing scheme: {}, hierarchy: {}".format(mixing_scheme, hierarchy))
 print("-------------------------")
 
-MODE = "QUANTILE"
+MODE = "GENERATE"
 bgt = Background_Trials(sim = sim, para = para, verbose = True)
 
 if MODE == "GENERATE":
