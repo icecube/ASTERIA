@@ -9,6 +9,7 @@ from scipy.stats import norm, lognorm, skewnorm
 import copy
 from helper import *
 
+plt.rcParams["font.family"] = "Times New Roman"
 
 def plot_hits(time, hits, det = "ic86"):
 
@@ -816,3 +817,325 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
 
     plt.savefig(filename_out)
     plt.close()
+
+def plot_reco(self, bins = 100, hypo = "signal", det = "ic86"):
+
+    fs = 10
+    
+    fig, ax = plt.subplots(1,3, figsize = (10,4))
+
+    ax[0].scatter(self.time_true, self.time_reco[hypo][det], s=10, alpha=0.1, color="C0", rasterized = True)
+    ax[0].plot(np.linspace(0,1000,100), np.linspace(0,1000,100), "k--")
+    ax[0].set_xlabel(r"$t_{true}$ [ms]", fontsize = fs)
+    ax[0].set_ylabel(r"$t_{reco}$ [ms]", fontsize = fs)
+    ax[0].tick_params(labelsize = fs)
+
+    # add marginal plots to ax[0]
+    divider0 = make_axes_locatable(ax[0])
+    ax0_top = divider0.append_axes("top", 0.4, pad=0.3, sharex=ax[0])
+
+    # histogram for reco time above the scatter plot
+    ax0_top.hist(self.time_true, bins = bins, density=True, color='grey', orientation='vertical', align = "left")
+    ax0_top.set_ylabel("%", fontsize = fs)
+
+    ax[1].scatter(self.freq_true, self.freq_reco[hypo][det], s=10, alpha=0.1, color="C0", rasterized = True)
+    ax[1].plot(np.linspace(0,500,100), np.linspace(0,500,100), "k--")
+    ax[1].set_xlabel(r"$f_{true}$ [Hz]", fontsize = fs)
+    ax[1].set_ylabel(r"$f_{reco}$ [Hz]", fontsize = fs)
+    ax[1].tick_params(labelsize = fs)
+
+    # add marginal plots to ax[1]
+    divider1 = make_axes_locatable(ax[1])
+    ax1_top = divider1.append_axes("top", 0.4, pad=0.3, sharex=ax[1])
+
+    # histogram for reco time above the scatter plot
+    ax1_top.hist(self.freq_true, bins = bins, density=True, color='grey', orientation='vertical', align = "left")
+    ax1_top.tick_params(labelsize = fs)
+
+    rel_time = self.time_true-self.time_reco[hypo][det]
+    rel_freq = self.freq_true-self.freq_reco[hypo][det]
+
+    rel_time_char = [np.median(rel_time).value, np.quantile(rel_time, 0.16).value, np.quantile(rel_time, 0.84).value]
+    rel_freq_char = [np.median(rel_freq).value, np.quantile(rel_freq, 0.16).value, np.quantile(rel_freq, 0.84).value]
+
+    tmin = np.maximum(rel_time_char[1]*5, -1000)
+    tmax = np.minimum(rel_time_char[2]*5, 1000)
+
+    fmin = np.maximum(rel_freq_char[1]*5, -500)
+    fmax = np.minimum(rel_freq_char[2]*5, 500)
+
+    ax[2].hist2d(rel_time.value, rel_freq.value, bins = bins, range = [[tmin, tmax],[fmin, fmax]])
+    ax[2].axvline(0, color = "k", ls = "--")
+    ax[2].axhline(0, color = "k", ls = "--")
+    ax[2].set_xlabel(r"$t_{true} - t_{reco}$ [ms]", fontsize = fs)
+    ax[2].set_ylabel(r"$f_{true} - f_{reco}$ [Hz]", fontsize = fs)
+    ax[2].tick_params(labelsize = fs)
+
+    # add marginal plots to ax[2]
+    divider2 = make_axes_locatable(ax[2])
+    ax2_top = divider2.append_axes("top", 0.4, pad=0.3, sharex=ax[2])
+    ax2_right = divider2.append_axes("right", 0.4, pad=0.3, sharey=ax[2])
+
+    # histogram for reco time above the scatter plot
+    ax2_top.hist(rel_time.value, bins = bins, range = (tmin, tmax), density=True, color='grey', orientation='vertical', align = "left")
+    ax2_top.axvline(rel_time_char[0], color="C0", ls = "--", lw = 2, label = r"$\langle t_{true} - t_{reco} \rangle$")
+    ax2_top.axvspan(rel_time_char[1], rel_time_char[2], color="C0", alpha = 0.25)
+    ax2_top.tick_params(labelsize = fs)
+
+    # histogram for reco freq above the scatter plot
+    ax2_right.hist(rel_freq.value, bins = bins, range = (fmin, fmax), density=True, color='grey', orientation='horizontal', align = "left")
+    ax2_right.axhline(rel_freq_char[0], color="C0", ls = "--", lw = 2, label = r"$\langle f_{true} - f_{reco} \rangle$")
+    ax2_right.axhspan(rel_freq_char[1], rel_freq_char[2], color="C0", alpha = 0.25)
+    ax2_right.tick_params(labelsize = fs)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/RECO_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}_{}_{}_dist_{:.1f}kpc.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
+    self.mixing_scheme, self.hierarchy, self.trials, hypo, det, self.distance.value)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+def plot_reco2(self, bins = 100, hypo = "signal", det = "ic86"):
+
+    fs = 14
+    
+    fig, ax = plt.subplots(1,1)
+
+    rel_time = self.time_true-self.time_reco[hypo][det]
+    rel_freq = self.freq_true-self.freq_reco[hypo][det]
+
+    rel_time_char = [np.median(rel_time).value, np.quantile(rel_time, 0.16).value, np.quantile(rel_time, 0.84).value]
+    rel_freq_char = [np.median(rel_freq).value, np.quantile(rel_freq, 0.16).value, np.quantile(rel_freq, 0.84).value]
+
+    tmin = np.maximum(rel_time_char[1]*5, -1000)
+    tmax = np.minimum(rel_time_char[2]*5, 1000)
+
+    fmin = np.maximum(rel_freq_char[1]*5, -500)
+    fmax = np.minimum(rel_freq_char[2]*5, 500)
+
+    ax.hist2d(rel_time.value, rel_freq.value, bins = bins, range = [[tmin, tmax],[fmin, fmax]])
+    ax.axvline(0, color = "k", ls = "--")
+    ax.axhline(0, color = "k", ls = "--")
+    ax.set_xlabel(r"$t_{true} - t_{reco}$ [ms]", fontsize = fs)
+    ax.set_ylabel(r"$f_{true} - f_{reco}$ [Hz]", fontsize = fs)
+    ax.tick_params(labelsize = fs)
+
+    # add marginal plots to ax[2]
+    divider2 = make_axes_locatable(ax)
+    ax2_top = divider2.append_axes("top", 0.4, pad=0.3, sharex=ax)
+    ax2_right = divider2.append_axes("right", 0.4, pad=0.4, sharey=ax)
+
+    # histogram for reco time above the scatter plot
+    ax2_top.hist(rel_time.value, bins = bins, range = (tmin, tmax), density=True, color='grey', orientation='vertical', align = "left")
+    ax2_top.axvline(rel_time_char[0], color="C0", ls = "--", lw = 2, label = r"$\langle t_{true} - t_{reco} \rangle$")
+    ax2_top.axvspan(rel_time_char[1], rel_time_char[2], color="C0", alpha = 0.25)
+    ax2_top.tick_params(labelsize = fs)
+
+    # histogram for reco freq above the scatter plot
+    ax2_right.hist(rel_freq.value, bins = bins, range = (fmin, fmax), density=True, color='grey', orientation='horizontal', align = "left")
+    ax2_right.axhline(rel_freq_char[0], color="C0", ls = "--", lw = 2, label = r"$\langle f_{true} - f_{reco} \rangle$")
+    ax2_right.axhspan(rel_freq_char[1], rel_freq_char[2], color="C0", alpha = 0.25)
+    ax2_right.tick_params(labelsize = fs)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/RECO2_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}_{}_{}_dist_{:.1f}kpc.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
+    self.mixing_scheme, self.hierarchy, self.trials, hypo, det, self.distance.value)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+def plot_reco_bias(self, hypo = "signal", det = "ic86"):
+
+    fs = 10
+    
+    fig, ax = plt.subplots(1,2)
+
+    rel_time = self.time_true-self.time_reco[hypo][det]
+    rel_freq = self.freq_true-self.freq_reco[hypo][det]
+
+    ax[0].scatter(self.time_true, rel_time, s=10, alpha=0.1, color="C0", rasterized = True)
+    ax[0].set_xlabel(r"$t_{true}$ [ms]", fontsize = fs)
+    ax[0].set_ylabel(r"$t_{true} - t_{reco}$ [ms]", fontsize = fs)
+    ax[0].tick_params(labelsize = fs)
+
+    ax[1].scatter(self.freq_true, rel_freq, s=10, alpha=0.1, color="C0", rasterized = True)
+    ax[1].set_xlabel(r"$f_{true}$ [ms]", fontsize = fs)
+    ax[1].set_ylabel(r"$f_{true} - f_{reco}$ [ms]", fontsize = fs)
+    ax[1].tick_params(labelsize = fs)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/BIAS_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}_{}_{}_dist_{:.1f}kpc.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
+    self.mixing_scheme, self.hierarchy, self.trials, hypo, det, self.distance.value)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+
+def plot_reco_horizon(self, ampl, hypo = "signal"):
+    
+    fs = 14
+
+    fig, ax = plt.subplots(2,1, sharex = True)
+
+    labels = [r'IceCube', r'Gen2', r'Gen2+WLS']
+    colors = ["C0", "C1", "C2"]
+
+    for i, det in enumerate(["ic86", "gen2", "wls"]): # loop over detector
+
+        ax[0].plot(self.dist_range.value, self.freq_stat[hypo][det][ampl][:,0].value, color = colors[i], label = labels[i])
+        ax[0].fill_between(self.dist_range.value, self.freq_stat[hypo][det][ampl][:,1].value, self.freq_stat[hypo][det][ampl][:,2].value, color = colors[i], alpha = 0.15)
+        ax[1].plot(self.dist_range.value, self.time_stat[hypo][det][ampl][:,0].value, color = colors[i])
+        ax[1].fill_between(self.dist_range.value, self.time_stat[hypo][det][ampl][:,1].value, self.time_stat[hypo][det][ampl][:,2].value, color = colors[i], alpha = 0.15)
+
+    ax[1].set_xlabel("Distance [kpc]", fontsize = fs)
+    ax[0].set_ylabel(r"$f_{reco}-f_{true}$ [Hz]", fontsize = fs)
+    ax[1].set_ylabel(r"$t_{reco}-t_{true}$ [ms]", fontsize = fs)
+
+    ax[0].set_xlim(0, 60)
+    ax[1].set_xlim(0, 60)
+
+    ax[0].tick_params(labelsize = fs)
+    ax[1].tick_params(labelsize = fs)
+
+    ax[0].legend(loc="upper center", bbox_to_anchor=(0.5, 1.4), fontsize=14, ncols = 3)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/HORI_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}_{}.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100,
+    self.mixing_scheme, self.hierarchy, self.trials, hypo)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+def plot_reco_horizon_diff(self, ampl, hypo = "signal"):
+    
+    fs = 14
+
+    fig, ax = plt.subplots(2,1, sharex = True)
+
+    labels = [r'IceCube', r'Gen2', r'Gen2+WLS']
+    colors = ["C0", "C1", "C2"]
+    lss = ["-", "--", ":"]
+
+    for i, det in enumerate(["ic86", "gen2", "wls"]): # loop over detector
+
+        ax[0].plot(self.dist_range.value, self.freq_diff[hypo][det][ampl,:].value, color = colors[i], ls = lss[i], label = labels[i])
+        ax[1].plot(self.dist_range.value, self.time_diff[hypo][det][ampl,:].value, color = colors[i], ls = lss[i])
+
+    ax[1].set_xlabel("Distance [kpc]", fontsize = fs)
+    ax[0].set_ylabel(r"$f_{reco}-f_{true}$ [Hz]", fontsize = fs)
+    ax[1].set_ylabel(r"$t_{reco}-t_{true}$ [ms]", fontsize = fs)
+
+    for i, fthresh in enumerate(self.freq_thresh):
+        ax[0].axhline(fthresh.value, color = "grey", ls = "--", lw = 2)
+        ax[0].text(50, fthresh.value * 1.2, s = "{:.0f}".format(fthresh), fontsize = fs, color = "grey", weight = "bold")
+
+    for i, tthresh in enumerate(self.time_thresh):
+        ax[1].axhline(tthresh.value, color = "grey", ls = "--", lw = 2)
+        ax[1].text(50, tthresh.value * 1.2, s = "{:.0f}".format(tthresh), fontsize = fs, color = "grey", weight = "bold")
+
+
+    ax[0].set_xlim(0, 60)
+    ax[1].set_xlim(0, 60)
+
+    ax[0].set_ylim(5, 600)
+    ax[1].set_ylim(10, 1000)
+
+    ax[0].set_yscale("log")
+    ax[1].set_yscale("log")
+
+    ax[0].tick_params(labelsize = fs)
+    ax[1].tick_params(labelsize = fs)
+
+    ax[0].legend(loc="upper center", bbox_to_anchor=(0.5, 1.4), fontsize=14, ncols = 3)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/DIFF_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}_{}.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.ampl_range[ampl]*100,
+    self.mixing_scheme, self.hierarchy, self.trials, hypo)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+def plot_reco_horizon_amplitude(self, hypo = "signal"):
+    
+    fs = 16
+
+    labels = [r'IceCube', r'Gen2', r'Gen2+WLS']
+    colors = ['C0', 'C1', 'C2']
+
+    fig, ax = plt.subplots(2,1, sharex = True)
+
+    for j, det in enumerate(["ic86", "gen2", "wls"]):
+        ax[0].plot(self.ampl_range * 100, self.freq_hori[hypo][det], color = colors[j], label  = labels[j])
+        ax[1].plot(self.ampl_range * 100, self.time_hori[hypo][det], color = colors[j])
+
+    ax[1].set_xlabel("Amplitude [%]", size=fs)
+    ax[0].set_ylabel(r"$d_{20 \rm Hz}$ [kpc]", size=fs)
+    ax[1].set_ylabel(r"$d_{50 \rm ms}$ [kpc]", size=fs)
+
+    for i in range(2):
+        ax[i].tick_params(labelsize=fs)
+        ax[i].set_xlim(0,50)
+        ax[i].set_ylim(0,50)
+        ax[i].set_yticks([10,20,30,40,50])
+        ax[i].grid()
+
+    ax[0].legend(loc="upper center", bbox_to_anchor=(0.5, 1.4), fontsize=14, ncols = 3)
+
+    plt.tight_layout()
+    filename = "./plots/reco/{}/{}/AMPL_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_mix_{}_hier_{}_trials_{:1.0e}_{}.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.mixing_scheme, self.hierarchy, self.trials, hypo)
+    plt.savefig(filename, dpi = 400)
+    plt.close()
+
+def plot_reco_boot(self, hypo = "signal"):
+
+    fs = 14
+
+    fig, ax = plt.subplots(3, 2, figsize=(12, 10), sharex = "col")
+    ax = ax.T.ravel()
+
+    dets = ["ic86", "gen2", "wls"]
+
+    for i in range(6):
+
+        j = i % 3
+        det = dets[j]
+
+        if i > 2: item = self.boot_time[hypo]
+        else: item = self.boot_freq[hypo]
+
+        error = np.std(item[det], axis = 1)
+
+        n1, _, _ = ax[i].hist(item[det][1].value, bins=20, density=True, histtype="step", color="C1", label="16%")
+        n0, _, _ = ax[i].hist(item[det][0].value, bins=20, density=True, histtype="step", color="C0", label="50%")
+        n2, _, _ = ax[i].hist(item[det][2].value, bins=20, density=True, histtype="step", color="C2", label="84%")
+
+        ax[i].text(item[det][1].mean().value, n1.max()/2, s = "{:1.1E}".format(error[1]), color = "C1", fontsize = fs, weight = "bold", ha = "center")
+        ax[i].text(item[det][0].mean().value, n0.max()/2, s = "{:1.1E}".format(error[0]), color = "C0", fontsize = fs, weight = "bold", ha = "center")
+        ax[i].text(item[det][2].mean().value, n2.max()/2, s = "{:1.1E}".format(error[2]), color = "C2", fontsize = fs, weight = "bold", ha = "center")
+
+        ax[i].text(0.15, 0.9, s = det, transform=ax[i].transAxes, fontsize=fs, va='top', 
+                bbox= dict(boxstyle='round', facecolor='white', alpha=0.5))
+        ax[i].tick_params(labelsize = fs)
+
+
+    # add xlabel for each row and one common ylabel
+    ax[2].set_xlabel(r"$f_{reco}-f_{true}$ [Hz]", fontsize = fs)
+    ax[5].set_xlabel(r"$t_{reco}-t_{true}$ [ms]", fontsize = fs)
+    fig.supylabel("Normalized Counts", fontsize = fs)
+
+    # Create a common legend for all subplots
+    handles, labels = ax[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', fontsize = fs, ncol = 3, bbox_to_anchor=(0.5, 1.0))
+
+    filename = "./plots/bootstrapping/reco/{}/BOOT_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_tot_trials_{:1.0e}_rep_trials_{:1.0e}_reps_{}_{}_dist_{:.1f}kpc.pdf".format(
+    self.ft_mode, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
+    self.mixing_scheme, self.hierarchy, self.trials, self.rep_trials, self.repetitions, hypo, self.distance.value)
+    plt.savefig(filename, bbox_inches='tight')
