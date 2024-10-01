@@ -123,21 +123,6 @@ class Scan():
                 # The minimizer is defined above and initializes the Analysis class.
                 args_dist_low = (ana_para, 5, "ic86", 1)
                 args_dist_high = (ana_para, 3, "wls", 2)
-
-                if 0:#self.verbose == "debug":
-                    import matplotlib.pyplot as plt
-                    dd = np.linspace(5,30,50)
-                    ls_low, ls_high = [], []
-                    for d in dd:
-                        ls_low.append(loss_dist_range_interpolate(d, *args_dist_low))
-                        ls_high.append(loss_dist_range_interpolate(d, *args_dist_high))
-                    fig, ax = plt.subplots(1,1)
-                    ax.plot(dd, ls_low)
-                    ax.plot(dd, ls_high)
-                    ax.set_xlabel("Distance [kpc]")
-                    ax.set_ylabel("Loss")
-                    plt.show()    
-
                 skip_next = False
                 try:
                     # returns lower bound distance
