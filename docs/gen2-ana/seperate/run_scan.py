@@ -1,7 +1,6 @@
 import os
 import sys
 from tqdm import tqdm
-os.environ['ASTERIA'] = '/home/jakob/software/ASTERIA/ASTERIA'
 from asteria.simulation import Simulation
 from scan import *
 import matplotlib.pyplot as plt
