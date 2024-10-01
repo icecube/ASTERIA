@@ -495,42 +495,6 @@ class Reconstruction():
                     fit_freq.append(self._freq_new[ind_freq])
                     fit_time.append(self._time_new[ind_time])
 
-                    if 0 and hypo == "signal":
-                        import matplotlib.pyplot as plt
-                        from plthelper import plot_stft
-                        
-                        fs = 14
-                        det = "ic86"
-                        freq = self._freq_new.value
-                        time = self._time_new.value
-                        power = self._stf["signal"][det][0]
-                        vmin, vmax = power.min(), power.max()
-
-                        time_true = (self.temp_para["time_start"] + self.temp_para["time_end"])[0]/2
-                        freq_true = self.temp_para["frequency"]
-
-                        time_reco = fit_time[0][0]
-                        freq_reco = fit_freq[0][0]
-
-                        fig, ax = plt.subplots(1,1)
-                        im = ax.pcolormesh(time, freq, power, cmap = "plasma", shading = "nearest", vmin = vmin, vmax = vmax)
-
-                        ax.scatter(time_true*1000, freq_true, s = 40, marker = "o", fc = "None", ec = "black", label = "true")    
-                        ax.scatter(time_reco, freq_reco, s = 40, marker = "x", color = "red", label = "reco")   
-
-
-                        cb = fig.colorbar(im)
-                        cb.ax.tick_params(labelsize=14)
-                        cb.set_label(label=r"$S(f,t)$",size=14)
-                        ax.set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize = fs)
-                        ax.set_ylabel(f"Frequency $f$ in [Hz]", fontsize = fs)
-                        ax.yaxis.get_offset_text().set_fontsize(fs)
-                        ax.tick_params(labelsize = fs)
-                        ax.legend(fontsize = fs)
-
-                        plt.show()
-                        a = 1/0
-            
                 self.freq_reco[hypo][det], self.time_reco[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten() # reconstructed parameters
 
         return
@@ -582,4 +546,3 @@ class Reconstruction():
         elif self.mode == "STF":
             self._hypothesis()
             self.stf(ft_para)
-        

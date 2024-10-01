@@ -1,9 +1,8 @@
 import os
 import sys
 from tqdm import tqdm
-os.environ['ASTERIA'] = '/home/jakob/software/ASTERIA/ASTERIA'
 from asteria.simulation import Simulation
-from reconstruction_trials import *
+from reco_trials import *
 import matplotlib.pyplot as plt
 
 def get_dir_name(para):
@@ -86,13 +85,16 @@ amplitude = np.array([ampl_range[ind_ampl]])
 
 
 # select distance
-dist_min, dist_max, dist_step = 0.2, 60, 0.2
+dist_min, dist_max, dist_step = 1, 60, 1
 dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
 dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
 
 freq_min = 50*u.Hz
-freq_max = 500*u.Hz
+freq_max = 490*u.Hz
+
+freq_thresh = np.array([20]) * u.Hz
+time_thresh = np.array([50]) * u.ms
 
 time_min = 50*u.ms
 time_max = 950*u.ms
@@ -176,18 +178,20 @@ print("-------------------------")
 
 reco_dir_name = get_dir_name(para)
 
-MODE = "BOOTSTRAP"
+MODE = "HORIZON"
+print("Mode: {}".format(MODE))
 
 rct = Reconstruction_Trials(sim, para = para, verbose = "debug")
 
-
-filename = "./files/bootstrapping/reco/{}/RECO_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.0f}%_mix_{}_hier_{}_trials_{:1.0e}_dist_{:.1f}%.npz".format(
-    ft_mode, model["name"], model["param"]["progenitor_mass"].value, 
-    ft_mode, duration.value, amplitude[0]*100, mixing_scheme, hierarchy, trials, distance.value)
-
 if MODE == "GENERATE":
     rct.generate()
-    rct.save(filename = filename)
+    rct.save()
+
+elif MODE == "HORIZON":
+    rct.stats(ampl_range = ampl_range, dist_range = dist_range, mode = "load")
+    rct.horizon(freq_thresh = freq_thresh, time_thresh = time_thresh)
 
 elif MODE == "BOOTSTRAP":
-    rct.bootstrap(filename, trials = 1000, repetitions = 100)
+    rct.bootstrap(rep_trials = 1000, repetitions = 500)
+    rct.bootstrap(rep_trials = 10000, repetitions = 500)
+    rct.bootstrap(rep_trials = 100000, repetitions = 500)
