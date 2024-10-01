@@ -102,6 +102,36 @@ def significance_horizon(dist_range, Zscore, sigma = [3,5]):
         
     return dist, perc
 
+def resolution_horizon(ampl_range, dist_range, quantity, thresh):
+
+    dist = {"null" : {"ic86" : np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc, # reconstructed frequency for each detector
+                      "gen2" : np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc, 
+                      "wls": np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc},
+            "signal" : {"ic86" : np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc,
+                        "gen2" : np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc, 
+                        "wls": np.zeros((ampl_range.size, thresh.size), dtype=np.float64) * u.kpc}}
+
+
+    for a, ampl in enumerate(ampl_range):
+        for hypo in ["null", "signal"]:
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+                # cubic spline (k = 3) with constant values outside boundaries
+                inter = InterpolatedUnivariateSpline(x = dist_range, y = quantity[hypo][det][a].value, k = 3, ext = 3)
+
+                for t, thr in enumerate(thresh.value): # loop over threshold values
+                    di = [] # temporary lists to store distance and percentage
+
+                    try:
+                        root = brentq(loss_dist_horizon, a = 0.1, b = 100, args = (inter, thr), xtol = 1e-2)
+                    except ValueError:
+                        root = np.nan
+                    di.append(root)
+
+                    dist[hypo][det][a][t] = np.array(di) * u.kpc
+            
+    return dist
+
 def resolution_at_horizon(dist_range, quant, horizon, sigma = [3,5]):
 
     reso =  {"ic86": [], "gen2": [], "wls": []} # empty dictionary
