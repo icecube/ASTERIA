@@ -362,13 +362,14 @@ class Reconstruction_Trials():
                 plot_reco_horizon_diff(self, ampl = a, hypo = "signal")
                 plot_reco_horizon_diff(self, ampl = a, hypo = "null")
 
-
         self.freq_hori = resolution_horizon(self.ampl_range, self.dist_range, self.freq_diff, self.freq_thresh)
         self.time_hori = resolution_horizon(self.ampl_range, self.dist_range, self.time_diff, self.time_thresh)
 
         if self.verbose:
             plot_reco_horizon_amplitude(self, hypo = "null")
             plot_reco_horizon_amplitude(self, hypo = "signal")
+
+            plot_reco_at_distance(self, dist = [10 * u.kpc, 25 * u.kpc], hypo = "signal")
 
         return
     
