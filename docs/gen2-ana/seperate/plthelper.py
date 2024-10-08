@@ -1139,3 +1139,68 @@ def plot_reco_boot(self, hypo = "signal"):
     self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
     self.mixing_scheme, self.hierarchy, self.trials, self.rep_trials, self.repetitions, hypo, self.distance.value)
     plt.savefig(filename, bbox_inches='tight')
+
+def plot_reco_at_distance(self, dist, hypo = "signal"):
+    
+    fs = 16
+
+    colors = ['C0', 'C1', 'C2']
+    lss = ["-", ":"]
+    markers = ["o", "s", "^"]
+
+    legend1_handles = []
+    legend2_handles = []
+    legend1_labels = [r'IceCube', r'Gen2', r'Gen2+WLS']
+    legend2_labels = ["MW Centre", "MW Edge"]
+
+    fig, ax = plt.subplots(2,1, sharex = True, gridspec_kw={'hspace': 0.2})
+
+
+    for j, det in enumerate(["ic86", "gen2", "wls"]):
+
+        for i, d in enumerate(dist):
+            dist_mask = self.dist_range == d
+            if i == 0:
+                handle, = ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
+                legend1_handles.append(handle)
+            ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
+            ax[1].plot(self.ampl_range * 100, self.time_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
+
+    ax[0].axhline(6.88, color = "grey", ls = "--")
+    ax[1].axhline(2*6.88, color = "grey", ls = "--")
+
+    # Plot the grey lines outside of range, just for legend
+    line1, = ax[0].plot(np.arange(-20, -10), np.ones_like(np.arange(-20, -10)), color="grey", ls="-")
+    line2, = ax[0].plot(np.arange(-20, -10), np.ones_like(np.arange(-20, -10)), color="grey", ls=":")
+    legend2_handles.extend([line1, line2])
+
+    comb_handles = legend1_handles + legend2_handles
+    comb_labels = legend1_labels + legend2_labels
+
+    rearr = [0,3,1,4,2] # rearrange handels and labels
+    rearr_handels, rearr_labels = [], []
+
+    for i in rearr:
+        rearr_handels.append(comb_handles[i])
+        rearr_labels.append(comb_labels[i])
+
+
+    # Create legends
+    ax[0].legend(rearr_handels, rearr_labels, loc="upper center", bbox_to_anchor=(0.5, 1.55), fontsize=14, ncols=3)
+
+    ax[1].set_xlabel("Amplitude [%]", size=fs)
+    ax[0].set_ylabel(r"$ \langle f_{reco}-f_{true} \rangle_{1\sigma}$ [Hz]", size=fs)
+    ax[1].set_ylabel(r"$ \langle t_{reco}-t_{true} \rangle_{1\sigma}$ [ms]", size=fs)
+
+    for i in range(2):
+        ax[i].tick_params(labelsize=fs)
+        ax[i].set_xlim(0,50)
+        ax[i].set_ylim(5, 1000)
+        ax[i].set_yscale("log")
+        ax[i].grid()
+
+    filename = "./plots/reco/{}/{}/REFI_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_mix_{}_hier_{}_trials_{:1.0e}_{}.pdf".format(
+    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+    self.ft_mode, self.reco_para["duration"].value, self.mixing_scheme, self.hierarchy, self.trials, hypo)
+    plt.savefig(filename, dpi = 400, bbox_inches='tight')
+    plt.close()
