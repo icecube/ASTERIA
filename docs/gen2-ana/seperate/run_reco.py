@@ -91,7 +91,7 @@ dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
 
 freq_min = 50*u.Hz
-freq_max = 490*u.Hz
+freq_max = 500*u.Hz
 
 freq_thresh = np.array([20]) * u.Hz
 time_thresh = np.array([50]) * u.ms
