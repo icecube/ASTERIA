@@ -3,7 +3,7 @@ from signal_hypothesis import *
 from scipy.optimize import brentq
 from helper import *
 
-from plthelper import plot_significance, plot_resolution
+from plthelper import plot_significance
 
 def loss_dist_range_interpolate(dist, ana_para, sigma, det, quant):
     sim, res_dt, trials, temp_para, mode, ft_para, sig_var, bkg_var = ana_para
@@ -95,8 +95,6 @@ class Scan():
         # create empty 2D list with each entry being a dictionary
         self.dist = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
         self.perc = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
-        self.fres = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
-        if self.ft_mode == "STF": self.tres = [[{} for f in range((self.freq_range).size)] for a in range((self.ampl_range).size)]
 
         for a, ampl in enumerate(self.ampl_range): # loop over scan amplitude
             for f, freq in enumerate(self.freq_range): # loop over scan frequency
@@ -148,7 +146,6 @@ class Scan():
                             print("WLS boundaries failed")
                             self.dist[a][f] = {"ic86": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "gen2": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "wls": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])]} 
                             self.perc[a][f] = {"ic86": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "gen2": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "wls": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])]} 
-                            self.fres[a][f] = {"ic86": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "gen2": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])], "wls": [np.array([np.nan,np.nan,np.nan]), np.array([np.nan,np.nan,np.nan])]}                             
                             skip_next = True
 
                 if skip_next:
@@ -162,7 +159,6 @@ class Scan():
                 # 2) Distance scan
 
                 # distance search range
-                #dist_range = np.arange(np.floor(dist_low.value), np.ceil(dist_high.value)+1, 1) * u.kpc
 
                 spkpc = 5 # steps per kpc
                 mar_low, mar_high = 5, 2 # extra margin to lower/higher side in kpc
@@ -171,7 +167,6 @@ class Scan():
 
                 if self.verbose == "debug": print("Distance scan range: {:.1f} - {:.1f}".format(d_low, d_high))
 
-                #self.dist_range = np.linspace(d_low, d_high, num_steps, dtype = int) * u.kpc
                 self.dist_range = np.round(np.arange(d_low, d_high + 1/spkpc, 1/spkpc), 1) * u.kpc
 
                 # initialize signal hypothesis instance for distance scan
@@ -184,31 +179,22 @@ class Scan():
                                                 sig_trials = self.sig_trials, bkg_trials = self.bkg_trials, bkg_bins = self.bkg_bins,
                                                 model = "generic", verbose = self.verbose) 
                 
-                if self.ft_mode == "STF": Pvalue, Zscore, Ts_stat, Freq_stat, Time_stat = sgh_out
-                elif self.ft_mode == "FFT": Pvalue, Zscore, Ts_stat, Freq_stat = sgh_out
+                Pvalue, Zscore, Ts_stat = sgh_out
 
                 self.Pvalue = Pvalue
                 self.Zscore = Zscore
                 self.Ts_stat = Ts_stat
-                self.Freq_stat = Freq_stat
-                if self.ft_mode == "STF": self.Time_stat = Time_stat
 
                 if self.verbose is not None:
                     
-                    plot_significance(self, save = True)
-                    plot_resolution(self, type = "freq", save = True)
-                    if self.ft_mode == "STF": plot_resolution(self, type = "time", save = True)
+                    plot_significance(self)
                
                 # 3) Calculate the 3 (5) sigma significance via interpolation of the distance scan data
                 dist, perc = significance_horizon(self.dist_range, self.Zscore, self.sigma)
-                fres = resolution_at_horizon(self.dist_range, self.Freq_stat, dist, self.sigma)
-                if self.ft_mode == "STF": tres = resolution_at_horizon(self.dist_range, self.Time_stat, dist, self.sigma)
 
                 # save data
                 self.dist[a][f] = dist
                 self.perc[a][f] = perc
-                self.fres[a][f] = fres
-                if self.ft_mode == "STF": self.tres[a][f] = tres
 
                 if self.verbose is not None:
                     print("3sig distance horizon IC86: {:.1f} - {:.1f} + {:.1f}".format(dist["ic86"][0][0], dist["ic86"][0][0]-dist["ic86"][0][1], dist["ic86"][0][2]-dist["ic86"][0][0]))
@@ -246,34 +232,14 @@ class Scan():
 
     def save(self, filename):
         
-        if self.ft_mode == "FFT":
-            np.savez(file = filename, 
-                     ampl = self.ampl_range, 
-                     freq = self.freq_range, 
-                     sig = self.sigma, 
-                     quan = self.quantiles,
-                     dist_ic86 = self.dist["ic86"],
-                     dist_gen2 = self.dist["gen2"],
-                     dist_wls = self.dist["wls"],
-                     fres_ic86 = self.fres["ic86"],
-                     fres_gen2 = self.fres["gen2"],
-                     fres_wls = self.fres["wls"])
-            
-        elif self.ft_mode == "STF":
-            np.savez(file = filename, 
-                     ampl = self.ampl_range, 
-                     freq = self.freq_range, 
-                     sig = self.sigma, 
-                     quan = self.quantiles,
-                     dist_ic86 = self.dist["ic86"],
-                     dist_gen2 = self.dist["gen2"],
-                     dist_wls = self.dist["wls"],
-                     fres_ic86 = self.fres["ic86"],
-                     fres_gen2 = self.fres["gen2"],
-                     fres_wls = self.fres["wls"],
-                     tres_ic86 = self.tres["ic86"],
-                     tres_gen2 = self.tres["gen2"],
-                     tres_wls = self.tres["wls"])
+        np.savez(file = filename, 
+                 ampl = self.ampl_range, 
+                 freq = self.freq_range, 
+                 sig = self.sigma, 
+                 quan = self.quantiles,
+                 dist_ic86 = self.dist["ic86"],
+                 dist_gen2 = self.dist["gen2"],
+                 dist_wls = self.dist["wls"])
         return
             
     def combine(self, filebase, ampl_range, item):
@@ -296,15 +262,7 @@ class Scan():
         gen2 = np.transpose(np.squeeze(gen2), (1,2,0,3))
         wls = np.transpose(np.squeeze(wls), (1,2,0,3))
 
-        # indicator, SIGN saves the significance horizon, FRES the frequency resolution etc.
-        if item == "dist":
-            indic = "SIGN"
-        elif item == "fres":
-            indic = "FRES"
-        elif item == "tres":
-            indic = "TRES"
-
-        filename = filebase.replace("SCAN",indic) +"_ampl_{:.1f}-{:.1f}%.npz".format(ampl_range[0]*100, ampl_range[-1]*100)
+        filename = filebase.replace("SCAN","SIGN") +"_ampl_{:.1f}-{:.1f}%.npz".format(ampl_range[0]*100, ampl_range[-1]*100)
         
         np.savez(file = filename, 
                     ampl = self.ampl_range, 
