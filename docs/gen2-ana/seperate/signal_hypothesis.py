@@ -480,9 +480,6 @@ class Signal_Hypothesis():
         self._fft = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self._fft0 = {"ic86": None, "gen2": None, "wls": None} # just for monitoring, no cuts applied        
         self.ts = {"ic86": None, "gen2": None, "wls": None}
-        self.ffit = {"ic86": None, "gen2": None, "wls": None}
-        self.freq_stat = {"ic86": None, "gen2": None, "wls": None}
-
 
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             # calculate FFT, power = (fourier modes) ** 2
@@ -495,10 +492,6 @@ class Signal_Hypothesis():
     
             # max of FFT is used to build TS distribution
             self.ts[det] = np.nanmax(self._fft[det], axis = -1)
-            self.ffit[det] = self._freq_new[np.argmax(self._fft[det], axis=-1)].value
-            #self.ffit[det] = np.round(self.ffit[det]) # round fit freq, if time window is applied, the fft freq are not integer
-            f0 = self.temp_para["frequency"].value
-            self.freq_stat[det] = np.array([np.median((self.ffit[det]-f0)/f0), np.quantile((self.ffit[det]-f0)/f0, 0.16), np.quantile((self.ffit[det]-f0)/f0, 0.84)]) # median and quantiles of ffit distribution
 
         return
 
@@ -526,17 +519,12 @@ class Signal_Hypothesis():
         self._stf = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
         self._stf0 = {"ic86": None, "gen2": None, "wls": None}
         self.ts = {"ic86": None, "gen2": None, "wls": None}
-        self.ffit = {"ic86": None, "gen2": None, "wls": None}
-        self.tfit = {"ic86": None, "gen2": None, "wls": None}
-        self.freq_stat = {"ic86": None, "gen2": None, "wls": None}
-        self.time_stat = {"ic86": None, "gen2": None, "wls": None}
 
         for det in ["ic86", "gen2", "wls"]: # loop over detector
 
             # empty lists filled in batch loop
             ts = []
-            fit_freq, fit_time = [], []
-
+            
             for bat in trial_batch: # loop over batches
                 
                 # avoid padding as this will introduce artefacts in the FT
@@ -559,18 +547,8 @@ class Signal_Hypothesis():
                 # maximum (hottest pixel) in array of 2D STF, returns array of length sig_trials
                 # value used for ts distribution
                 ts.append(np.nanmax(self._stf[det], axis = (1,2)))
-
-                # get time and freq index position of maximum 
-                ind_freq, ind_time = argmax_lastNaxes(self._stf[det], 2)
-                # get corresponding time and freq of bin
-                fit_freq.append(self._freq_new[ind_freq])
-                fit_time.append(self._time_new[ind_time])
         
             self.ts[det] = np.array(ts).flatten()
-            self.ffit[det], self.tfit[det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten() # reconstructed parameters
-            f0, t0 = self.temp_para["frequency"].value, (self.temp_para["time_start"].value + self.temp_para["time_end"].value)/2 # true parameters
-            self.freq_stat[det] = np.array([np.median((self.ffit[det]-f0)/f0), np.quantile((self.ffit[det]-f0)/f0, 0.16), np.quantile((self.ffit[det]-f0)/f0, 0.84)]) # median and quantiles of ffit-f0/f0 distribution
-            self.time_stat[det] = np.array([np.median((self.tfit[det]-t0)/t0), np.quantile((self.tfit[det]-t0)/t0, 0.16), np.quantile((self.tfit[det]-t0)/t0, 0.84)]) # median and quantiles of tfit-t0/t0 distribution
 
         return
 
@@ -708,8 +686,6 @@ class Signal_Hypothesis():
         pvalue = {"ic86": [], "gen2": [], "wls": []}
         zscore = {"ic86": [], "gen2": [], "wls": []}
         ts_stat = {"null" : {"ic86": [], "gen2": [], "wls": []}, "signal" : {"ic86": [], "gen2": [], "wls": []}}
-        freq_stat = {"ic86": [], "gen2": [], "wls": []}
-        if mode == "STF": time_stat = {"ic86": [], "gen2": [], "wls": []}
 
         for dist in distance_range:
 
@@ -729,20 +705,14 @@ class Signal_Hypothesis():
                 zscore[det].append(self.zscore[det])
                 ts_stat["null"][det].append(self.ts_stat["null"][det])
                 ts_stat["signal"][det].append(self.ts_stat["signal"][det])
-                freq_stat[det].append(self.freq_stat[det])
-                if mode == "STF": time_stat[det].append(self.time_stat[det])
 
         # for each key return array of length (3, len(dist_range))
         Pvalue = {"ic86": [], "gen2": [], "wls": []}
         Zscore = {"ic86": [], "gen2": [], "wls": []}
-        Freq_stat = {"ic86": [], "gen2": [], "wls": []}
-        if mode == "STF": Time_stat = {"ic86": [], "gen2": [], "wls": []}
 
         for det in ["ic86", "gen2", "wls"]: 
             Pvalue[det] = np.transpose(np.array(pvalue[det]))
             Zscore[det] = np.transpose(np.array(zscore[det]))
-            Freq_stat[det] = np.transpose(np.array(freq_stat[det]))
-            if mode == "STF": Time_stat[det] = np.transpose(np.array(time_stat[det]))
 
         Ts_stat = {}
         for key, nested_dict in ts_stat.items():
@@ -750,5 +720,4 @@ class Signal_Hypothesis():
             for nested_key, value in nested_dict.items():
                 Ts_stat[key][nested_key] = np.transpose(np.array(value))
 
-        if mode == "STF": return Pvalue, Zscore, Ts_stat, Freq_stat, Time_stat
-        elif mode == "FFT": return Pvalue, Zscore, Ts_stat, Freq_stat
+        return Pvalue, Zscore, Ts_stat
