@@ -150,7 +150,7 @@ class Reconstruction_Trials():
                     self.time_reco[hypo][det][r*self.batch:(r+1)*self.batch] = reco.time_reco[hypo][det] * u.ms
         
 
-        if self.verbose:
+        if self.verbose and 0:
             plot_reco(self, bins = 100, hypo = "signal", det = "ic86")
             plot_reco(self, bins = 100, hypo = "signal", det = "gen2")
             plot_reco(self, bins = 100, hypo = "signal", det = "wls")
@@ -237,15 +237,15 @@ class Reconstruction_Trials():
     
         return
     
-    def stats(self, ampl_range, dist_range, mode = "load"):
+    def stats(self, ampl_range, dist_range, mode = "load", axis = "distance"):
 
         self.ampl_range = ampl_range
         self.dist_range = dist_range
         
-        if mode == "generate":
+        if mode == "generate" and axis == "distance":
 
             for a, ampl in enumerate(self.ampl_range):
-                print("Amplitude: {}%".format(ampl*100))
+                print("Amplitude: {}%".format(np.round(ampl * 100, 1)))
                 self.set_amplitude(ampl)
 
                 self.freq_stat = {"null" : {"ic86" : np.zeros((self.dist_range.size, 3), dtype=np.float64) * u.Hz, # reconstructed frequency for each detector
@@ -291,6 +291,56 @@ class Reconstruction_Trials():
                         det = det,
                         freq_stat = freq_stat,
                         time_stat = time_stat)
+                
+        elif mode == "generate" and axis == "amplitude":
+
+            for d, dist in enumerate(self.dist_range):
+                print("Distance: {}%".format(dist))
+                self.set_distance(dist)
+
+                self.freq_stat = {"null" : {"ic86" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz, # reconstructed frequency for each detector
+                                            "gen2" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz, 
+                                            "wls": np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz},
+                                  "signal" : {"ic86" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz,
+                                              "gen2" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz, 
+                                              "wls": np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.Hz}}
+
+                self.time_stat = {"null" : {"ic86" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms, # reconstructed frequency for each detector
+                                            "gen2" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms, 
+                                            "wls": np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms},
+                                  "signal" : {"ic86" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms,
+                                              "gen2" : np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms, 
+                                              "wls": np.zeros((self.ampl_range.size, 3), dtype=np.float64) * u.ms}}
+                
+                filename = "./files/reco/{}/{}/STAT_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_dist_{:.1f}kpc_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
+                    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                    self.ft_mode, self.reco_para["duration"].value, self.distance.value, 
+                    self.mixing_scheme, self.hierarchy, self.trials)
+
+
+                for a, ampl in enumerate(self.ampl_range):
+                    print("Amplitude: {}%".format(np.round(ampl * 100, 1)))
+                    self.set_amplitude(ampl)
+                    self.load()
+
+                    for hypo in ["null", "signal"]: # loop over hypothesis
+                        for det in ["ic86", "gen2", "wls"]: # loop over detector
+
+                            rel_freq = self.freq_true-self.freq_reco[hypo][det]
+                            rel_time = self.time_true-self.time_reco[hypo][det]
+
+                            self.freq_stat[hypo][det][a] = np.array([np.median(rel_freq).value, np.quantile(rel_freq, 0.16).value, np.quantile(rel_freq, 0.84).value]) * u.Hz
+                            self.time_stat[hypo][det][a] = np.array([np.median(rel_time).value, np.quantile(rel_time, 0.16).value, np.quantile(rel_time, 0.84).value]) * u.ms
+
+                freq_stat = strip_units(self.freq_stat)
+                time_stat = strip_units(self.time_stat)
+
+                np.savez(file = filename, 
+                        dist = self.dist_range.value, 
+                        hypo = hypo,
+                        det = det,
+                        freq_stat = freq_stat,
+                        time_stat = time_stat)
         
         elif mode == "load":
 
@@ -308,30 +358,49 @@ class Reconstruction_Trials():
                                           "gen2" : np.zeros((self.ampl_range.size, self.dist_range.size, 3), dtype=np.float64) * u.ms, 
                                           "wls": np.zeros((self.ampl_range.size, self.dist_range.size, 3), dtype=np.float64) * u.ms}}
 
-            for a, ampl in enumerate(self.ampl_range):
-                print("Amplitude: {}%".format(ampl*100))
-                self.set_amplitude(ampl)
-             
-                filename = "./files/reco/{}/{}/STAT_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
-                            self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-                            self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
-                            self.mixing_scheme, self.hierarchy, self.trials)
-                data = np.load(filename, allow_pickle=True)
+            if axis == "distance":
+                for a, ampl in enumerate(self.ampl_range):
+                    print("Amplitude: {}%".format(ampl*100))
+                    self.set_amplitude(ampl)
+                
+                    filename = "./files/reco/{}/{}/STAT_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
+                                self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                                self.ft_mode, self.reco_para["duration"].value, self.reco_para["ampl"][0]*100, 
+                                self.mixing_scheme, self.hierarchy, self.trials)
+                    data = np.load(filename, allow_pickle=True)
 
 
-                # add units
-                for hypo in ["null", "signal"]: # loop over hypothesis
-                    for det in ["ic86", "gen2", "wls"]: # loop over detector
-                        self.freq_stat[hypo][det][a] = data["freq_stat"].item()[hypo][det] * u.Hz
-                        self.time_stat[hypo][det][a] = data["time_stat"].item()[hypo][det] * u.ms
-            
-                if self.verbose:
-                    plot_reco_horizon(self, ampl = a, hypo="null")
-                    plot_reco_horizon(self, ampl = a, hypo="signal")
+                    # add units
+                    for hypo in ["null", "signal"]: # loop over hypothesis
+                        for det in ["ic86", "gen2", "wls"]: # loop over detector
+                            self.freq_stat[hypo][det][a] = data["freq_stat"].item()[hypo][det] * u.Hz
+                            self.time_stat[hypo][det][a] = data["time_stat"].item()[hypo][det] * u.ms
+                
+                    if self.verbose:
+                        plot_reco_horizon(self, ampl = a, hypo="null")
+                        plot_reco_horizon(self, ampl = a, hypo="signal")
+
+            elif axis == "amplitude":
+                for d, dist in enumerate(self.dist_range):
+                    print("Distance: {}%".format(dist))
+                    self.set_distance(dist)
+                
+                    filename = "./files/reco/{}/{}/STAT_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_dist_{:.1f}kpc_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
+                                self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                                self.ft_mode, self.reco_para["duration"].value, self.distance.value, 
+                                self.mixing_scheme, self.hierarchy, self.trials)
+                    data = np.load(filename, allow_pickle=True)
+
+
+                    # add units
+                    for hypo in ["null", "signal"]: # loop over hypothesis
+                        for det in ["ic86", "gen2", "wls"]: # loop over detector
+                            self.freq_stat[hypo][det][:,d] = data["freq_stat"].item()[hypo][det] * u.Hz
+                            self.time_stat[hypo][det][:,d] = data["time_stat"].item()[hypo][det] * u.ms
 
         return
     
-    def horizon(self, freq_thresh, time_thresh):
+    def horizon(self, freq_thresh, time_thresh, axis = "distance"):
 
         self.freq_thresh = freq_thresh
         self.time_thresh = time_thresh
@@ -356,20 +425,22 @@ class Reconstruction_Trials():
                 self.freq_diff[hypo][det] = np.abs(self.freq_stat[hypo][det][:,:,2]-self.freq_stat[hypo][det][:,:,1])
                 self.time_diff[hypo][det] = np.abs(self.time_stat[hypo][det][:,:,2]-self.time_stat[hypo][det][:,:,1])
 
-        if self.verbose:
-            for a, ampl in enumerate(self.ampl_range):
+        if axis == "distance":
+            if self.verbose:
+                for a, ampl in enumerate(self.ampl_range):
 
-                plot_reco_horizon_diff(self, ampl = a, hypo = "signal")
-                plot_reco_horizon_diff(self, ampl = a, hypo = "null")
+                    plot_reco_horizon_diff(self, ampl = a, hypo = "signal")
+                    plot_reco_horizon_diff(self, ampl = a, hypo = "null")
 
-        self.freq_hori = resolution_horizon(self.ampl_range, self.dist_range, self.freq_diff, self.freq_thresh)
-        self.time_hori = resolution_horizon(self.ampl_range, self.dist_range, self.time_diff, self.time_thresh)
+            self.freq_hori = resolution_horizon(self.ampl_range, self.dist_range, self.freq_diff, self.freq_thresh)
+            self.time_hori = resolution_horizon(self.ampl_range, self.dist_range, self.time_diff, self.time_thresh)
 
-        if self.verbose:
             plot_reco_horizon_amplitude(self, hypo = "null")
             plot_reco_horizon_amplitude(self, hypo = "signal")
 
-            plot_reco_at_distance(self, dist = [10 * u.kpc, 25 * u.kpc], hypo = "signal")
+        elif axis == "amplitude":
+
+            plot_reco_at_distance(self, hypo = "signal")
 
         return
     
