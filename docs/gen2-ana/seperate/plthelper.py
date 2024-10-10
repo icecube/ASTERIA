@@ -814,13 +814,12 @@ def plot_reco_boot(self, hypo = "signal"):
     self.mixing_scheme, self.hierarchy, self.trials, self.rep_trials, self.repetitions, hypo, self.distance.value)
     plt.savefig(filename, bbox_inches='tight')
 
-def plot_reco_at_distance(self, dist, hypo = "signal"):
+def plot_reco_at_distance(self, hypo = "signal"):
     
     fs = 16
 
     colors = ['C0', 'C1', 'C2']
     lss = ["-", ":"]
-    markers = ["o", "s", "^"]
 
     legend1_handles = []
     legend2_handles = []
@@ -832,13 +831,13 @@ def plot_reco_at_distance(self, dist, hypo = "signal"):
 
     for j, det in enumerate(["ic86", "gen2", "wls"]):
 
-        for i, d in enumerate(dist):
+        for i, d in enumerate(self.dist_range):
             dist_mask = self.dist_range == d
             if i == 0:
-                handle, = ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
+                handle, = ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], ls = lss[i])
                 legend1_handles.append(handle)
-            ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
-            ax[1].plot(self.ampl_range * 100, self.time_diff[hypo][det][:,dist_mask], color = colors[j], marker = markers[j], ls = lss[i])
+            ax[0].plot(self.ampl_range * 100, self.freq_diff[hypo][det][:,dist_mask], color = colors[j], ls = lss[i])
+            ax[1].plot(self.ampl_range * 100, self.time_diff[hypo][det][:,dist_mask], color = colors[j], ls = lss[i])
 
     ax[0].axhline(6.88, color = "grey", ls = "--")
     ax[1].axhline(2*6.88, color = "grey", ls = "--")
