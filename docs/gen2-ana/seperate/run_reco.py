@@ -80,13 +80,16 @@ sim.run()
 ############################################################
 
 # select amplitude
-ampl_range = np.array([2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40, 45, 50])/100 
+#ampl_range = np.array([2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40, 45, 50])/100 
+ampl_range = np.arange(1, 51, 1)/100
+ampl_range = np.round(ampl_range, 2)
 amplitude = np.array([ampl_range[ind_ampl]])
 
 
 # select distance
-dist_min, dist_max, dist_step = 1, 60, 1
-dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
+#dist_min, dist_max, dist_step = 1, 60, 1
+#dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
+dist_range = np.array([10, 25]) * u.kpc
 dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
 
@@ -179,6 +182,7 @@ print("-------------------------")
 reco_dir_name = get_dir_name(para)
 
 MODE = "HORIZON"
+axis = "amplitude"
 print("Mode: {}".format(MODE))
 
 rct = Reconstruction_Trials(sim, para = para, verbose = "debug")
@@ -188,8 +192,8 @@ if MODE == "GENERATE":
     rct.save()
 
 elif MODE == "HORIZON":
-    rct.stats(ampl_range = ampl_range, dist_range = dist_range, mode = "load")
-    rct.horizon(freq_thresh = freq_thresh, time_thresh = time_thresh)
+    rct.stats(ampl_range = ampl_range, dist_range = dist_range, mode = "load", axis = axis)
+    rct.horizon(freq_thresh = freq_thresh, time_thresh = time_thresh, axis = axis)
 
 elif MODE == "BOOTSTRAP":
     rct.bootstrap(rep_trials = 1000, repetitions = 500)
