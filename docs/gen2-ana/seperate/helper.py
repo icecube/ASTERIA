@@ -153,60 +153,6 @@ def resolution_at_horizon(dist_range, quant, horizon, sigma = [3,5]):
 
     return reso
 
-def get_distribution_by_name(name):
-    distribution = getattr(stats, name, None)
-    if distribution is not None and callable(distribution):
-        return distribution
-    else:
-        raise ValueError('{} not a supported method in scipy.stats.'.format(name))
-
-
-def call_distribution(bkg_distr, para, x_hist, log_scale = None):
-    distribution = bkg_distr
-    distr = distribution(*para)
-    if log_scale:
-        return np.log10(distr.pdf(x_hist))
-    else:
-        return distr.pdf(x_hist)
-
-def fit_distribution(bkg_distr, hist, log_scale = None):
-
-    # bin centres and bin counts
-    x_hist, y_hist = hist
-
-    # remove zeros
-    null_mask = y_hist == 0
-    x_hist = x_hist[~null_mask]
-    y_hist = y_hist[~null_mask]
-
-    # fit only values larger than the max
-    #ind_max = np.argmax(y_hist)
-    #x_hist = x_hist[ind_max:]
-    #y_hist = y_hist[ind_max:]
-
-    # distribution number of parameters
-    num_params = len(bkg_distr._param_info())
-
-    # location and scale of distribtion from histogram as initial guess
-    loc = np.sum(x_hist * y_hist) / np.sum(y_hist)
-    std = np.sqrt(np.sum(y_hist * (x_hist - loc)**2) / np.sum(y_hist))
-
-    if num_params == 2:     
-        starting_params = (loc, std)
-    elif num_params == 3:
-        starting_params = (1, loc, std)
-
-    # take logarithm of y values
-    if log_scale: y_hist = np.log10(y_hist)  
-
-    res = minimize(loss_lognorm, x0 = starting_params, args=[x_hist, y_hist, bkg_distr, log_scale], method="Nelder-Mead")
-    return res
-
-def loss_lognorm(para, args):
-    x_hist, y_hist, bkg_distr, log_scale = args
-    y_fit = call_distribution(bkg_distr, para, x_hist, log_scale)
-    return np.sqrt(np.sum((y_fit-y_hist)**2))
-
 def interpolate_bounds(bounds, distance):
     inter_bounds = {"ic86" : [], "gen2" : [], "wls": []}
     for det in ["ic86", "gen2", "wls"]:
