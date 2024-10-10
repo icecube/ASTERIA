@@ -69,49 +69,6 @@ def plot_stft(time, freq, power, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_stft_log(time, freq, log_power, det = "ic86"):
-
-    freq = freq.value
-    time = time.value
-
-    hypos = ["signal", "null"]
-    im, cb = [None,None], [None,None]
-    
-    fig, ax = plt.subplots(1,2, figsize = (10,4))
-
-    for i in range(2):
-        im[i] = ax[i].pcolormesh(time, freq, log_power[hypos[i]][det][0], cmap='viridis', shading = "nearest", vmin = 0, vmax = 3.5)
-        
-        cb = fig.colorbar(im[i])
-        cb.ax.tick_params(labelsize=14)
-        cb.set_label(label=r"$\max_0 \left( \log \{ S(f,t) \} - \langle \log \{  S(f,t) \} \rangle_t \right)$",size=14)
-        ax[i].set_xlabel(r'Time $t-t_{\rm bounce}$ [ms]', fontsize=14)
-        ax[i].set_ylabel(f"Frequency $f$ in [Hz]", fontsize=14)
-        ax[i].yaxis.get_offset_text().set_fontsize(14)
-        ax[i].tick_params(labelsize=14)
-
-    plt.tight_layout()
-
-def plot_stft_time_int(freq, log_int, det = "ic86"):
-
-    freq = freq.value
-
-    diff = log_int["signal"][det][0] - log_int["null"][det][0]
-    
-    fig, ax = plt.subplots(1,1)
-
-    ax.step(freq, log_int["null"][det][0], color = "C0", ls = ":", label=r'$H_{0}$')
-    ax.step(freq, log_int["signal"][det][0], color = "C1", ls = "--", label=r'$H_{1}$')
-    ax.step(freq, diff, color = "k", label = r'$H_{1} - H_{0}$')
-
-    ax.set_xlabel('Frequency [Hz]', fontsize = 14)
-    ax.set_ylabel('summed power', fontsize = 14)
-    ax.set_xlim(0,500)
-    ax.tick_params(labelsize = 14)
-    ax.legend(fontsize = 14, ncol = 3)
-
-    plt.tight_layout()
-
 def plot_ts(ts, bkg_distr, det = "ic86"):
 
     # Plot TS distribution for null and signal hypothesis for gen2
@@ -170,73 +127,7 @@ def plot_ts(ts, bkg_distr, det = "ic86"):
 
     plt.tight_layout()
 
-def plot_fit_freq(fit_freq, det = "ic86"):
-    # Data
-    fit_freq_null, fit_freq_signal = fit_freq["null"][det], fit_freq["signal"][det]
-
-    bins = 499
-
-    fig, ax = plt.subplots()
-
-    ax.hist(fit_freq_null, histtype="step", density=True, bins = bins, range = (1, 499), lw = 2, color="C0", label=r"$H_0$", align='left')
-    ax.hist(fit_freq_signal, histtype="step", density=True, bins = bins, range = (1, 499), lw = 2, color="C1", label=r"$H_1$", align='left')
-    ax.axvline(np.median(fit_freq_null), color="C0")
-    ax.axvline(np.median(fit_freq_signal), color="C1")
-    ax.set_xlabel("Frequency [Hz]", fontsize=14)
-    ax.set_ylabel("Counts", fontsize=14)
-    ax.set_yscale("log")
-    ax.tick_params(labelsize=14)
-    ax.legend(fontsize = 14)
-
-    plt.tight_layout()
-
-def plot_fit_time_freq(fit_freq, fit_time, det = "ic86"):
-    # Data    
-    fit_freq_null, fit_time_null = fit_freq["null"][det], fit_time["null"]["ic86"]
-    fit_freq_signal, fit_time_signal = fit_freq["signal"][det], fit_time["signal"]["ic86"]
-
-    bins = 50
-
-    fig = plt.figure(figsize=(8, 8))
-    gs = fig.add_gridspec(4, 4)
-
-    # Main scatter plot
-    ax_main = fig.add_subplot(gs[1:, :-1])
-    ax_main.scatter(fit_time_null, fit_freq_null, s=10, alpha=0.1, color="C0", label=r"$H_0$")
-    ax_main.scatter(fit_time_signal, fit_freq_signal, s=10, alpha=0.1, color="C1", label=r"$H_1$")
-    ax_main.set_xlabel("Time [ms]", fontsize=14)
-    ax_main.set_ylabel("Frequency [Hz]", fontsize=14)
-    ax_main.tick_params(labelsize=14)
-    ax_main.grid()
-
-    # Top histogram
-    ax_top = fig.add_subplot(gs[0, :-1], sharex=ax_main)
-    ax_top.hist(fit_time_null, bins=bins, range = (0, 1000), alpha=0.5, color="C0", orientation='vertical', align='left')
-    ax_top.hist(fit_time_signal, bins=bins, range = (0, 1000), alpha=0.5, color="C1", orientation='vertical', align='left')
-    ax_top.axvline(np.median(fit_time_null), color="C0")
-    ax_top.axvline(np.median(fit_time_signal), color="C1")
-
-    ax_top.set_ylabel("Counts", fontsize=14)
-    ax_top.tick_params(labelsize=14)
-
-    # Right histogram
-    ax_right = fig.add_subplot(gs[1:, -1], sharey=ax_main)
-    ax_right.hist(fit_freq_null, bins=bins, range = (0, 500), alpha=0.5, color="C0", orientation='horizontal', align='left')
-    ax_right.hist(fit_freq_signal, bins=bins, range = (0, 500), alpha=0.5, color="C1", orientation='horizontal', align='left')
-    ax_right.axhline(np.median(fit_freq_null), color="C0")
-    ax_right.axhline(np.median(fit_freq_signal), color="C1")
-    ax_right.set_xlabel("Counts", fontsize=14)
-    ax_right.tick_params(labelsize=14)
-
-    # Adjusting legend handles
-    leg = ax_main.legend(fontsize=14)
-    for h in leg.legend_handles:
-        h.set_alpha(1)  # Set legend handle opacity to 1 (opaque)
-        h.set_sizes([30])  # Set legend handle size to 30
-
-    plt.tight_layout()
-
-def plot_significance(self, save = False):
+def plot_significance(self):
 
     dist_range = copy.deepcopy(self.dist_range)
     zscore = copy.deepcopy(self.Zscore)
@@ -315,75 +206,16 @@ def plot_significance(self, save = False):
     ax[1].grid()
     plt.tight_layout()
 
-    if save:
-        filename = self._file + "/plots/scan/{}/{}/SIG_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_bins_{:1.0e}.pdf".format(
-                   self.ft_mode, self.scan_dir_name, 
-                   self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
-                   self.ft_mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
-                   self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
-                   self.mixing_scheme, self.hierarchy,
-                   self.sig_var * 100, self.bkg_var * 100,
-                   self.sig_trials, self.bkg_trials, self.bkg_bins)
-        plt.savefig(filename)
-        plt.close()
-
-def plot_resolution(self, type, save = False):
-
-    dist_range = copy.deepcopy(self.dist_range)
-    zscore = copy.deepcopy(self.Zscore)
-
-    if type == "freq":
-        quant = copy.deepcopy(self.Freq_stat)
-        qstring = "FRES"
-    elif type == "time":
-        quant = copy.deepcopy(self.Time_stat)
-        qstring = "TRES"
-
-    fig, ax = plt.subplots(1,2, figsize = (14,4))
-    ax = ax.ravel()
-
-    labels = [r'$IceCube$', r'$Gen2$', r'$Gen2+WLS$']
-    colors = ['C0', 'C1', 'C2']
-
-    for i, det in enumerate(["ic86", "gen2", "wls"]):
-
-        ax[0].plot(dist_range, 100 * quant[det][0], label=labels[i], color = colors[i])
-        ax[0].fill_between(dist_range.value, 100 * quant[det][1], 100 * quant[det][2], color = colors[i], alpha = 0.2)
-
-        ax[1].plot(zscore[det][0], 100 * quant[det][0], label=labels[i], color = colors[i])
-        ax[1].fill_between(zscore[det][0], 100 * quant[det][1], 100 * quant[det][2], color = colors[i], alpha = 0.2)
-
-    ax[0].set_xlabel('Distance d [kpc]', fontsize = 12)
-    ax[0].set_ylabel(r'$H_1: (q_{reco} - q_{true})/q_{true}$ [%]' , fontsize = 12)
-    ax[0].set_yscale("symlog")
-    ax[0].tick_params(labelsize = 12)
-    ax[0].grid()
-
-    ax[1].set_xlabel(r'SASI detection significance [$\sigma$]' , fontsize = 12)
-    ax[1].set_ylabel(r'$H_1: (q_{reco} - q_{true})/q_{true}$ [%]' , fontsize = 12)
-    ax[1].legend()
-
-    ax[1].set_yscale("symlog", linthresh = 1)
-    ax[1].set_xticks([1,2,3,4,5])
-    ax[1].get_xaxis().set_major_formatter(ScalarFormatter())
-    ax[1].tick_params(labelsize = 12)
-
-    ax[1].axvline(3, color = "k", ls = "--")
-    ax[1].axvline(5, color = "k", ls = "--")
-
-    plt.tight_layout()
-
-    if save:
-        filename = self._file + "/plots/scan/{}/{}/{}_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_bins_{:1.0e}.pdf".format(
-                   self.ft_mode, self.scan_dir_name, qstring,
-                   self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
-                   self.ft_mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
-                   self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
-                   self.mixing_scheme, self.hierarchy,
-                   self.sig_var * 100, self.bkg_var * 100,
-                   self.sig_trials, self.bkg_trials, self.bkg_bins)
-        plt.savefig(filename)
-        plt.close()
+    filename = self._file + "/plots/scan/{}/{}/SIG_model_{}_{:.0f}_mode_{}_ampl_{:.1f}%_freq_{:.0f}Hz_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_bins_{:1.0e}.pdf".format(
+                self.ft_mode, self.scan_dir_name, 
+                self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
+                self.ft_mode, self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value,
+                self.temp_para["time_start"].value, self.temp_para["time_end"].value, 
+                self.mixing_scheme, self.hierarchy,
+                self.sig_var * 100, self.bkg_var * 100,
+                self.sig_trials, self.bkg_trials, self.bkg_bins)
+    plt.savefig(filename)
+    plt.close()
 
 def plot_para_scan(freq_range, ampl_range, data, det, sig, quant, type = "sign", scale = None, relative = False):
 
@@ -518,69 +350,6 @@ def plot_bootstrap(zscore):
 
     return fig, ax
 
-def plot_hist_fit(ts_binned, fit_func, pvalue, bins, det = "ic86"):
-
-    ts_xhist, ts_yhist = ts_binned[det]
-    pvals = pvalue[det]
-
-    zscore = norm.isf(pvals/2)
-    diff_zscore = np.diff(zscore)
-
-    # get fit params from npz file for given det and distance
-    fig, ax = plt.subplots(2,2, figsize = (10,10))
-    ax = ax.ravel()
-
-    ax[0].step(ts_xhist, ts_yhist)
-    ax[0].plot(ts_xhist, fit_func.pdf(ts_xhist), "k:")
-    ax[0].set_ylabel("Normalized Counts")
-    ax[0].set_yscale("log")
-    ax[0].set_xticklabels([]) #Remove x-tic labels for the first frame
-
-    # residual axis
-    rax0 = ax[0].inset_axes([0, -0.25, 1, 0.2])
-    rax0.plot(ts_xhist, (ts_yhist-fit_func.pdf(ts_xhist))/ts_yhist, color='k')
-    rax0.set_xlabel("TS value")
-    rax0.set_ylabel("rel. residuals")
-    rax0.set_yscale("log")
-
-    ax[1].step(ts_xhist, pvals, color = "C0")
-    ax[1].plot(ts_xhist, fit_func.sf(ts_xhist), "k:")
-    ax[1].set_ylabel("p-value")
-    ax[1].set_xticklabels([]) #Remove x-tic labels for the first frame
-
-    ax11 = ax[1].twinx()
-    ax11.step(ts_xhist, zscore, color = "C1")
-    ax11.plot(ts_xhist, norm.isf(fit_func.sf(ts_xhist)/2), "k:")
-    ax11.set_ylabel(r"Z-score ($\sigma$)")
-
-    # residual axis
-    rax1 = ax[1].inset_axes([0, -0.25, 1, 0.2])
-    rax1.plot(ts_xhist, pvals-fit_func.sf(ts_xhist), color='C0')
-    rax1.plot(ts_xhist, (zscore-norm.isf(fit_func.sf(ts_xhist)/2))/zscore, color='C1', ls = "--")
-    rax1.set_xlabel("TS value")
-    rax1.set_ylabel("rel. residuals")
-    rax1.set_yscale("log")
-
-    ax[1].spines['left'].set_color('C0')
-    ax[1].yaxis.label.set_color('C0')
-    ax[1].tick_params(axis='y', colors='C0')
-    ax11.spines['right'].set_color('C1')
-    ax11.yaxis.label.set_color('C1')
-    ax11.tick_params(axis='y', colors='C1')
-    ax11.grid(axis="y")
-
-    ax[2].step((ts_xhist[1:]+ts_xhist[:-1])/2, diff_zscore, color = "C1")
-    ax[2].set_xlabel("TS value")
-    ax[2].set_ylabel(r"$\Delta$Z-score ($\Delta\sigma$)")
-
-    ax[3].hist(diff_zscore[~np.isinf(diff_zscore)], bins = int(np.sqrt(bins)))
-    ax[3].set_xlabel(r"$\Delta$Z-score ($\Delta\sigma$)")
-    ax[3].set_ylabel("Normalized Counts")
-    ax[3].set_yscale("log")
-
-    plt.tight_layout()
-    plt.show()
-
 def plot_summary_fft(self, relative = True, det = "ic86"):
     
     filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
@@ -591,7 +360,7 @@ def plot_summary_fft(self, relative = True, det = "ic86"):
     bkg_hist = np.load(filename_in)
 
     fs = 12 # fontsize
-    fig, ax = plt.subplots(2,2, figsize = (10,10))
+    fig, ax = plt.subplots(1,3, figsize = (10,3))
     ax = ax.ravel()
 
     # plot hit rate over time
@@ -630,47 +399,6 @@ def plot_summary_fft(self, relative = True, det = "ic86"):
     ax[2].legend(loc = "upper right", fontsize = fs)
     ax[2].tick_params(labelsize = fs)
     ax[2].grid()              
-
-    # plot TS value and relative best fit frequency with marginal distribitions to the side
-    if relative: ffit = (self.ffit[det] - self.temp_para["frequency"].value)/self.temp_para["frequency"].value * 100
-    else: ffit = self.ffit[det]
-    ax[3].scatter(self.ts[det], ffit, alpha=0.2)
-    ax[3].set_xlabel("TS value", fontsize = fs)
-    ax[3].set_ylabel(r"$(f_{reco} - f_{true})/f_{true}$ [%]", fontsize = fs)
-    ax[3].tick_params(labelsize = fs)
-    ax[3].grid() 
-
-    # add marginal plots to ax[3]
-    divider = make_axes_locatable(ax[3])
-    ax_top = divider.append_axes("top", 0.4, pad=0.3, sharex=ax[3])
-    ax_right = divider.append_axes("right", 0.4, pad=0.3, sharey=ax[3])
-
-    # histogram for TS above the scatter plot
-    ax_top.hist(self.ts[det], bins=100, density=True, color='grey', orientation='vertical')
-    ax_top.grid()
-    ax_top.set_ylabel("%", fontsize = fs)
-    ax_top.tick_params(labelsize=fs)
-
-    # histogram for best fit frequency to the right of the scatter plot
-    # for unrounded ffit
-    #mask = np.logical_and(self._freq_new.value >= ffit_min, self._freq_new.value <= ffit_max)
-    #ffit_range = np.round(self._freq_new.value)[mask]
-
-    ffit_min, ffit_max, dffit = self.ffit[det].min(), self.ffit[det].max(), np.diff(self._freq_new.value)[0]
-    ffit_range = np.arange(ffit_min, ffit_max + 2*dffit, dffit)
-    
-    f0 = self.temp_para["frequency"].value
-    if relative:
-        ffit_range = (ffit_range - self.temp_para["frequency"].value)/self.temp_para["frequency"].value * 100
-        f0 = 0
-
-    ax_right.hist(ffit, bins = ffit_range, density=True, color='grey', orientation='horizontal', align = "left")
-    ax_right.axhline(np.median(ffit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
-    ax_right.axhline(f0, color="C1", lw = 2, label = r"$f_{true}$")
-    ax_right.set_xlabel("%", fontsize = fs)
-    ax_right.tick_params(labelsize = fs)
-    ax_right.grid()
-    ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
     
     # filename of summary plot
     model_str = "ampl_{:.1f}%_freq_{:.0f}Hz".format(self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value) # each model is saved in its own directory
@@ -699,7 +427,7 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
     bkg_hist = np.load(filename_in)
     
     fs = 12 # fontsize
-    fig, ax = plt.subplots(2,2, figsize = (10,10))
+    fig, ax = plt.subplots(1,3, figsize = (10,3))
     ax = ax.ravel()
 
     f0 = self.temp_para["frequency"].value
@@ -746,60 +474,6 @@ def plot_summary_stf(self, relative = True, det = "ic86"):
     ax[2].legend(loc = "upper right", fontsize = fs)
     ax[2].tick_params(labelsize = fs)
     ax[2].grid()              
-
-    # plot TS value and relative best fit frequency with marginal distribitions to the side
-    if relative: 
-        ffit = (self.ffit[det] - f0)/f0 * 100
-        tfit = (self.tfit[det] - t0)/t0 * 100
-    else: 
-        ffit = self.ffit[det]
-        tfit = self.tfit[det]
-
-    im = ax[3].scatter(x = tfit, y = ffit, c = self.ts[det], cmap = "viridis", alpha=0.1)
-    ax[3].set_xlabel(r"$(t_{reco} - t_{true})/t_{true}$ [%]", fontsize = fs)
-    ax[3].set_ylabel(r"$(f_{reco} - f_{true})/f_{true}$ [%]", fontsize = fs)
-    ax[3].tick_params(labelsize = fs)
-    ax[3].grid() 
-
-    cb = fig.colorbar(im)
-    cb.ax.tick_params(labelsize = fs)
-    cb.solids.set(alpha=1)
-    cb.set_label(label=r"TS value",size = fs)
-
-    # add marginal plots to ax[3]
-    divider = make_axes_locatable(ax[3])
-    ax_top = divider.append_axes("top", 0.4, pad=0.3, sharex=ax[3])
-    ax_right = divider.append_axes("right", 0.4, pad=0.3, sharey=ax[3])
-
-    # histogram for best fit frequency to the right of the scatter plot
-    ffit_min, ffit_max, dffit = self.ffit[det].min(), self.ffit[det].max(), np.diff(self._freq_new.value)[0]
-    ffit_range = np.arange(ffit_min, ffit_max + 2*dffit, dffit)
-
-    tfit_min, tfit_max, dtfit = self.tfit[det].min(), self.tfit[det].max(), np.diff(self._time_new.value)[0]
-    tfit_range = np.arange(tfit_min, tfit_max + 2*dtfit, dtfit)
-
-    f0 = self.temp_para["frequency"].value
-    if relative:
-        ffit_range = (ffit_range - f0)/f0 * 100
-        tfit_range = (tfit_range - t0)/t0 * 100
-        f0, t0 = 0, 0
-
-    # histogram for reco time above the scatter plot
-    ax_top.hist(tfit, bins = tfit_range, density=True, color='grey', orientation='vertical', align = "left")
-    ax_top.axvline(np.median(tfit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
-    ax_top.axvline(t0, color="C1", lw = 2, label = r"$f_{true}$")
-    ax_top.set_xlabel("%", fontsize = fs)
-    ax_top.tick_params(labelsize = fs)
-    ax_top.grid()
-
-    # histogram for reco freq above the scatter plot
-    ax_right.hist(ffit, bins = ffit_range, density=True, color='grey', orientation='horizontal', align = "left")
-    ax_right.axhline(np.median(ffit), color="C0", ls = "--", lw = 2, label = r"$\langle f_{reco} \rangle$")
-    ax_right.axhline(f0, color="C1", lw = 2, label = r"$f_{true}$")
-    ax_right.set_xlabel("%", fontsize = fs)
-    ax_right.tick_params(labelsize = fs)
-    ax_right.grid()
-    ax_right.legend(loc = "upper center", fontsize = fs, bbox_to_anchor=(0.5, 1.3))
     
     # filename of summary plot
     model_str = "ampl_{:.1f}%_freq_{:.0f}Hz".format(self.temp_para["amplitude"] * 100, self.temp_para["frequency"].value) # each model is saved in its own directory
