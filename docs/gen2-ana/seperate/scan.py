@@ -273,3 +273,40 @@ class Scan():
                     gen2 = gen2,
                     wls = wls)
         return
+    
+    def frequency_average(self, filename, ampl_range):
+        self.ampl_range = ampl_range
+        
+        data = np.load(filename)
+
+        ic86 = np.zeros((len(self.sigma), self.ampl_range.size, 4))
+        gen2 = np.zeros((len(self.sigma), self.ampl_range.size, 4))
+        wls = np.zeros((len(self.sigma), self.ampl_range.size, 4))
+
+        for s, sig in enumerate(self.sigma):
+            for i, det in enumerate(["ic86", "gen2", "wls"]):
+
+                mean, std = np.nanmean(np.abs(data[det][s,:,:,0]), axis = 0), np.nanstd(np.abs(data[det][s,:,:,0]), axis = 0)
+                q16, q84 = np.nanmean(np.abs(data[det][s,:,:,1]), axis = 0), np.nanmean(np.abs(data[det][s,:,:,2]), axis = 0)
+
+                vals = np.array([mean, std, q16, q84]).T # transverse from (4, len(ampl_range)) to (len(ampl_range), 4)
+
+                if det == "ic86":
+                    ic86[s,:,:] = vals
+                elif det == "gen2":
+                    gen2[s,:,:] = vals
+                elif det == "wls":
+                    wls[s,:,:] = vals
+
+        filename = filename.replace("SIGN","SIGN_FAVG")
+
+        np.savez(file = filename, 
+                    ampl = self.ampl_range, 
+                    freq = self.freq_range, 
+                    sig = self.sigma, 
+                    quan = self.quantiles,
+                    ic86 = ic86,
+                    gen2 = gen2,
+                    wls = wls)
+
+        return
