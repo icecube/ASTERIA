@@ -165,7 +165,7 @@ print("mixing scheme: {}, hierarchy: {}".format(mixing_scheme, hierarchy))
 print("-------------------------")
 
 scan_dir_name = get_dir_name(para)
-MODE = "RUN"
+MODE = "COMBINE"
 
 scan = Scan(sim, para = para, verbose = "debug")
 
@@ -182,8 +182,15 @@ if MODE == "RUN":
 
 elif MODE == "COMBINE":
     # COMBINE DATA
-    filebase = "./files/scan/{}/{}/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}".format(
+    #filebase = "./files/scan/{}/{}/SCAN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}".format(
+    #    ft_mode, scan_dir_name, model["name"], model["param"]["progenitor_mass"].value, 
+    #    ft_mode, time_start.value, time_end.value, mixing_scheme, hierarchy,
+    #    sig_var * 100, bkg_var * 100, sig_trials, bkg_trials)
+    #scan.combine(filebase = filebase, ampl_range = ampl_range, item = "dist")
+
+    filename = "./files/scan/{}/{}/SIGN_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}".format(
         ft_mode, scan_dir_name, model["name"], model["param"]["progenitor_mass"].value, 
         ft_mode, time_start.value, time_end.value, mixing_scheme, hierarchy,
-        sig_var * 100, bkg_var * 100, sig_trials, bkg_trials)
-    scan.combine(filebase = filebase, ampl_range = ampl_range, item = "dist")
+        sig_var * 100, bkg_var * 100, sig_trials, bkg_trials) +"_ampl_{:.1f}-{:.1f}%.npz".format(
+        ampl_range[0]*100, ampl_range[-1]*100)
+    scan.frequency_average(filename = filename, ampl_range = ampl_range)
