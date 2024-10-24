@@ -444,6 +444,76 @@ class Reconstruction_Trials():
 
         return
     
+    def reco_at_significance(self, scan_para):
+
+        ampl_range, amplitude, sig_trials, bkg_trials, time_start, time_end, sigma = scan_para
+
+        self.ampl_range = ampl_range
+
+        self.freq_reco_sig = {"ic86" : np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.Hz, # reconstructed frequency at significance for each detector
+                              "gen2" : np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.Hz, 
+                              "wls": np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.Hz}
+
+        self.time_reco_sig = {"ic86" : np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.ms, # reconstructed time at significance for each detector
+                              "gen2" : np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.ms, 
+                              "wls": np.zeros((len(sigma), amplitude.size, 3), dtype=np.float64) * u.ms}                  
+
+        # filename for detection horizon data
+        filename = "./files/scan/{}/{}/SIGN_FAVG_model_{}_{:.0f}_mode_{}_time_{:.0f}ms-{:.0f}ms_mix_{}_hier_{}_sig_var_{:.0f}%_bkg_var_{:.0f}%_sig_trials_{:1.0e}_bkg_trials_{:1.0e}_ampl_{:.1f}-{:.1f}%.npz".format(
+                self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                self.ft_mode, time_start.value, time_end.value, self.mixing_scheme, self.hierarchy,
+                self.sig_var * 100, self.bkg_var * 100, sig_trials, bkg_trials, self.ampl_range[0]*100, self.ampl_range[-1]*100)
+
+        print("Filename detection horizon: {}".format(filename))
+
+        data = np.load(filename)
+
+        for det in ["ic86", "gen2", "wls"]: # loop over detector
+            print("Detector: {}".format(det))
+
+            for s, sig in enumerate(sigma): # loop over significance level
+                print("Significance: {} sigma".format(sig))
+
+                for a, ampl in enumerate(amplitude): # loop over amplitude of model
+
+                    print("Amplitude: {}%".format(ampl*100))
+                    self.set_amplitude(ampl)
+
+                    mean, std, q16, q84 = data[det][s][ampl_range == ampl].flatten() # read in horizon from SIGN_FAVG file
+                    horizon = [mean, q16, q84] * u.kpc # compute resolution at mean and quantiles
+                    if self.verbose: print("{} sigma detection horizon {}: {:.3f}+{:.3f}-{:.3f} kpc".format(sig, det, mean, q84-mean, mean-q16))
+
+                    for d, dist in enumerate(horizon):
+                        
+                        if np.isnan(dist): # if detection horizon is nan e.g. for (low ampl, 5sigma, ic86)
+                            self.freq_reco_sig[det][s,a,d] = np.nan 
+                            self.time_reco_sig[det][s,a,d] = np.nan
+                            continue
+
+                        self.set_distance(dist)
+                        print("Distance: {:.3f}".format(self.distance))
+                        self.generate() # run reconstruction
+
+                        rel_freq = self.freq_true-self.freq_reco["signal"][det] # take only detect that is on horizon
+                        rel_time = self.time_true-self.time_reco["signal"][det]
+
+                        self.freq_reco_sig[det][s,a,d] = np.quantile(rel_freq, 0.84) - np.quantile(rel_freq, 0.16) 
+                        self.time_reco_sig[det][s,a,d] = np.quantile(rel_time, 0.84) - np.quantile(rel_time, 0.16)
+
+        filename = "./files/reco/{}/{}/RECO_SIG_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
+                    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                    self.ft_mode, self.reco_para["duration"].value, amplitude[0] * 100,
+                    self.mixing_scheme, self.hierarchy, self.trials)
+
+        np.savez(file = filename, 
+                 ampl = amplitude,
+                 det = det,
+                 sigma = sigma,
+                 freq_reco_sig = self.freq_reco_sig,
+                 time_reco_sig = self.time_reco_sig)
+        
+        return
+            
     def bootstrap(self, filename, rep_trials = 10000, repetitions = 100):
 
         self.rep_trials = rep_trials
