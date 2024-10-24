@@ -79,17 +79,23 @@ sim.run()
 #######################TEMPLATE SETUP#######################
 ############################################################
 
+axis = "distance" # "distace", "amplitude"
+
 # select amplitude
-#ampl_range = np.array([2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40, 45, 50])/100 
-ampl_range = np.arange(1, 51, 1)/100
-ampl_range = np.round(ampl_range, 2)
+if axis == "distance":
+    ampl_range = np.array([2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40, 45, 50])/100 
+elif axis == "amplitude":
+    ampl_range = np.arange(1, 51, 1)/100
+ampl_range = np.round(ampl_range, 3)
 amplitude = np.array([ampl_range[ind_ampl]])
 
 
 # select distance
-#dist_min, dist_max, dist_step = 1, 60, 1
-#dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
-dist_range = np.array([10, 25]) * u.kpc
+if axis == "distance":
+    dist_min, dist_max, dist_step = 1, 60, 1
+    dist_range = np.arange(dist_min, dist_max + dist_step, dist_step) * u.kpc
+elif axis == "ampl_range":  
+    dist_range = np.array([10, 25]) * u.kpc
 dist_range = np.round(dist_range, 1)
 distance = dist_range[ind_dist]
 
@@ -181,8 +187,8 @@ print("-------------------------")
 
 reco_dir_name = get_dir_name(para)
 
-MODE = "HORIZON"
-axis = "amplitude"
+MODE = "SIGNIFICANCE" # "GENERATE", "HORIZON", "SIGNIFICANCE", "BOOTSTRAP"
+axis = "amplitude" # "distace", "amplitude"
 print("Mode: {}".format(MODE))
 
 rct = Reconstruction_Trials(sim, para = para, verbose = "debug")
@@ -194,6 +200,15 @@ if MODE == "GENERATE":
 elif MODE == "HORIZON":
     rct.stats(ampl_range = ampl_range, dist_range = dist_range, mode = "load", axis = axis)
     rct.horizon(freq_thresh = freq_thresh, time_thresh = time_thresh, axis = axis)
+
+elif MODE == "SIGNIFICANCE":
+
+    sig_trial, bkg_trials = 1E4, 1E8
+    time_start, time_end = 150 * u.ms, 300 * u.ms
+    sigma = [3,5]
+    scan_stat = (ampl_range, amplitude, sig_trial, bkg_trials, time_start, time_end, sigma)
+    
+    rct.reco_at_significance(scan_stat)
 
 elif MODE == "BOOTSTRAP":
     rct.bootstrap(rep_trials = 1000, repetitions = 500)
