@@ -513,6 +513,82 @@ class Reconstruction_Trials():
                  time_reco_sig = self.time_reco_sig)
         
         return
+    
+    def combine(self, scan_para):
+
+        ampl_range, amplitude, sig_trials, bkg_trials, time_start, time_end, sigma = scan_para
+
+        self.ampl_range = ampl_range
+
+        self.freq_reco_sig = {"ic86" : np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.Hz, # reconstructed frequency at significance for each detector
+                              "gen2" : np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.Hz, 
+                              "wls": np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.Hz}
+
+        self.time_reco_sig = {"ic86" : np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.ms, # reconstructed time at significance for each detector
+                              "gen2" : np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.ms, 
+                              "wls": np.zeros((len(sigma), self.ampl_range.size, 3), dtype=np.float64) * u.ms}                  
+
+        for a, ampl in enumerate(self.ampl_range):
+            filename = "./files/reco/{}/{}/RECO_SIG_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_ampl_{:.1f}%_mix_{}_hier_{}_trials_{:1.0e}.npz".format(
+                    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                    self.ft_mode, self.reco_para["duration"].value, ampl * 100,
+                    self.mixing_scheme, self.hierarchy, self.trials)
+            data = np.load(filename, allow_pickle = True)
+
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                    self.freq_reco_sig[det][:,a,:] = data["freq_reco_sig"].item()[det].squeeze()
+                    self.time_reco_sig[det][:,a,:] = data["time_reco_sig"].item()[det].squeeze()
+
+        
+        if 1:
+            import matplotlib.pyplot as plt
+
+            fig, ax = plt.subplots(2,2, figsize = (6,6), sharex = "all")
+            fig.subplots_adjust(hspace=0, wspace=0)
+            ax = ax.ravel()
+            labels = ["IceCube", "Gen2", "Gen2+WLS"]
+            colors = ["C0", "C1", "C2"]
+            ii = 0
+            for i in range(2):
+                if i == 0: item = self.freq_reco_sig
+                elif i == 1: item = self.time_reco_sig
+
+                for s, sig in enumerate(sigma): # loop over significance
+                    for j, det in enumerate(["ic86", "gen2", "wls"]): # loop over detector
+
+                        y = item[det][s][:,0].value
+                        ylow = y-item[det][s,:,1].value
+                        yhig = item[det][s,:,2].value-y
+                        ylow = np.where(np.isnan(ylow) | (ylow < 0), 0, ylow) # because of numerical limitations, there can be negative and np.nan values in ylow. We set those to 0.
+                        
+                        ax[ii].errorbar(self.ampl_range * 100, y = y, yerr = (ylow, yhig), label = labels[j], color = colors[j], marker = "o", ls = "none", capsize = 5)
+                        han, lab = ax[0].get_legend_handles_labels()    
+                        
+                        #ax[ii].axhline(np.nanmean(y), color = colors[j], ls = "--", lw = 1)
+                        #ax[ii].axhline(np.nanmedian(y), color = colors[j], ls = "-", lw = 1)
+
+                    if ii >= 2: ax[ii].set_xlabel("Amplitude [%]")
+                    if ii < 2: ax[ii].set_ylabel("Resolution [Hz] at {:.0f}$\sigma$".format(sig))
+                    if ii >= 2: ax[ii].set_ylabel("Resolution [ms] at {:.0f}$\sigma$".format(sig))
+
+                    ii+=1
+            ax[0].set_ylim(6.5,12)
+
+            #ax[0].set_yscale("log")
+
+            fig.legend(han, lab, loc="upper center", fontsize=14, ncols = 3)
+
+            filename = "./plots/reco/{}/{}/RECO_SIG_model_{}_{:.0f}_mode_{}_duration_{:.0f}ms_mix_{}_hier_{}_trials_{:1.0e}.pdf".format(
+                    self.ft_mode, self.reco_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
+                    self.ft_mode, self.reco_para["duration"].value,
+                    self.mixing_scheme, self.hierarchy, self.trials)
+            
+            fig.tight_layout()
+            plt.savefig(filename)
+            plt.show()
+
+        return
+
             
     def bootstrap(self, filename, rep_trials = 10000, repetitions = 100):
 
