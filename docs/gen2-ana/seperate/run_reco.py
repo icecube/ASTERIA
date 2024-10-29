@@ -208,7 +208,8 @@ elif MODE == "SIGNIFICANCE":
     sigma = [3,5]
     scan_stat = (ampl_range, amplitude, sig_trial, bkg_trials, time_start, time_end, sigma)
     
-    rct.reco_at_significance(scan_stat)
+    #rct.reco_at_significance(scan_stat)
+    rct.combine(scan_stat)
 
 elif MODE == "BOOTSTRAP":
     rct.bootstrap(rep_trials = 1000, repetitions = 500)
