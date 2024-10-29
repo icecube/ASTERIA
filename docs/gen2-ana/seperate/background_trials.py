@@ -93,9 +93,10 @@ class Background_Trials():
                     model = "generic", smoothing = False)
 
             for det in ["ic86", "gen2", "wls"]: # loop over subdetectors
-                if r == 0: bkg_min, bkg_max = nlh.ts[det].min(), nlh.ts[det].max()
+                if r == 0: 
+                    bkg_min, bkg_max = nlh.ts[det].min(), nlh.ts[det].max()
+                    bounds[det] = (0.1 * bkg_min, 1.9 * bkg_max)
 
-                bounds[det] = (0.1 * bkg_min, 1.9 * bkg_max)
                 hist_y, hist_bins = np.histogram(nlh.ts[det] , bins = self.bkg_bins, range = bounds[det], density=True)
 
                 if r == 0: # x values are always the same
