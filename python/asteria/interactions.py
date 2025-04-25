@@ -768,16 +768,12 @@ class Oxygen18(Interaction):
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
 
-class _InteractionsMeta(type):
-    """Internal metaclass for Interactions enumeration object.
-    Enables iteration of interactions without requiring an instance
-
-    .. data:: _defaults : tuple of asteria.interaction.Interaction
-    Tuple of ASTERIA neutrino interaction objects used by default.
-
-    Note: Using a metaclass (different than a parent class) enables overwriting the __iter__
-    method, so this object may be iterated both with or without instantiating it.
+class Interactions:
+    """ Public-facing enumeration object for ASTERIA Interactions
+    Iterating this object without instantiating it will yield a set of default
+    asteria Interactions
     """
+
     _defaults = (
         ElectronScatter(),
         InvBetaPar(),
@@ -786,25 +782,6 @@ class _InteractionsMeta(type):
         Oxygen18()
     )
 
-    def __iter__(self):
-        """Iterate through the default list of interactions
-        """
-        for interaction in self._defaults:
-            yield interaction
-
-    def __repr__(self):
-        return "\n".join(["Interactions: "]+[f"{i:>2d} - {x.__name__}" for i, x in enumerate(self)])
-
-    def __len__(self):
-        return len(self._defaults)
-
-
-class Interactions(metaclass=_InteractionsMeta):
-    """ Public-facing enumeration object for ASTERIA Interactions
-    Iterating this object without instantiating it will yield a set of default
-    asteria Interactions
-    """
-
     def __init__(self, interactions=None):
         """Initialization for custom Interaction enumeration object.
 
@@ -812,7 +789,9 @@ class Interactions(metaclass=_InteractionsMeta):
         ----------
         interactions : list, tuple or numpy.ndarray of asteria.interactions.Interaction
         """
-        if interactions is not None:
+        if interactions is None:
+            self._values = self._defaults
+        else:
             if not isinstance(interactions, (list, tuple, np.ndarray)):
                 raise ValueError("Invalid iterable for interactions, expected list,"
                                  f"tuple or numpy.ndarray, but received {type(interactions)}")
