@@ -779,11 +779,11 @@ class _InteractionsMeta(type):
     method, so this object may be iterated both with or without instantiating it.
     """
     _defaults = (
-        ElectronScatter,
-        InvBetaPar,
-        Oxygen16CC,
-        Oxygen16NC,
-        Oxygen18
+        ElectronScatter(),
+        InvBetaPar(),
+        Oxygen16CC(),
+        Oxygen16NC(),
+        Oxygen18()
     )
 
     def __iter__(self):
