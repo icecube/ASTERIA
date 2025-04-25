@@ -802,13 +802,20 @@ class Interactions:
             elif len(set(interactions)) != len(interactions):
                 raise ValueError("Duplicate interactions requested")
 
+            elif any([isinstance(i, Interaction) for i in interactions]):
+                raise ValueError("Interaction instance requested, please request interactions by class "
+                                 "(i.e. ElectronScatter)")
+
             elif any(not issubclass(x, Interaction) for x in interactions):
                 idx = np.where([not issubclass(x, Interaction) for x in interactions])[0][0]
                 raise ValueError(f"Invalid interaction {interactions[idx]} at index {idx}, "
                                  "only Interaction objects derived from asteria.interactions.Interaction "
                                  "are supported")
 
-            self._values = tuple(interactions)
+            # Create tuple of requested interaction object instances. The above checks are intended to guard against
+            # use of invalid Interaction types
+            self._values = tuple([i() for i in interactions])
+
 
     def __iter__(self):
         """Iterate through a custom list of interactions
@@ -822,4 +829,4 @@ class Interactions:
         return len(self._values)
 
     def __repr__(self):
-        return "\n".join(["Interactions: "]+[f"{i:>2d} - {x.__name__}" for i, x in enumerate(self)])
+        return "\n".join(["Interactions: "]+[f"{i:>2d} - {x.__class__.__name__}" for i, x in enumerate(self)])
