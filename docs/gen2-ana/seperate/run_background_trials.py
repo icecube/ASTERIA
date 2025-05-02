@@ -34,8 +34,8 @@ model = {'name': 'Sukhbold_2015',
         }
 
 # neutrino flavor mixing scheme and hierarchy
-mixing_scheme = "NoTransformation" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
-hierarchy = "normal" #"normal", "inverted"
+mixing_scheme = "AdiabaticMSW" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
+hierarchy = "inverted" #"normal", "inverted"
 
 # detector signal and background count variation
 sig_var = 0 # signal variation of +-10%
@@ -114,7 +114,7 @@ print("background variation: {}%".format(bkg_var*100))
 print("mixing scheme: {}, hierarchy: {}".format(mixing_scheme, hierarchy))
 print("-------------------------")
 
-MODE = "GENERATE"
+MODE = "QUANTILE"
 bgt = Background_Trials(sim = sim, para = para, verbose = True)
 
 if MODE == "GENERATE":

@@ -144,6 +144,8 @@ class Reconstruction_Trials():
                     trials = self.batch, 
                     model = "generic", smoothing = False)
             
+            if r == 0: self.reco = reco
+            
             for hypo in ["null", "signal"]: # loop over hypothesis
                 for det in ["ic86", "gen2", "wls"]: # loop over detector
                     self.freq_reco[hypo][det][r*self.batch:(r+1)*self.batch] = reco.freq_reco[hypo][det] * u.Hz
@@ -536,8 +538,8 @@ class Reconstruction_Trials():
             data = np.load(filename, allow_pickle = True)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
-                    self.freq_reco_sig[det][:,a,:] = data["freq_reco_sig"].item()[det].squeeze()
-                    self.time_reco_sig[det][:,a,:] = data["time_reco_sig"].item()[det].squeeze()
+                self.freq_reco_sig[det][:,a,:] = data["freq_reco_sig"].item()[det].squeeze()
+                self.time_reco_sig[det][:,a,:] = data["time_reco_sig"].item()[det].squeeze()
 
         
         if 1:
@@ -563,9 +565,6 @@ class Reconstruction_Trials():
                         
                         ax[ii].errorbar(self.ampl_range * 100, y = y, yerr = (ylow, yhig), label = labels[j], color = colors[j], marker = "o", ls = "none", capsize = 5)
                         han, lab = ax[0].get_legend_handles_labels()    
-                        
-                        #ax[ii].axhline(np.nanmean(y), color = colors[j], ls = "--", lw = 1)
-                        #ax[ii].axhline(np.nanmedian(y), color = colors[j], ls = "-", lw = 1)
 
                     if ii >= 2: ax[ii].set_xlabel("Amplitude [%]")
                     if ii < 2: ax[ii].set_ylabel("Resolution [Hz] at {:.0f}$\sigma$".format(sig))
@@ -584,7 +583,7 @@ class Reconstruction_Trials():
                     self.mixing_scheme, self.hierarchy, self.trials)
             
             fig.tight_layout()
-            plt.savefig(filename)
+            #plt.savefig(filename)
             plt.show()
 
         return

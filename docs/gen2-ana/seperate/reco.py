@@ -95,24 +95,26 @@ class Reconstruction():
         IceCube-Gen2      : i3 + dc + md
         IceCube-Gen2 + WLS: i3 + dc + md + ws
         """ 
-        self._bkg = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
+        self._bkg = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}} # empty dictionary
 
-        size = self.trials * self.tlength
+        size = self.trials * self.tlength * 2 # we need distinct noise for signal and null hypothesis -> 2 times the data
 
         # pull random background for subdetectors
-        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
-        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(self.trials, self.tlength)
+        bkg_i3 = self.sim.detector.i3_bg(dt=self.sim._res_dt, size=size).reshape(2, self.trials, self.tlength)
+        bkg_dc = self.sim.detector.dc_bg(dt=self.sim._res_dt, size=size).reshape(2, self.trials, self.tlength)
+        bkg_md = self.sim.detector.md_bg(dt=self.sim._res_dt, size=size).reshape(2, self.trials, self.tlength)
+        bkg_ws = self.sim.detector.ws_bg(dt=self.sim._res_dt, size=size).reshape(2, self.trials, self.tlength)
         
         # combine subdetector background into IC86 and Gen2 background rate
         bkg_ic86 = bkg_i3 + bkg_dc
         bkg_gen2 = bkg_i3 + bkg_dc + bkg_md
         bkg_wls  = bkg_i3 + bkg_dc + bkg_md + bkg_ws
 
-        self._bkg["ic86"] = bkg_ic86 * (1 + self.bkg_var)
-        self._bkg["gen2"] = bkg_gen2 * (1 + self.bkg_var)
-        self._bkg["wls"] = bkg_wls * (1 + self.bkg_var)
+        for h, hypo in enumerate(["null", "signal"]): # loop over hypothesis
+            self._bkg[hypo]["ic86"] = bkg_ic86[h] * (1 + self.bkg_var)
+            self._bkg[hypo]["gen2"] = bkg_gen2[h] * (1 + self.bkg_var)
+            self._bkg[hypo]["wls"] = bkg_wls[h] * (1 + self.bkg_var)
 
         return
     
@@ -295,7 +297,7 @@ class Reconstruction():
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
-                self._comb[hypo][det] = self._sig_sample[hypo][det] + self._bkg[det]
+                self._comb[hypo][det] = self._sig_sample[hypo][det] + self._bkg[hypo][det]
         
         if residual:
             self.apply_residual()
@@ -452,7 +454,7 @@ class Reconstruction():
         hann_ovl = int(hann_len - hann_hop) # define hann overlap
 
         # STFT is computationally expensive, batching will ensure that RAM is not completly used up
-        bat_step = 5000 # size of batches
+        bat_step = 10000 # size of batches
         trial_batch = np.arange(0, self.trials, step=bat_step) #chunk data in batches of bat_step
 
         self._stf = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
@@ -463,12 +465,14 @@ class Reconstruction():
                      "signal" : {"ic86": None, "gen2": None, "wls": None}}
         self.time_reco = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
                      "signal" : {"ic86": None, "gen2": None, "wls": None}}
+        self.ts = {"null" : {"ic86": None, "gen2": None, "wls": None}, 
+                     "signal" : {"ic86": None, "gen2": None, "wls": None}}
 
         for hypo in ["null", "signal"]: # loop over hypothesis
             for det in ["ic86", "gen2", "wls"]: # loop over detector
 
                 # empty lists filled in batch loop
-                fit_freq, fit_time = [], []
+                ts, fit_freq, fit_time = [], [], []
 
                 for bat in trial_batch: # loop over batches
                     
@@ -489,12 +493,15 @@ class Reconstruction():
                     # take square of absolute for power
                     self._stf[hypo][det] = np.abs(self._stf[hypo][det]) ** 2
 
+                    # get maximum of power
+                    ts.append(np.nanmax(self._stf[hypo][det], axis = (1,2)))
                     # get time and freq index position of maximum 
                     ind_freq, ind_time = argmax_lastNaxes(self._stf[hypo][det], 2)
                     # get corresponding time and freq of bin
                     fit_freq.append(self._freq_new[ind_freq])
                     fit_time.append(self._time_new[ind_time])
 
+                self.ts[hypo][det] = np.array(ts).flatten()
                 self.freq_reco[hypo][det], self.time_reco[hypo][det] = np.array(fit_freq).flatten(), np.array(fit_time).flatten() # reconstructed parameters
 
         return
