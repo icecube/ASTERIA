@@ -27,16 +27,15 @@ class Background_Trials():
         self.verbose = verbose
 
         # read in keywords of para
+        self.mode = self.para["mode"]
         self.model = self.para["model"]
         self.hierarchy = self.para["hierarchy"]
         self.mixing_scheme = self.para["mixing_scheme"]
         self.distance = self.para["distance"]
-        self.ft_mode = self.para["ft_mode"]
-        self.ft_para = self.para["ft_para"]
+        self.time_win = self.para["time_win"]
+        self.smoothing_frequency = self.para["smoothing_frequency"]
         self.bkg_trials = self.para["bkg_trials"]
         self.bkg_bins = self.para["bkg_bins"]
-        self.sig_var = self.para["sig_var"]
-        self.bkg_var = self.para["bkg_var"]
 
         self.get_dir_name()
         self._file = os.path.dirname(os.path.abspath(__file__))
@@ -46,10 +45,6 @@ class Background_Trials():
         # select correct directory for systemics
         if self.mixing_scheme == "NoTransformation":
             self.bkg_dir_name = "default"
-            if self.sig_var != 0:
-                self.bkg_dir_name = "syst_det_sig_{:+.0f}%".format(self.sig_var*100)
-            elif self.bkg_var != 0:
-                self.bkg_dir_name = "syst_det_bkg_{:+.0f}%".format(self.bkg_var*100)
 
         elif self.mixing_scheme == "CompleteExchange":
             self.bkg_dir_name = "syst_mix_comp_exch"
@@ -68,10 +63,9 @@ class Background_Trials():
         """
 
         # filename for simulation output
-        filename = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-            self.ft_mode, self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-            self.ft_mode, self.mixing_scheme, self.hierarchy,
-            self.sig_var * 100, self.bkg_var * 100,
+        filename = self._file + "/files/background/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.mode, self.bkg_dir_name, self.model, 
+            self.mode, self.mixing_scheme, self.hierarchy,
             self.bkg_trials, self.bkg_bins, self.distance.value)
 
         # number of maximum trials, number of repetitions needed to fill bkg_trials
@@ -84,13 +78,15 @@ class Background_Trials():
         
         bounds = {"ic86": None, "gen2": None, "wls": None}
         
+        # Initialize null hypothsis class 
+        nlh = Null_Hypothesis(self.sim, res_dt = self.sim._res_dt, distance=self.distance)
+
         for r in tqdm(range(self.repetitions)): # loop over batches
-            # Initialize null hypothsis class and run analysis
-            nlh = Null_Hypothesis(self.sim, res_dt = self.sim._res_dt, distance=self.distance)
-            nlh.run(mode = self.ft_mode, ft_para = self.ft_para, 
-                    sig_var = self.sig_var, bkg_var = self.bkg_var, 
-                    bkg_trials = self.max_trials, 
-                    model = "generic", smoothing = False)
+            # run background trials
+            nlh.run(mode = self.mode, 
+                    bkg_trials = self.max_trials,
+                    time_win = self.time_win,
+                    smoothing_frequency= self.smoothing_frequency)
 
             for det in ["ic86", "gen2", "wls"]: # loop over subdetectors
                 if r == 0: 
@@ -135,11 +131,10 @@ class Background_Trials():
         for dist in distance_range: # loop over all distances
             print("Distance: {}".format(dist))
             # filename of simulation output
-            filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-                self.ft_mode, self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-                self.ft_mode, self.mixing_scheme, self.hierarchy,
-                self.sig_var * 100, self.bkg_var * 100,
-                self.bkg_trials, self.bkg_bins, dist.value)
+            filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+                self.mode, self.bkg_dir_name, self.model, 
+                self.mode, self.mixing_scheme, self.hierarchy,
+                self.bkg_trials, self.bkg_bins, self.distance.value)
             data = np.load(filename_in)
             
             for det in ["ic86", "gen2", "wls"]: # loop over detectors
@@ -152,10 +147,9 @@ class Background_Trials():
             qdict[det] = np.array(qdict[det])
         
         # save npz files
-        filename_out = self._file + "/files/background/{}/{}/QUAN_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_sig_var_{:+.0f}%_bkg_var_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
-            self.ft_mode, self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-            self.ft_mode, self.mixing_scheme, self.hierarchy,
-            self.sig_var * 100, self.bkg_var * 100,
+        filename_out = self._file + "/files/background/{}/{}/QUAN_model_{}_mode_{}_mix_{}_hier_{}_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+            self.mode, self.bkg_dir_name, self.model, 
+            self.mode, self.mixing_scheme, self.hierarchy,
             self.bkg_trials, self.bkg_bins)
         
         np.savez(file = filename_out, 
