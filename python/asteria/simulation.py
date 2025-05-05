@@ -285,12 +285,6 @@ class Simulation:
         for flavor in self.flavors:
             result = np.zeros(self.energy.size)
             for interaction in self.interactions:
-
-                if interaction.name=="requests": # skips first element = request list
-                    continue
-                if not self.interactions.requests.value[interaction.name]: #skips those elements that are False
-                    continue
-
                 xs = interaction.cross_section(flavor, self.energy).to(u.m ** 2).value
                 E_lep = interaction.mean_lepton_energy(flavor, self.energy).value
                 photon_scaling_factor = interaction.photon_scaling_factor(flavor).value
