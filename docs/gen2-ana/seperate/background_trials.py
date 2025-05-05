@@ -63,8 +63,8 @@ class Background_Trials():
         """
 
         # filename for simulation output
-        filename = self._file + "/files/background/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-            self.mode, self.bkg_dir_name, self.model, 
+        filename = self._file + "/files/background/{}/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.mode, self.bkg_dir_name, self.model, self.model,
             self.mode, self.mixing_scheme, self.hierarchy,
             self.bkg_trials, self.bkg_bins, self.distance.value)
 
@@ -131,8 +131,8 @@ class Background_Trials():
         for dist in distance_range: # loop over all distances
             print("Distance: {}".format(dist))
             # filename of simulation output
-            filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-                self.mode, self.bkg_dir_name, self.model, 
+            filename_in = self._file + "/files/background/{}/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+                self.mode, self.bkg_dir_name, self.model, self.model, 
                 self.mode, self.mixing_scheme, self.hierarchy,
                 self.bkg_trials, self.bkg_bins, dist.value)
             data = np.load(filename_in)
@@ -147,8 +147,8 @@ class Background_Trials():
             qdict[det] = np.array(qdict[det])
         
         # save npz files
-        filename_out = self._file + "/files/background/{}/{}/QUAN_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
-            self.mode, self.bkg_dir_name, self.model, 
+        filename_out = self._file + "/files/background/{}/{}/{}/QUAN_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+            self.mode, self.bkg_dir_name, self.model, self.model,
             self.mode, self.mixing_scheme, self.hierarchy,
             self.bkg_trials, self.bkg_bins)
         
