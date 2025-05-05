@@ -134,7 +134,7 @@ class Background_Trials():
             filename_in = self._file + "/files/background/{}/{}/HIST_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
                 self.mode, self.bkg_dir_name, self.model, 
                 self.mode, self.mixing_scheme, self.hierarchy,
-                self.bkg_trials, self.bkg_bins, self.distance.value)
+                self.bkg_trials, self.bkg_bins, dist.value)
             data = np.load(filename_in)
             
             for det in ["ic86", "gen2", "wls"]: # loop over detectors
@@ -147,7 +147,7 @@ class Background_Trials():
             qdict[det] = np.array(qdict[det])
         
         # save npz files
-        filename_out = self._file + "/files/background/{}/{}/QUAN_model_{}_mode_{}_mix_{}_hier_{}_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+        filename_out = self._file + "/files/background/{}/{}/QUAN_model_{}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
             self.mode, self.bkg_dir_name, self.model, 
             self.mode, self.mixing_scheme, self.hierarchy,
             self.bkg_trials, self.bkg_bins)

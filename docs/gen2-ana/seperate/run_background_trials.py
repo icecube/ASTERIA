@@ -49,8 +49,8 @@ model = {
 }
 
 # neutrino flavor mixing scheme and hierarchy
-mixing_scheme = "AdiabaticMSW" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
-hierarchy = "inverted" #"normal", "inverted"
+mixing_scheme = "NoTransformation" #"NoTransformation", "CompleteExchange", "AdiabaticMSW"
+hierarchy = "normal" #"normal", "inverted"
 
 sim = Simulation(model=model,
                 distance=distance, 
