@@ -205,7 +205,7 @@ class Null_Hypothesis():
         This method overwrites the content of _comb. If keyword det is set to None, the cut is applied to all
         subdetectors. The new, cut time is _time_new with length tlength_new.
         Args:
-            time_win (list of astropy.units.quantity.Quantity): lower and higher time cut
+            time_win (tuple): lower and higher time cut
             det (str): subdetector ("ic86", "gen2" or "wls"), default None
         """
         time_low, time_high = time_win
@@ -231,7 +231,7 @@ class Null_Hypothesis():
         Args:
             mode (str): analysis mode
             bkg_trials (int): Number of background trials.
-            time_win (float): Time window.
+            time_win (tuple): lower and higher time cut
             smoothing_frequency (float): Low pass frequency for smooting of signal hypothesis.
         """
 
