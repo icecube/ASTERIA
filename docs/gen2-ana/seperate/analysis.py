@@ -281,7 +281,7 @@ class Analysis():
         Args:
             mode (str): analysis mode
             bkg_trials (int): Number of background trials.
-            time_win (float): Time window.
+            time_win (tuple): lower and higher time cut
             smoothing_frequency (float): Low pass frequency for smooting of signal hypothesis.
         """
 
@@ -308,7 +308,7 @@ class Analysis():
             distance_range (np.ndarray): Distance range array
             mode (str): analysis mode
             bkg_trials (int): Number of background trials.
-            time_win (float): Time window.
+            time_win (tuple): lower and higher time cut
             smoothing_frequency (float): Low pass frequency for smooting of signal hypothesis.
             verbose (bool, optional): Verbose level. Defaults to None.
         """
