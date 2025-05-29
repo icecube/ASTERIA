@@ -1,4 +1,7 @@
-# ASTERIA: A Supernova TEst Routine for IceCube Analysis 
+# ASTERIA: A Supernova TEst Routine for IceCube Analysis
+
+[![tests](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml)
+
 ## Introduction
 
 This is a fast supernova neutrino simulation designed for the IceCube Neutrino
