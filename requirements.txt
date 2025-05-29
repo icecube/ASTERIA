@@ -1,8 +1,0 @@
-numpy
-scipy
-astropy
-pyyaml
-matplotlib
-setuptools
-Tables >=3.5.1
-snewpy>=1.3
