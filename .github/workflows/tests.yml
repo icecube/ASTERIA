@@ -1,5 +1,4 @@
 # This is a basic workflow to help you get started with Actions
-# This workflow was originally taken from the NEWS2/snewpy repository
 
 name: tests
 
@@ -7,10 +6,11 @@ name: tests
 # events but only for the main branch
 on:
   push:
-    branches:
+    branches: 
       - main
       - release_*
   pull_request:
+    branches:
       - main
       - release_*
 
@@ -23,14 +23,14 @@ jobs:
         # Test all supported Python versions under Ubuntu
         os: [ubuntu-latest]
         python-version: ['3.10', '3.11', '3.12', '3.13']
-        # Test one version under MacOS X and Windows
+        # Additionally, test one Python version under MacOS and Windows, to detect OS-specific issues
         include:
           - os: macos-latest
             python-version: '3.12'
           - os: windows-latest
             python-version: '3.12'
 
-    # The type of runner used for the job.
+    # The type of runner that the job will run on.
     runs-on: ${{ matrix.os }}
 
     # Steps represent a sequence of tasks that will be executed as part of the job
@@ -49,8 +49,6 @@ jobs:
       - name: Install ASTERIA
         run: |
           pip install ".[dev]"
-
-      # Run the unit tests
-      - name: Test with pytest
+      - name: Run unit tests with pytest
         run: |
           pytest
