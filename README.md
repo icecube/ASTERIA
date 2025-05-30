@@ -4,11 +4,18 @@
 
 ## Introduction
 
-<img align="right" alt="ASTERIA" src="docs/asteria.png">
+<img align="right" alt="ASTERIA" width="200px" src="docs/asteria.png">
 
 This is a fast supernova neutrino simulation designed for the IceCube Neutrino Observatory. The original version, called the Unified Supernova Simulation Routine (USSR), was written in C++ by Thomas Kowarik and Gösta Kroll at Universität Mainz in 2011. This project began as a Python port of the original program.
 
-The code uses estimates of the supernova neutrino luminosity from large-scale simulations of core-collapse supernovae to calculate photons in the IceCube detector.
+The code uses estimates of the supernova neutrino luminosity from large-scale simulations of core-collapse supernovae to calculate photons in the IceCube detector. The calculation includes parameterizations of the most important interactions contributing to signal in the ice from core-collapse neutrinos:
+* Inverse beta decay.
+* Electron scattering.
+* Charged-current interactions on <sup>16</sup>O.
+* Neutral-current interactions on <sup>16</sup>O.
+* Inelastic scattering on <sup>17/18</sup>O.
+
+Details are available in R. Abbasi et al., [*IceCube sensitivity for low-energy neutrinos from nearby supernovae*](https://arxiv.org/abs/1108.0171), A&A 535:A109, 2011.
 
 ## Access
 
