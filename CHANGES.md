@@ -1,5 +1,13 @@
 # ASTERIA Change Log
 
+## 1.0.0 (2020-07-01)
+
+* Added SimulationHandler to manage simulation setup/teardown ([PR #52](https://github.com/icecube/ASTERIA/pull/52)).
+* Added build and test requirements for CircleCI and PyPI ([PR #10](https://github.com/icecube/ASTERIA/pull/10)).
+* Implemented I/O module for saving and loading simulations ([PR #8](https://github.com/icecube/ASTERIA/pull/8), [PR #38](https://github.com/icecube/ASTERIA/pull/38)).
+* Added computation of neutrino oscillations ([PR #6](https://github.com/icecube/ASTERIA/pull/6), [PR #11](https://github.com/icecube/ASTERIA/pull/11), [PR #16](https://github.com/icecube/ASTERIA/pull/16), [PR #19](https://github.com/icecube/ASTERIA/pull/19), [PR #30](https://github.com/icecube/ASTERIA/pull/30), [PR #35](https://github.com/icecube/ASTERIA/pull/35), [PR #44](https://github.com/icecube/ASTERIA/pull/44)).
+* Cleaned up Cherenkov light calculations ([PR #5](https://github.com/icecube/ASTERIA/pull/5)).
+
 ## 0.2.0 (2019-02-24)
 
 * Added stellar CDFs in FITS format to generate random progenitor distances ([PR #4](https://github.com/icecube/ASTERIA/pull/4)).
