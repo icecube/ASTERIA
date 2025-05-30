@@ -4,8 +4,9 @@
 
 ## Introduction
 
-This is a fast supernova neutrino simulation designed for the IceCube Neutrino Observatory. The original version, called the Unified Supernova Simulation Routine (USSR), was written in C++ by Thomas Kowarik and
-Gösta Kroll at Universität Mainz in 2011. This project began as a Python port of the original program.
+<img align="right" alt="ASTERIA" src="docs/asteria.png">
+
+This is a fast supernova neutrino simulation designed for the IceCube Neutrino Observatory. The original version, called the Unified Supernova Simulation Routine (USSR), was written in C++ by Thomas Kowarik and Gösta Kroll at Universität Mainz in 2011. This project began as a Python port of the original program.
 
 The code uses estimates of the supernova neutrino luminosity from large-scale simulations of core-collapse supernovae to calculate photons in the IceCube detector.
 
@@ -27,8 +28,7 @@ pip install . [--user]
 
 ## Ignored Files
 
-ASTERIA is configured in such a way that the following directories will be
-automatically generated if they are missing, but their content will be ignored by git.
+ASTERIA is configured in such a way that the following directories will be automatically generated if they are missing, but their content will be ignored by git.
 
 ```
 /path/to/asteria_folder/scratch
