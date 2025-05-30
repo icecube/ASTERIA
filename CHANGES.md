@@ -1,5 +1,7 @@
 # ASTERIA Change Log
 
+## 2.0.0 (unreleased)
+
 ## 1.6.0 (2024-07-01)
 
 Added more user control to simulation time resolution and fixed time integration:
