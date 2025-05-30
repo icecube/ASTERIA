@@ -1,5 +1,41 @@
 # ASTERIA Change Log
 
+## 1.6.0 (2024-07-01)
+
+Added more user control to simulation time resolution and fixed time integration:
+* Add `res_dt` as `__init__` kwarg in https://github.com/icecube/ASTERIA/pull/100
+* Pprint config cleanup in https://github.com/icecube/ASTERIA/pull/101
+* Allow short simulations to be performed in https://github.com/icecube/ASTERIA/pull/106
+
+## 1.5.0 (2023-11-06)
+
+Improvements to SNEWPY model initialization and interfaces:
+* Add setuptools to requirements in https://github.com/icecube/ASTERIA/pull/81
+* Init model fix in https://github.com/icecube/ASTERIA/pull/85 and https://github.com/icecube/ASTERIA/pull/97
+* Added Fornax_2022 support in https://github.com/icecube/ASTERIA/pull/98
+* Removed TeX statements from suggested rcparams file in https://github.com/icecube/ASTERIA/pull/99
+
+## 1.4.0 (2023-01-13)
+
+* Unittest workflow improved in https://github.com/icecube/ASTERIA/pull/79
+
+## 1.3.0 (2022-11-14)
+
+* Analytic fluence calculation added in https://github.com/icecube/ASTERIA/pull/77
+* Added credit for example code taken from SNEWPY in https://github.com/icecube/ASTERIA/pull/78
+
+## 1.2.0 (2022-07-25)
+
+* Switch to using SNEWPY Flavor class in https://github.com/icecube/ASTERIA/pull/61
+* Snewpy source dec21 in https://github.com/icecube/ASTERIA/pull/62
+* New config in https://github.com/icecube/ASTERIA/pull/67
+* Added utility functions in https://github.com/icecube/ASTERIA/pull/68
+* Deadtime factor in https://github.com/icecube/ASTERIA/pull/69
+* Fixed issues with model pathname creation in https://github.com/icecube/ASTERIA/pull/70
+* Added guard for using incorrect snewpy branch in https://github.com/icecube/ASTERIA/pull/73
+* Improved guard against incorrect snewpy branch in https://github.com/icecube/ASTERIA/pull/74
+* Updated significance calculation in https://github.com/icecube/ASTERIA/pull/76
+
 ## 1.0.0 (2020-07-01)
 
 * Added SimulationHandler to manage simulation setup/teardown ([PR #52](https://github.com/icecube/ASTERIA/pull/52)).
