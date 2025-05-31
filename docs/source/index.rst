@@ -28,3 +28,5 @@ Access to supernova neutrino simulations is provided through the SNEWPY code, do
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
+   notebooks
