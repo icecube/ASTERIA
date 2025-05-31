@@ -8,17 +8,9 @@ See either of these two resources:
 - https://github.com/SNEWS2/snewpy
 """
 try:
-    # Try to import for SNEWPY <
-    from snewpy.models.util import init_model
+    from snewpy.models import _init_model as init_model
 except ModuleNotFoundError:
-    try:
-        from snewpy.models import _init_model as init_model
-    except ModuleNotFoundError:
-        from .util import init_model
-finally:
-    if 'init_model' not in locals():
-        raise ModuleNotFoundError("Unable to find Model import function, please check SNEWPY version compatibility")
-
+    from .util import init_model as init_snewpy_model_from_param
 
 try:
     from snewpy import model_path

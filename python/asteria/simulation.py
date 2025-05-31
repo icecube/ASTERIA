@@ -27,8 +27,8 @@ from .detector import Detector
 class Simulation:
     """ Top-level class for performing ASTERIA's core simulation routine, and handler for the resulting outputs
     """
-    def __init__(self, config=None, *, model=None, distance=10 * u.kpc, flavors=None, hierarchy=None,
-                 interactions=None, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
+    def __init__(self, config=None, *, model=None, distance=10 * u.kpc, res_dt=2 * u.ms, flavors=None, hierarchy=None,
+                 interactions=Interactions, mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
                  dE=None, t=None, tmin=None, tmax=None, dt=None, geomfile=None, effvolfile=None):
         self.param = {}
         if model and not config:
