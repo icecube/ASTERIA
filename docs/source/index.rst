@@ -12,9 +12,9 @@ The code uses estimates of the supernova neutrino luminosity from large-scale si
 
 * Inverse beta decay.
 * Electron scattering.
-* Charged-current interactions on <sup>16</sup>O.
-* Neutral-current interactions on <sup>16</sup>O.
-* Inelastic scattering on <sup>17/18</sup>O.
+* Charged-current interactions on :sup:`16`\ O.
+* Neutral-current interactions on :sup:`16`\ O.
+* Scattering on :sup:`17/18`\ O.
 
 Details are available in R. Abbasi et al., `IceCube sensitivity for low-energy neutrinos from nearby supernovae <(https://arxiv.org/abs/1108.0171>`_, A&A 535:A109, 2011.
 
