@@ -97,7 +97,7 @@ class Simulation:
             else:
                 self._mixing = ft.NoTransformation()
 
-            self.interactions = interactions
+            self.interactions = Interactions(interactions) if interactions is None else Interactions()
             self._E_per_V = None
             self._total_E_per_V = None
             self._photon_spectra = None
