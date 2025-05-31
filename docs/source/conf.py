@@ -31,7 +31,6 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.viewcode',
     'nbsphinx',
-    'IPython.sphinxext.ipython_console_highlighting',
 ]
 
 templates_path = ['.templates']
