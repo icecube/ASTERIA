@@ -9,3 +9,12 @@ In-Ice Interations
     
     nb/cross_sections.ipynb
     nb/inverse_beta_decay.ipynb
+
+Detector Response
+-----------------
+
+.. toctree::
+    :maxdepth: 1
+    :glob:
+
+    nb/detector*
