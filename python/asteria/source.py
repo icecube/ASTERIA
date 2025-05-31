@@ -24,21 +24,54 @@ from scipy.special import loggamma, gdtr
 
 import astropy.units as u
 import numpy as np
+import logging
+
 
 
 class Source:
 
     def __init__(self, model, model_params=None):
+        """CCSN Soruce Object. Contains methods describing neutrino emission
+
+        Parameters
+        ----------
+        model : str
+            Name of SNEWPY Model
+        model_params : dict
+            SNEWPY Model parameters
+        """
         self.model = init_model(model, **model_params)
         self._interp_lum = {}
         self._interp_meanE = {}
         self._interp_pinch = {}
+        self._special_compat_mode = False
+        t = self.model.time
 
-        for flavor in Flavor:
-            t = self.model.time
-            self._interp_lum.update({flavor: PchipInterpolator(t, self.model.luminosity[flavor], extrapolate=False)})
-            self._interp_meanE.update({flavor: PchipInterpolator(t, self.model.meanE[flavor], extrapolate=False)})
-            self._interp_pinch.update({flavor: PchipInterpolator(t, self.model.pinch[flavor], extrapolate=False)})
+        if all([hasattr(self.model, attr) for attr in ("luminosity", "meanE", "pinch")]):
+            for flavor in Flavor:
+                self._interp_lum.update({flavor: PchipInterpolator(t, self.model.luminosity[flavor], extrapolate=False)})
+                self._interp_meanE.update({flavor: PchipInterpolator(t, self.model.meanE[flavor], extrapolate=False)})
+                self._interp_pinch.update({flavor: PchipInterpolator(t, self.model.pinch[flavor], extrapolate=False)})
+        else:
+            logging.warning(f"Model '{self.model.__class__.__name__}' lacks one or more of the following attributes: "
+                             "'luminosity', 'meanE', 'pinch'. Some ASTERIA methods may not function fully")
+
+        # TODO: change condition to see if class inherits from Fornax baseclasses
+        if self.model.__class__.__name__ in ('Fornax_2019', 'Fornax_2021', 'Fornax_2022'):
+            logging.warning(f"Model '{self.model.__class__.__name__}' detected. Special compatibility mode enabled.\n"
+                            "Expect a reduction in performance and increase in simulation run times.", )
+            self._special_compat_mode = True
+
+    @property
+    def special_compat_mode(self):
+        """Indicates whether A special compatibility mode should be used for parsing certain SNEWPY Models
+        Currently required for (For
+
+        Returns
+        -------
+
+        """
+        return self._special_compat_mode
 
     def luminosity(self, t, flavor=Flavor.NU_E_BAR):
         """Return interpolated source luminosity at time t for a given flavor.
@@ -56,7 +89,10 @@ class Source:
         luminosity : Astropy.units.quantity.Quantity
             Source luminosity (units of power).
         """
-        return np.nan_to_num(self._interp_lum[flavor](t)) * (u.erg / u.s)
+        if self._interp_lum:
+            return np.nan_to_num(self._interp_lum[flavor](t)) * (u.erg / u.s)
+        else:
+            raise NotImplementedError('Source is missing `luminosity` interpolator!')
 
     def meanE(self, t, flavor=Flavor.NU_E_BAR):
         """Return interpolated source mean energy at time t for a given flavor.
@@ -75,7 +111,10 @@ class Source:
             Source mean energy (units of energy).
         """
         # TODO Checks for units/unitless inputs
-        return np.nan_to_num(self._interp_meanE[flavor](t)) * u.MeV
+        if self._interp_meanE:
+            return np.nan_to_num(self._interp_meanE[flavor](t)) * u.MeV
+        else:
+            raise NotImplementedError('Source is missing `meanE` interpolator!')
 
     def alpha(self, t, flavor=Flavor.NU_E_BAR):
         """Return source pinching paramter alpha at time t for a given flavor.
@@ -110,19 +149,22 @@ class Source:
         flux :
         Source number flux (unit-less, count of neutrinos).
         """
-        L = self.luminosity(t, flavor).to(u.MeV / u.s).value
-        meanE = self.meanE(t, flavor).value
+        if self._interp_meanE and self._interp_lum:
+            L = self.luminosity(t, flavor).to(u.MeV / u.s).value
+            meanE = self.meanE(t, flavor).value
 
-        if isinstance(t, np.ndarray):
-            _flux = np.divide(L, meanE, where=(meanE > 0), out=np.zeros(L.size))
-        else:
-            # TODO: Fix case where t is list, or non astropy quantity. This is a front-end function for some use cases
-            if meanE > 0.:
-                _flux = L / meanE
+            if isinstance(t, np.ndarray):
+                _flux = np.divide(L, meanE, where=(meanE > 0), out=np.zeros(L.size))
             else:
-                _flux = 0
+                # TODO: Fix case where t is list, or non astropy quantity. This is a front-end function for some use cases
+                if meanE > 0.:
+                    _flux = L / meanE
+                else:
+                    _flux = 0
 
-        return _flux / u.s
+            return _flux / u.s
+        else:
+            raise NotImplementedError('Source is missing `meanE` and.or `luminosity` interpolator!')
 
     @staticmethod
     def _energy_pdf(a, Ea, E):
@@ -134,6 +176,9 @@ class Source:
         return gdtr(1., a + 1., (a + 1.) * (E / Ea))
 
     def energy_pdf(self, t, E, flavor=Flavor.NU_E_BAR, *, limit_size=True):
+        if not self._interp_lum or not self._interp_pinch or not self._interp_meanE:
+            raise NotImplementedError('Source is missing `meanE`, `pinch` and/or `luminosity` interpolator!\n'
+                                      'Please use SNEWPY Model method `get_initial_spectrum`.')
         _E = E.to(u.MeV).value
         if isinstance(E, np.ndarray):
             if _E[0] == 0:

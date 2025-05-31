@@ -1,7 +1,0 @@
-numpy
-scipy
-astropy
-pyyaml
-matplotlib
-Tables >=3.5.1
-snewpy>=1.3b1

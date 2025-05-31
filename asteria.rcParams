@@ -35,6 +35,3 @@ legend.fontsize  : 16.
 font.size  : 20.
 font.family  : sans-serif
 font.sans-serif : 'cm'
-
-text.usetex : True
-text.latex.preamble : \usepackage[cm]{sfmath}
