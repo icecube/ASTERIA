@@ -1,6 +1,7 @@
 # ASTERIA: A Supernova TEst Routine for IceCube Analysis
 
 [![tests](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/asteria/badge/?version=latest)](https://asteria.readthedocs.io/en/latest/?badge=latest)
 
 ## Introduction
 
