@@ -7,10 +7,18 @@ See either of these two resources:
 - snewpy.readthedocs.io
 - https://github.com/SNEWS2/snewpy
 """
-try:
-    from snewpy.models import _init_model as init_model
+try:Add commentMore actions
+    # Try to import for SNEWPY <
+    from snewpy.models.util import init_model
 except ModuleNotFoundError:
-    from .util import init_model as init_snewpy_model_from_param
+    try:
+        from snewpy.models import _init_model as init_model
+    except ModuleNotFoundError:
+        from .util import init_model
+finally:
+    if 'init_model' not in locals():
+        raise ModuleNotFoundError("Unable to find Model import function, please check SNEWPY version compatibility")
+
 
 try:
     from snewpy import model_path
@@ -25,7 +33,6 @@ from scipy.special import loggamma, gdtr
 import astropy.units as u
 import numpy as np
 import logging
-
 
 
 class Source:
