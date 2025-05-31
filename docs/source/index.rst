@@ -17,7 +17,7 @@ The code uses estimates of the supernova neutrino luminosity from large-scale si
 
 Details are available in R. Abbasi et al., `IceCube sensitivity for low-energy neutrinos from nearby supernovae <(https://arxiv.org/abs/1108.0171>`_, A&A 535:A109, 2011.
 
-Access to supernova neutrino simulations is provided through the SNEWPY code, documented `here <https://snewpy.readthedocs.io/en/stable/>`_ and `here <https://github.com/SNEWS2/snewpy>`_.
+Access to supernova neutrino simulations is provided through the SNEWPY code, documented on `readthedocs <https://snewpy.readthedocs.io/en/stable/>`_ and `github <https://github.com/SNEWS2/snewpy>`_.
 
 .. toctree::
    :maxdepth: 2
