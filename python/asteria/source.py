@@ -7,13 +7,13 @@ See either of these two resources:
 - snewpy.readthedocs.io
 - https://github.com/SNEWS2/snewpy
 """
-try:Add commentMore actions
+try:
     # Try to import for SNEWPY <
     from snewpy.models.util import init_model
-except ModuleNotFoundError:
+except (ImportError, ModuleNotFoundError):
     try:
         from snewpy.models import _init_model as init_model
-    except ModuleNotFoundError:
+    except (ImportError, ModuleNotFoundError):
         from .util import init_model
 finally:
     if 'init_model' not in locals():

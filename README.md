@@ -1,10 +1,11 @@
 # ASTERIA: A Supernova TEst Routine for IceCube Analysis
 
 [![tests](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/asteria/badge/?version=latest)](https://asteria.readthedocs.io/en/latest/?badge=latest)
 
 ## Introduction
 
-<img align="right" alt="ASTERIA" width="200px" src="docs/asteria.png">
+<img align="right" alt="ASTERIA" width="200px" src="docs/source/asteria.png">
 
 This is a fast supernova neutrino simulation designed for the IceCube Neutrino Observatory. The original version, called the Unified Supernova Simulation Routine (USSR), was written in C++ by Thomas Kowarik and Gösta Kroll at Universität Mainz in 2011. This project began as a Python port of the original program.
 

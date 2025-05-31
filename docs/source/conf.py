@@ -34,7 +34,7 @@ extensions = [
 ]
 
 templates_path = ['.templates']
-exclude_patterns = []
+exclude_patterns = ['**.ipynb_checkpoints']
 
 
 
