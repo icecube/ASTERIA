@@ -49,8 +49,9 @@ jobs:
       - name: Install ASTERIA
         run: |
           pip install ".[dev]"
+      - name: Set ASTERIA environment
+        run: |
+          echo "ASTERIA=${{ github.workspace }}" >> "$GITHUB_ENV"
       - name: Run unit tests with pytest
         run: |
-          ASTERIA=${{ github.workspace }}
-          echo "ASTERIA=$ASTERIA" >> "$GITHUB_ENV"
           pytest
