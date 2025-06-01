@@ -51,4 +51,6 @@ jobs:
           pip install ".[dev]"
       - name: Run unit tests with pytest
         run: |
-          ASTERIA=$(pwd) pytest
+          ASTERIA=${{ github.workspace }}
+          echo "ASTERIA=$ASTERIA" >> $GITHUB_ENV
+          pytest
