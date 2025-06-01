@@ -33,7 +33,7 @@ class Simulation:
         self.metadata = {key: str(val) for key, val in locals().items() if
                          val is not None and
                          key not in ['self', 'E', 't']}
-        self.metadata.update({'interactions': ', '.join([item.name for item in interactions])})
+        self.metadata.update({'interactions': ', '.join([item.__class__.__name__ for item in interactions])})
 
         self.param = {}
         if model and not config:
