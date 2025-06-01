@@ -4,7 +4,7 @@ import numpy as np
 import astropy.units as u
 
 from asteria.simulation import Simulation
-from snewpy.neutrino import Flavor
+from snewpy.neutrino import Flavor, MassHierarchy
 
 import os
 
@@ -18,9 +18,25 @@ class TestSimulation(unittest.TestCase):
         # Initialize a simulation from an INI file.
         inifile = os.path.join(self.basedir, 'data/config/example.ini')
         sim = Simulation(config=inifile)
-        sim.run()
+
+        # Test the configuration metadata.
+        self.assertEqual(sim.metadata['model']['name'], 'Nakazato_2013')
+        self.assertEqual(sim.metadata['model']['param'], 'progenitor_mass, 13.0 solMass; revival_time, 300.0 ms; metallicity, 0.02; eos, shen')
+        self.assertEqual(sim.metadata['distance'], '10.0 kpc')
+        self.assertEqual(sim.metadata['res_dt'], '2.0 ms')
+        self.assertEqual(sim.metadata['interactions'], 'ElectronScatter, InvBetaPar, Oxygen16CC, Oxygen16NC, Oxygen18')
+        self.assertEqual(sim.metadata['flavors'], "<enum 'Flavor'>")
+        self.assertEqual(sim.metadata['hierarchy'], 'default')
+        self.assertEqual(sim.metadata['mixing_scheme'], 'AdiabaticMSW')
+
+        # Test the simulation object.
+        self.assertTrue(np.allclose(sim.distance, 10*u.kpc))
+        self.assertEqual(sim.hierarchy, MassHierarchy.NORMAL)
+        self.assertEqual(sim.mixing_scheme, 'AdiabaticMSW')
 
         # Test a few of the simulation outputs.
+        sim.run()
+
         n = len(sim.time)
         self.assertTrue(n == 2001)
         t = np.arange(-1, 1.001, 0.001)
