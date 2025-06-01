@@ -51,4 +51,4 @@ jobs:
           pip install ".[dev]"
       - name: Run unit tests with pytest
         run: |
-          pytest
+          ASTERIA=$(pwd) pytest
