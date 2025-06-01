@@ -11,7 +11,7 @@ import os
 class TestSimulation(unittest.TestCase):
 
     def setUp(self):
-        # Create a list of interactions for use later.
+        # ASTERIA base folder.
         self.basedir = os.environ['ASTERIA']
 
     def test_config_from_ini(self):
