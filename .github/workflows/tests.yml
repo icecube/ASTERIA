@@ -52,5 +52,5 @@ jobs:
       - name: Run unit tests with pytest
         run: |
           ASTERIA=${{ github.workspace }}
-          echo "ASTERIA=$ASTERIA" >> $GITHUB_ENV
+          echo "ASTERIA=$ASTERIA" >> "$GITHUB_ENV"
           pytest
