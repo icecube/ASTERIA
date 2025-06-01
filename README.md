@@ -31,10 +31,18 @@ git clone https://github.com/icecube/ASTERIA.git
 ## Installation
 
 ASTERIA can be installed by cloning the repository and running
-
 ```
 cd /path/to/asteria
 pip install . [--user]
+```
+
+To run simulations, you'll need to set the environment variable `ASTERIA` to point to the source tree. For example, in `bash`, run
+```
+export ASTERIA=/path/to/asteria
+```
+and in `[t]csh`, run
+```
+setenv ASTERIA /path/to/asteria
 ```
 
 ## Ignored Files
