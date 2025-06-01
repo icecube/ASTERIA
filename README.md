@@ -2,7 +2,7 @@
 
 [![tests](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml)
 [![Documentation Status](https://readthedocs.org/projects/asteria/badge/?version=latest)](https://asteria.readthedocs.io/en/latest/?badge=latest)
-[![Coverage Status](https://coveralls.io/repos/github/icecube/ASTERIA/badge.svg)](https://coveralls.io/github/icecube/ASTERIA)
+[![Coverage Status](https://coveralls.io/repos/github/icecube/ASTERIA/badge.png)](https://coveralls.io/github/icecube/ASTERIA)
 
 ## Introduction
 
