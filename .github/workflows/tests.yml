@@ -49,6 +49,14 @@ jobs:
       - name: Install ASTERIA
         run: |
           pip install ".[dev]"
+      - name: Set ASTERIA environment
+        run: |
+          echo "ASTERIA=${{ github.workspace }}" >> "$GITHUB_ENV"
+        if: runner.os != 'Windows'
+      - name: Set ASTERIA environment for Windows
+        run: |
+          echo "ASTERIA=${{ github.workspace }}" | Out-File -FilePath $env:GITHUB_ENV -Append
+        if: runner.os == 'Windows'
       - name: Run unit tests with pytest
         run: |
           pytest
