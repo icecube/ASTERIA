@@ -33,7 +33,8 @@ class Simulation:
         self.metadata = {key: str(val) for key, val in locals().items() if
                          val is not None and
                          key not in ['self', 'E', 't']}
-        self.metadata.update({'interactions': ', '.join([item.__class__.__name__ for item in interactions])})
+
+        self.metadata.update({ 'interactions': ', '.join([item.__class__.__name__ for item in interactions]) })
 
         self.param = {}
         if model and not config:
@@ -178,7 +179,7 @@ class Simulation:
                 if basic['interactions'] and basic['interactions'].upper() not in ('DEFAULT', 'ALL'):
                     interactions = basic['interactions']  # TODO Add str-to-interactions parser
                 else:
-                    interactions = Interactions
+                    interactions = Interactions()
 
                 self._create_paramdict(model_dict, dist, flavors, basic['hierarchy'], interactions, mixing['scheme'],
                                        float(mixing['angle']), energy, time)
