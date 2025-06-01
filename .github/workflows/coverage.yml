@@ -44,9 +44,12 @@ jobs:
       - name: Install ASTERIA
         run: |
           pip install ".[dev]"
+      - name: Set ASTERIA environment
+        run: |
+          echo "ASTERIA=${{ github.workspace }}" >> "$GITHUB_ENV"
       - name: Run tests with coverage
         run: |
-          ASTERIA=$(pwd) pytest --cov
+          pytest --cov
       - name: Coveralls
         env:
           COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
