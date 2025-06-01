@@ -33,7 +33,8 @@ class Simulation:
         self.metadata = {key: str(val) for key, val in locals().items() if
                          val is not None and
                          key not in ['self', 'E', 't']}
-        self.metadata.update({'interactions': ', '.join([item.__class__.__name__ for item in interactions])})
+
+        self.metadata.update({ 'interactions': ', '.join([item.__class__.__name__ for item in interactions]) })
 
         self.param = {}
         if model and not config:
@@ -41,28 +42,28 @@ class Simulation:
             self.metadata.update({'model': {'name': model['name'],
                                             'param': '; '.join([f"{key}, {val}" for key, val in model['param'].items()])}
                                 })
-            if not E and None in (Emin, Emax, dE):
+            if E is None and None in (Emin, Emax, dE):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `E` or "
                                  "arguments `Emin`, `Emax`, `dE")
-            elif not E and None not in (Emin, Emax, dE):
+            elif E is None and None not in (Emin, Emax, dE):
                 _Emin = Emin.to(u.MeV).value
                 _Emax = Emax.to(u.MeV).value
                 _dE = dE.to(u.MeV).value
                 E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
-            elif not E:
+            elif E is None:
                 E = np.arange(0, 100, 1) * u.MeV
                 self.metadata.update({'Emin': 0 * u.MeV, 'Emax': 100 * u.MeV, 'dE': 1 * u.ms})
 
-            if not t and None in (tmin, tmax, dt):
+            if t is None and None in (tmin, tmax, dt):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `t` or "
                                  "arguments `tmin`, `tmax`, `dt")
-            elif not t and None not in (tmin, tmax, dt):
+            elif t is None and None not in (tmin, tmax, dt):
                 _tmin = tmin.to(u.ms).value
                 _tmax = tmax.to(u.ms).value
                 _dt = dt.to(u.ms)
                 t = np.arange(_tmin, _tmax + _dt.value, _dt.value) * u.ms
                 t = t.to(u.s)
-            elif t:
+            elif t is not None:
                 _dt = np.ediff1d(t)[0]
             else:
                 t = np.arange(-1, 1, 0.001) * u.s
@@ -178,7 +179,7 @@ class Simulation:
                 if basic['interactions'] and basic['interactions'].upper() not in ('DEFAULT', 'ALL'):
                     interactions = basic['interactions']  # TODO Add str-to-interactions parser
                 else:
-                    interactions = Interactions
+                    interactions = Interactions()
 
                 self._create_paramdict(model_dict, dist, flavors, basic['hierarchy'], interactions, mixing['scheme'],
                                        float(mixing['angle']), energy, time)
