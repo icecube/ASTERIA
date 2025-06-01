@@ -25,7 +25,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["hypothesis", "pytest"]
+dev = ["hypothesis", "pytest", "pytest-cov", "coveralls"]
 docs = ["numpydoc", "nbsphinx", "ipykernel", "tqdm[notebook]"]
 
 [project.urls]
