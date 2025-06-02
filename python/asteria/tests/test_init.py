@@ -50,8 +50,8 @@ class TestInitialization(unittest.TestCase):
 
         self.assertEqual(mpl.rcParams['legend.fontsize'], 16.)
 
-        self.assertEqual(mpl.rcParams['font.size'], 20.)
-        self.assertEqual(mpl.rcParams['font.family'], ['sans-serif'])
+        self.assertEqual(mpl.rcParams['font.size'], 18.)
+        self.assertEqual(mpl.rcParams['font.family'], ['serif'])
 
     def test_set_rcparams_verbose(self):
         # Check that verbose output works.
