@@ -53,5 +53,5 @@ exclude = [
 [tool.setuptools.package-data]
 "asteria.data.detector" = ["*.txt"]
 "asteria.data.stellar" = ["*.fits"]
-"asteria.data.USSR" = ["*.txt"]
+"asteria.data.USSR" = ["*.txt", "earth_survival_probability/*.txt"]
 "asteria.etc" = ["asteria.rcParams", "*.yaml", "*.ini"]
