@@ -54,4 +54,4 @@ exclude = [
 "asteria.data.detector" = ["*.txt"]
 "asteria.data.stellar" = ["*.fits"]
 "asteria.data.USSR" = ["*.txt"]
-"asteria.etc" = ["asteria.rcParams"]
+"asteria.etc" = ["asteria.rcParams", "*.yaml", "*.ini"]
