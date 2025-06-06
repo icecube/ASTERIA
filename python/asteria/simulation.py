@@ -17,6 +17,7 @@ from math import ceil
 import numpy as np
 import configparser
 import warnings
+from importlib.resources import files
 import os
 
 from .interactions import Interactions
@@ -104,15 +105,13 @@ class Simulation:
             self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
-            if not geomfile:
-                self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                              'data/detector/Icecube_geometry.20110102.complete.txt')
+            if geomfile is None:
+                self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
             else:
                 self._geomfile = geomfile
 
-            if not effvolfile:
-                self._effvolfile = os.path.join(os.environ['ASTERIA'],
-                                                'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+            if effvolfile is None:
+                self._effvolfile = files('asteria.data').joinpath('detector/effectivevolume_benedikt_AHA_normalDoms.txt')
             else:
                 self._effvolfile = effvolfile
 
@@ -185,15 +184,13 @@ class Simulation:
                                        float(mixing['angle']), energy, time)
                 self.__init__(**self.param)
 
-                if not geomfile:
-                    self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                                  'data/detector/Icecube_geometry.20110102.complete.txt')
+                if geomfile is None:
+                    self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
                 else:
                     self._geomfile = geomfile
 
-                if not effvolfile:
-                    self._effvolfile = os.path.join(os.environ['ASTERIA'],
-                                                    'data/detector/effectivevolume_benedikt_AHA_normalDoms.txt')
+                if effvolfile is None:
+                    self._effvolfile = files('asteria.data').joinpath('detector/effectivevolume_benedikt_AHA_normalDoms.txt')
                 else:
                     self._effvolfile = effvolfile
 
