@@ -32,6 +32,7 @@ figure.figsize : 6., 7.
 
 legend.fontsize  : 16.
 
-font.size  : 20.
-font.family  : sans-serif
-font.sans-serif : 'cm'
+font.size  : 18.
+font.family : serif
+font.serif : Palatino
+text.usetex: True

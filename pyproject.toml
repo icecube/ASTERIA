@@ -40,7 +40,18 @@ where = ["python"]
 include = [
     "asteria",
     "asteria.*",
+    "asteria.data.*",
+    "asteria.etc",
 ]
 exclude = [
     "asteria.scripts",
+    "asteria.data.config",
+    "asteria.data.processed",
+    "asteria.data.spectra"
 ]
+
+[tool.setuptools.package-data]
+"asteria.data.detector" = ["*.txt"]
+"asteria.data.stellar" = ["*.fits"]
+"asteria.data.USSR" = ["*.txt", "earth_survival_probability/*.txt"]
+"asteria.etc" = ["asteria.rcParams", "*.yaml", "*.ini"]

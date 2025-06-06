@@ -6,17 +6,15 @@ import astropy.units as u
 from asteria.simulation import Simulation
 from snewpy.neutrino import Flavor, MassHierarchy
 
-import os
+from importlib.resources import files
 
 class TestSimulation(unittest.TestCase):
 
-    def setUp(self):
-        # ASTERIA base folder.
-        self.basedir = os.environ['ASTERIA']
-
     def test_config_from_ini(self):
         # Initialize a simulation from an INI file.
-        inifile = os.path.join(self.basedir, 'data/config/example.ini')
+        inifile = files('asteria.etc').joinpath('example.ini')
+        self.assertTrue(inifile.exists())
+
         sim = Simulation(config=inifile)
 
         # Test the configuration metadata.

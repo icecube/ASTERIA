@@ -2,5 +2,8 @@
 sphinx ~= 8.2.0
 nbsphinx ~= 0.9.0
 ipython ~= 9.0
+ipykernel ~= 6.29
+uproot ~= 5.6
 sphinx_rtd_theme ~= 3.0.0
 readthedocs-sphinx-search ~= 0.3.2
+git+https://github.com/icecube/asteria.git@cleanup-environment
