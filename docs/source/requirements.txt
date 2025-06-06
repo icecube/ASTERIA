@@ -5,3 +5,4 @@ ipython ~= 9.0
 ipykernel ~= 6.29
 sphinx_rtd_theme ~= 3.0.0
 readthedocs-sphinx-search ~= 0.3.2
+git+https://github.com/icecube/asteria.git@main
