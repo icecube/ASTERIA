@@ -1,6 +1,16 @@
 # ASTERIA Change Log
 
-## 2.0.0 (unreleased)
+## 1.7.0 (2025-06-08)
+
+An intermediate release prior to major ASTERIA 2.0 interface change. Many fixes under the hood:
+* Updated setuptools to `pyproject.toml` (PR https://github.com/icecube/ASTERIA/pull/112).
+* Fixed broken `Interaction` class function calls (PR https://github.com/icecube/ASTERIA/pull/116, https://github.com/icecube/ASTERIA/pull/117, https://github.com/icecube/ASTERIA/pull/122).
+* Major cleanup of readthedocs documentation, including notebook generation with nbsphinx (PR https://github.com/icecube/ASTERIA/pull/115, https://github.com/icecube/ASTERIA/pull/118, https://github.com/icecube/ASTERIA/pull/119, https://github.com/icecube/ASTERIA/pull/120, https://github.com/icecube/ASTERIA/pull/121, https://github.com/icecube/ASTERIA/pull/123).
+* Repair to sim configuration (PR https://github.com/icecube/ASTERIA/pull/124).
+* Significant upgrades to all unit tests and coverage (PR https://github.com/icecube/ASTERIA/pull/125, https://github.com/icecube/ASTERIA/pull/126, https://github.com/icecube/ASTERIA/pull/127, https://github.com/icecube/ASTERIA/pull/129).
+* Removed unused command line parser (PR https://github.com/icecube/ASTERIA/pull/130).
+* Removed ASTERIA environment variable (PR https://github.com/icecube/ASTERIA/pull/133).
+* Sorted notebooks and marked some as obsolete (PR https://github.com/icecube/ASTERIA/pull/134).
 
 ## 1.6.0 (2024-07-01)
 
