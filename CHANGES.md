@@ -1,5 +1,7 @@
 # ASTERIA Change Log
 
+## 1.8.0 (unreleased)
+
 ## 1.7.0 (2025-06-08)
 
 An intermediate release prior to major ASTERIA 2.0 interface change. Many fixes under the hood:
