@@ -18,6 +18,9 @@ Simulation Configuration
     :maxdepth: 1
 
     nb/config_example.ipynb
+    nb/AnalyticModel_DetectorResponse.ipynb
+    nb/luminosity.ipynb
+    nb/simulation_handling.ipynb
 
 Detector Response
 -----------------
@@ -36,6 +39,16 @@ Flavor Transformations
 
     nb/earth_models.ipynb
     nb/PiegsaEarthOscillations.ipynb
+    nb/simplemixing_class.ipynb
+    nb/supernova_mixing.ipynb
+
+ROOT I/O
+--------
+
+.. toctree::
+    :maxdepth: 1
+
+    nb/sim_2_root.ipynb
 
 Other Notebooks
 ---------------
@@ -43,12 +56,6 @@ Other Notebooks
 .. toctree::
     :maxdepth: 1
     
-    nb/AnalyticModel_DetectorResponse.ipynb
     nb/asymmetric_errors.ipynb
     nb/load_simulation.ipynb
-    nb/luminosity.ipynb
-    nb/sim_2_root.ipynb
-    nb/simplemixing_class.ipynb
-    nb/simulation_handling.ipynb
     nb/stellar_distributions.ipynb
-    nb/supernova_mixing.ipynb
