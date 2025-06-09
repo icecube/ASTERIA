@@ -51,7 +51,7 @@ def initialize(config):
     .. param :: config : asteria.config.Configuration
         - Loaded ASTERIA model Configuration object.
     """
-    h5path = '/'.join([config.abs_base_path, config.IO.table.path])
+    h5path = config.IO.table.path
     try:
         h5file = tables.open_file(filename=h5path, mode='w',
                                   title='Simulations of ASTERIA Source: {}'.format(config.source.name))
@@ -211,7 +211,7 @@ def find(group, config):
     
     
 def save(config, result, force=False):
-    h5path = '/'.join([config.abs_base_path, config.IO.table.path])
+    h5path = config.IO.table.path
 
     if not isdir(dirname(h5path)):
         raise NotADirectoryError('Directory {0} not found, aborting.'.format(dirname(h5path)))
@@ -302,7 +302,7 @@ def load(config):
     .. return :: result : ndarray
         - Results array, e.g., photonic energy per unit volume.
     """
-    h5path = '/'.join([config.abs_base_path, config.IO.table.path])
+    h5path = config.abs_base_path.joinpath(config.IO.table.path)
     
     # Test file existence 
     if not isfile(h5path):

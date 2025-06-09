@@ -57,6 +57,7 @@ import astropy.units
 import astropy.constants
 import astropy.utils.data
 
+from importlib.resources import readers, files
 
 # Extract a number from a string with optional leading and
 # trailing whitespace.
@@ -195,11 +196,10 @@ class Configuration(Node):
         # Use environment variables to interpolate {NAME} in the base path.
         base_path = self.base_path
         if base_path == '<PACKAGE_DATA>':
-            self._assign(
-                'abs_base_path', astropy.utils.data._find_pkg_data_path('data'))
+            self._assign('abs_base_path', files('asteria.data'))
         else:
             try:
-                self._assign('abs_base_path', base_path.format(**os.environ))
+                self._assign('abs_base_path', readers.MultiplexedPath(base_path.format(**os.environ)))
             except KeyError as e:
                 raise ValueError('Environment variable not set: {0}.'.format(e))
 
