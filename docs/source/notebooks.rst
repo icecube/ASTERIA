@@ -1,8 +1,8 @@
 Jupyter Notebooks
 =================
 
-Models and Interations
-----------------------
+Models and Interactions
+-----------------------
 
 .. toctree::
     :maxdepth: 1
