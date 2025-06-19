@@ -18,6 +18,7 @@ import numpy as np
 import configparser
 import warnings
 from importlib.resources import files
+import abc
 import os
 
 from .interactions import Interactions
@@ -35,7 +36,7 @@ class Simulation:
                          val is not None and
                          key not in ['self', 'E', 't']}
 
-        self.metadata.update({ 'interactions': ', '.join([item.__class__.__name__ for item in interactions]) })
+        self.metadata.update({ 'interactions': ', '.join([_int().__class__.__name__ if isinstance(_int, abc.ABCMeta) else _int.__class__.__name__ for _int in interactions]) })
 
         self.param = {}
         if model and not config:
@@ -99,7 +100,14 @@ class Simulation:
             else:
                 self._mixing = ft.NoTransformation()
 
-            self.interactions = Interactions(interactions) if interactions is None else Interactions()
+            if interactions is None:
+                self.interactions = Interactions()
+            else:
+                if isinstance(interactions, (tuple, list)):
+                    self.interactions = Interactions(interactions)
+                else:
+                    self.interactions = Interactions([interactions])
+
             self._E_per_V = None
             self._total_E_per_V = None
             self._photon_spectra = None
