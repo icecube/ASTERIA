@@ -10,6 +10,7 @@ Models and Interactions
     nb/cross_sections.ipynb
     nb/inverse_beta_decay.ipynb
     nb/model_phase_plots.ipynb
+    nb/interaction_contrib.ipynb
 
 Simulation Configuration
 ------------------------
