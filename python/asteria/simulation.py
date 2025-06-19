@@ -105,6 +105,8 @@ class Simulation:
             else:
                 if isinstance(interactions, (tuple, list)):
                     self.interactions = Interactions(interactions)
+                elif isinstance(interactions, Interactions):
+                    self.interactions = interactions
                 else:
                     self.interactions = Interactions([interactions])
 
