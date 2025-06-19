@@ -39,7 +39,7 @@ class Simulation:
         self.metadata.update({ 'interactions': ', '.join([_int().__class__.__name__ if isinstance(_int, abc.ABCMeta) else _int.__class__.__name__ for _int in interactions]) })
 
         self.param = {}
-        if model and not config:
+        if model and config is None:
 
             self.metadata.update({'model': {'name': model['name'],
                                             'param': '; '.join([f"{key}, {val}" for key, val in model['param'].items()])}
