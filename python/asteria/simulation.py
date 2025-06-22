@@ -140,8 +140,8 @@ class Simulation:
 
             if effvolfile is None:
                 self._effvolfile = {
-                    'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
-                     'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
+                    'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.ecsv'),
+                     'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.ecsv')
                    }
             else:
                 self._effvolfile = effvolfile
@@ -243,8 +243,8 @@ class Simulation:
 
                 if effvolfile is None:
                     self._effvolfile = {
-                        'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
-                        'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
+                        'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.ecsv'),
+                        'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.ecsv')
                     }
                 else:
                     self._effvolfile = effvolfile

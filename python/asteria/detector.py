@@ -25,16 +25,20 @@ class Detector:
         
         # For Gen2
         if self._detector_scope == 'Gen2':
-            # read in effective volume table
-            effvol = {'IC86': np.genfromtxt(effvol_table['IC86']), 'Gen2': np.genfromtxt(effvol_table['Gen2'])}
-
-        # For standard IceCube (IC86) and if detector_scope not defined
+            self._effvol_table = {}
+            for det, filename in effvol_table.items():
+                evt = Table.read(filename)
+                evt.sort('z')
+                self._effvol_table[det] = evt
         else:
-            # downsample geometry
+            #- downsample geometry
             doms = doms[doms['det_type'] == 'IC86']
-            # read in effective volume table
-            effvol = np.genfromtxt(effvol_table['IC86'])
-        self._effvol_table = self.get_effvol_table(effvol)
+
+            #- read in effective volume table
+            filename = effvol_table['IC86']
+            evt = Table.read(filename)
+            evt.sort('z')
+            self._effvol_table = evt
 
         # Doms effective volume DeepCore and normal doms
         doms_effvol = self.effvol(doms)
@@ -221,45 +225,20 @@ class Detector:
     def ws_dom_effvol(self):
         return self.ws_total_effvol / self.n_ws
     
-    def get_effvol_table(self, effvol):
-        """ Load effective volume table as astropy table
-        Inputs:
-        - effvol: ndarray, dict of ndarray
-            Effective volume table from data files
-        Outputs:
-        - effvol_table: ndarray, dict of ndarry
-            Effective volume table in astropy Table format
-        """
-        if self._detector_scope == 'Gen2':
-            keys = effvol.keys()
-            effvol_table = {}
-            for key in keys:
-                evt = Table(effvol[key], names=['z', 'effvol'], dtype=['f8', 'f8'], 
-                            meta={'Name': 'Effective_Volume'})
-                evt.sort('z')
-                effvol_table[key] = evt
-            return effvol_table
-        else:
-            evt = Table(effvol, names=['z', 'effvol'], dtype=['f8', 'f8'],
-                        meta={'Name': 'Effective_Volume'})
-            evt.sort('z')
-            effvol_table = evt
-            return effvol_table
-
     def effvol(self, doms):
-        """ Interpolate table to to get effective volume
-        Inputs:
-        - doms: float, list, tuple, ndarray
+        """Interpolate table to to get effective volume.
+
+        Parameters
+        ----------
+        doms: float, list, tuple, ndarray
             DOMs table to read of the depth for given subdetector and sensor
-        Outputs:
-        - vol: float, list, tuple, ndarray
-            Effective volume at depth """
-        # TODO Jakob: For IceCube Upgrade, where different sensors come interchangeably, this has to be adapted because
-        # the current version relies on the fact that IceCube is completly made of DOMs (up to scaling) and Gen2 is completely made
-        # of mDOMs. To obtain the individual effective volume we currently take a mask using the dom table and filtering for a sensor.
-        # Idealy, we would replace this array based implementation with a table or dictionary. I.e. we construct a table like the doms
-        # table and then instead of lopping over the detector_scope we loop over the sensor type and interpolate at the position of the
-        # sensor.
+
+        Returns
+        -------
+        vol: float, list, tuple, ndarray
+            Effective volume at depth
+        """
+        # TODO Jakob: For IceCube Upgrade, where different sensors come interchangeably, this has to be adapted because the current version relies on the fact that IceCube is completly made of DOMs (up to scaling) and Gen2 is completely made of mDOMs. To obtain the individual effective volume we currently take a mask using the dom table and filtering for a sensor. Idealy, we would replace this array based implementation with a table or dictionary. I.e. we construct a table like the doms table and then instead of lopping over the detector_scope we loop over the sensor type and interpolate at the position of the sensor.
         # TODO Jakob: Consider changing interpolator and set values exceeding range to edge values
         if self._detector_scope == 'Gen2':
             vol = np.array([])

@@ -1,12 +1,12 @@
 # %ECSV 1.0
 # ---
 # datatype:
-# - {name: depth, unit: m, datatype: float64}
+# - {name: z, unit: m, datatype: float64}
 # - {name: effvol, unit: m3, datatype: float64}
 # meta: {author: Benedikt Riedel, description: Single-photon effective volume vs. DOM depth, icemodel: AHA, name: IceCube-86 Effective
 #     Volume, reference: 'arXiv:1108.0171, Fig. 5'}
 # schema: astropy-2.0
-depth effvol
+z effvol
 502.61 0.1387640449
 485.59 0.1460674157
 468.57 0.1629213483
