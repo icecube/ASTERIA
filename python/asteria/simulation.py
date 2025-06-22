@@ -17,6 +17,7 @@ from math import ceil
 import numpy as np
 import configparser
 import warnings
+from importlib.resources import files
 import abc
 import os
 
@@ -124,17 +125,15 @@ class Simulation:
                 raise ValueError("add_wls only takes values True, False or None")
 
             if not geomfile:
-                self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                              'data/detector/geo_IC86+Gen2.txt')
+                self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
             else:
                 self._geomfile = geomfile
 
             if not effvolfile:
-                self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
-                                            'data/detector/effvol_DOM.txt'),
-                                    "Gen2": os.path.join(os.environ['ASTERIA'],
-                                            'data/detector/effvol_mDOM.txt')
-                                    }
+                self._effvolfile = {
+                    'IC86' : files('asteria.data').joinpath('detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
+                     'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
+                   }
             else:
                 self._effvolfile = effvolfile
 
@@ -229,17 +228,15 @@ class Simulation:
                     self._add_wls = False
 
                 if not geomfile:
-                    self._geomfile = os.path.join(os.environ['ASTERIA'],
-                                                  'data/detector/geo_IC86+Gen2.txt')
+                    self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
                 else:
                     self._geomfile = geomfile
 
                 if not effvolfile:
-                    self._effvolfile = {"IC86": os.path.join(os.environ['ASTERIA'],
-                                                'data/detector/effvol_DOM.txt'),
-                                        "Gen2": os.path.join(os.environ['ASTERIA'],
-                                                'data/detector/effvol_mDOM.txt')
-                                        }
+                    self._effvolfile = {
+                        'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
+                        'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
+                    }
                 else:
                     self._effvolfile = effvolfile
 
