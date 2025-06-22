@@ -30,7 +30,7 @@ Detector Response
     :maxdepth: 1
     :glob:
 
-    nb/detector*
+    nb/detector.ipynb
 
 Flavor Transformations
 ----------------------
@@ -40,7 +40,6 @@ Flavor Transformations
 
     nb/earth_models.ipynb
     nb/PiegsaEarthOscillations.ipynb
-    nb/simplemixing_class.ipynb
     nb/supernova_mixing.ipynb
 
 ROOT I/O
