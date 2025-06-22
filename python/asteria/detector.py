@@ -44,11 +44,6 @@ class Detector:
         doms['effvol'] = doms_effvol.flatten()
         self._doms_table = doms
 
-#        #self._doms_table = Table(np.hstack((doms, doms_effvol)),
-#        self._doms_table = Table(rfn.append_fields(doms, names='effvol', data=doms_effvol.flatten(), usemask=False),
-#                                 names=['str', 'i', 'x', 'y', 'z', 'det_type', 'om_type', 'effvol'],
-#                                 dtype=['i4', 'i4', 'f8', 'f8', 'f8', 'U4', 'U2', 'float64'],
-#                                 meta={'Name': 'DomsTable'})
         self.n_i3_doms = np.sum(self._doms_table['om_type'] == 'i3')
         self.n_dc_doms = np.sum(self._doms_table['om_type'] == 'dc')
         self.n_md = np.sum(self._doms_table['om_type'] == 'md')
