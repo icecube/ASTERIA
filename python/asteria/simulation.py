@@ -407,7 +407,7 @@ class Simulation:
         """Returns dictionary of photonic energy deposition vs time for each neutrino flavor.
         This property will return None if this Simulation instance has not yet been run.
         """
-        return self._E_per_V if self._E_per_V else None
+        return self._E_per_V if self._E_per_V is not None else None
 
     @property
     def total_E_per_V(self):
@@ -415,7 +415,7 @@ class Simulation:
         This property will return None if this Simulation instance has not yet been run.
         """
         # TODO: Compound statement is redundant, member is None at init and then changed only after running
-        return self._total_E_per_V if self._total_E_per_V else None
+        return self._total_E_per_V if self._total_E_per_V is not None else None
 
     def avg_dom_signal(self, dt=None, flavor=None):
         """Returns estimated signal in one DOM, computed using avg DOM effective volume
