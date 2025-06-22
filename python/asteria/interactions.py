@@ -3,8 +3,6 @@
 """
 
 from abc import ABC, abstractmethod
-from enum import Enum, EnumMeta, _EnumDict
-from sys import modules
 
 import numpy as np
 import astropy.units as u
@@ -753,7 +751,6 @@ class Oxygen18(Interaction):
                 return np.zeros_like(Enu) * u.MeV
             return 0. * u.MeV
 
-
         e_min = self.e_th + self.e_ckov
         if isinstance(Enu, (list, tuple, np.ndarray)):
             lep = np.where(Enu < e_min, 0., Enu - e_min)
@@ -770,183 +767,66 @@ class Oxygen18(Interaction):
         else:
             return self.photons_per_lepton_MeV * self.p2e_path_ratio
 
-    
-class _InteractionsMeta(EnumMeta):
-    """ Internal Meta-class for Interactions enumeration object.
-    Extends functionality of enum.Enum __new__ and __call__ methods.
-    
-    .. data:: _InteractionDict : dict
-        Dictionary of ASTERIA neutrino interaction objects.
+
+class Interactions:
+    """ Public-facing enumeration object for ASTERIA Interactions
+    Iterating this object without instantiating it will yield a set of default
+    asteria Interactions
     """
-    _InteractionDict = {'InvBetaPar'      : InvBetaPar(),
-                        'InvBetaTab'      : InvBetaTab(),
-                        'ElectronScatter' : ElectronScatter(),
-                        'Oxygen16CC'      : Oxygen16CC(),
-                        'Oxygen16NC'      : Oxygen16NC(),
-                        'Oxygen18'        : Oxygen18() }
-               
-    def __call__(cls, requests=None):
-        """Given a dictionary of requests for neutrino interactions, returns an
-        enumeration containing the requested interactions.           
-            
-           .. param :: cls : Interactions
-              Called object. (Similar to 'self' keyword)
-            
-           .. param :: requests : dict, (list, tuple, ndarray of str), or str
-              Dictionary of requested interactions
-               - Keys with value True are initialized as enumeration members                
+
+    _defaults = (
+        ElectronScatter(),
+        InvBetaPar(),
+        Oxygen16CC(),
+        Oxygen16NC(),
+        Oxygen18()
+    )
+
+    def __init__(self, interactions=None):
+        """Initialization for custom Interaction enumeration object.
+
+        Parameters
+        ----------
+        interactions : list, tuple or numpy.ndarray of asteria.interactions.Interaction
         """
-        if isinstance(requests, str):
-            # If string 'default' or 'all' requests, return default interactions Enum
-            if requests.lower() in {'all', 'default'}:
-                return Interactions
-            else:
-                raise RuntimeError("Unknown requests made: {0}".format(requests))
+        if interactions is None:
+            self._values = self._defaults
+        else:
+            if not isinstance(interactions, (list, tuple, np.ndarray)):
+                raise ValueError("Invalid iterable for interactions, expected list,"
+                                 f"tuple or numpy.ndarray, but received {type(interactions)}")
 
-        # If requests input is list, tuple or ndarray of strings, assume all elements are requested interactions
-        if isinstance(requests, (list, tuple, np.ndarray)):
-            requests = {item: True for item in requests}
+            elif len(interactions) == 0:
+                raise ValueError("No interactions requested")
 
-        # Declare Meta-class _InteractionsMeta for error-checking.
-        metacls = cls.__class__
+            elif len(set(interactions)) != len(interactions):
+                raise ValueError("Duplicate interactions requested")
 
-        # If no requests have been made, raise an error.
-        if requests is None or all( not val for val in requests.values() ):
-            raise RuntimeError('No Interactions Requested. ') 
-        # If an unknown interaction is requested, raise an error.
-        elif any( key not in metacls._InteractionDict for key in requests):
-            raise AttributeError('Unknown interaction(s) "{0}" Requested'.format(
-                                 '", "'.join(set(requests)-set(metacls._InteractionDict))))
-        # If requests does not have all boolean values, throw an error  .
-        elif not all(isinstance(val, bool) for val in requests.values()):
-            errordict = {key: val for key, val in requests.items()
-                         if not isinstance(requests[key], bool)}
-            raise ValueError('Requests must be dictionary with bool values. ' +
-                             'Given elements: {0}'.format(errordict))
+            elif any([isinstance(i, Interaction) for i in interactions]):
+                raise ValueError("Interaction instance requested, please request interactions by class "
+                                 "(i.e. ElectronScatter)")
 
-        # Retrieve interactions (if any) that were missing from requests.
-        missing = {key: False for key in metacls._InteractionDict if
-                   key not in requests}
-        requests.update(missing)
+            elif any(not issubclass(x, Interaction) for x in interactions):
+                idx = np.where([not issubclass(x, Interaction) for x in interactions])[0][0]
+                raise ValueError(f"Invalid interaction {interactions[idx]} at index {idx}, "
+                                 "only Interaction objects derived from asteria.interactions.Interaction "
+                                 "are supported")
 
-        # If both implementations of Inverse Beta Decay are requested, throw an error.
-        if requests['InvBetaTab'] and requests['InvBetaPar']:
-            raise RuntimeError('Requested InvBetaTab & InvBetaPar; ' +
-                               'only one instance of IBD is allowed.')
-        # Otherwise, create a new Enum object...
+            # Create tuple of requested interaction object instances. The above checks are intended to guard against
+            # use of invalid Interaction types
+            self._values = tuple([i() for i in interactions])
 
-        # Sort requests according to metacls._InteractionDict
-        requests = {key: requests[key] for key in metacls._InteractionDict }
-        
-        # Populate an _EnumDict with fields required for Enum creation.
-        bases = (Enum, )
-        classdict = _EnumDict()
-        fields = {'__doc__'               : cls.__doc__,
-                  '__init__'              : cls.__init__,
-                  '__module__'            : cls.__module__,
-                  '__qualname__'          : 'Interactions',
-                  '_generate_next_value_' : cls._generate_next_value_,
-                  'cross_section'         : cls.cross_section,
-                  'mean_lepton_energy'    : cls.mean_lepton_energy,
-                  'photon_scaling_factor' : cls.photon_scaling_factor,
-                  'requests'              : requests }
-        classdict.update({ key : val for key, val in fields.items()})
-        
-        # Create and return an Enum object using _InteractionsMeta.__new__      
-        return metacls.__new__(metacls, 'Interactions', bases, classdict)
-    
-    def __new__(metacls, cls, bases, classdict): 
-        """Returns an Enum object containing neutrino interactions.
-    
-            .. param:: metacls : class 
-                Meta-class of new Enum object being created (_InteractionsMeta).
-                
-            .. param:: cls : str
-                String for name of new Enum object being created
-                
-            .. param:: bases : tuple
-                Tuple of base classes ( enum.Enum,).  
-                
-            .. param:: classdict : _EnumDict
-                Extended dictionary object (from package enum) for creating an Enum object.                
+
+    def __iter__(self):
+        """Iterate through a custom list of interactions
         """
-        
-        # If no request has been made, make a request for the default interactions
-        if 'requests' not in classdict:
-            classdict.update({'requests' : {'InvBetaPar'      : True,
-                                            'InvBetaTab'      : False,
-                                            'ElectronScatter' : True,
-                                            'Oxygen16CC'      : True,
-                                            'Oxygen16NC'      : True,
-                                            'Oxygen18'        : True } })
-                                            
-        for key, val in classdict['requests'].items():
-            if val:
-                # Add a member to the enumeration.
-                classdict[key] = metacls._InteractionDict[key]
-            else:
-                # DO NOT add a member to the enumeration.
-                classdict.update({ key : metacls._InteractionDict[key] })
-        
-        # Create and return an Enum object using Enum.__new__ method.
-        return super().__new__(metacls, cls, bases, classdict)
+        # Note: This will overwrite the metaclass definition only when an Interaction object is instantiated
+        #       Otherwise, the default options defined in _InteractionsMeta will be used.
+        for interaction in self._values:
+            yield interaction
 
+    def __len__(self):
+        return len(self._values)
 
-class Interactions(Enum, metaclass=_InteractionsMeta):
-    """Neutrino Interaction types. 
-    
-    .. param (Optional):: requests : dict       
-        Dictionary of requested interactions. Each key must be
-        the string of an neutrino Interaction name, values must
-        be True/False. The default is given below.
-        
-        default = {'InvBetaPar'      : True,
-                   'InvBetaTab'      : False,
-                   'ElectronScatter' : True,
-                   'Oxygen16CC'      : True,
-                   'Oxygen16NC'      : True,
-                   'Oxygen18'        : True }
-                   
-    .. data :: InvBetaPar
-        Parameterized Inverse Beta Decay.
-    
-    .. data :: InvBetaTab
-        Tabulated Inverse Beta Decay.
-        
-    .. data :: ElectronScatter
-        Elastic neutrino-electron scattering.
-        
-    .. data :: Oxygen16CC
-        Oxygen-16 charged-current interaction.
-        
-    .. data :: Oxygen16NC
-        Oxygen-16 neutral-current interaction.
-    
-    .. data :: Oxygen18
-        Oxygen-18 charged-current interaction.
-    
-    .. data :: requests : dict
-        Dictionary of requests made for interactions (e.g. default).
-        
-    See also: _InteractionsMeta Meta-class, which extends the
-    functionality of this object and defines its type.        
-    """
-    @property
-    def __doc__(self):
-        """Returns Doc-string of corresponding ASTERIA Interaction object."""
-        return self.value.__doc__
-    
-    @property
-    def cross_section(self):
-        """Returns ASTERIA Interaction cross_section method. """
-        return self.value.cross_section
-    
-    @property
-    def mean_lepton_energy(self):
-        """Returns corresponding ASTERIA Interaction mean_lepton_energy method. """
-        return self.value.mean_lepton_energy
-    
-    @property
-    def photon_scaling_factor(self):
-        """Returns corresponding ASTERIA Interaction photon_scaling_factor method. """
-        return self.value.photon_scaling_factor
+    def __repr__(self):
+        return "\n".join(["Interactions: "]+[f"{i:>2d} - {x.__class__.__name__}" for i, x in enumerate(self)])

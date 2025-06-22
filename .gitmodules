@@ -1,3 +1,0 @@
-[submodule "data/snfluxes"]
-	path = data/snfluxes
-	url = https://github.com/IceCubeOpenSource/snfluxes.git

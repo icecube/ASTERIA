@@ -1,6 +1,6 @@
 # This is a basic workflow to help you get started with Actions
 
-name: tests
+name: coverage
 
 # Controls when the action will run. Triggers the workflow on push or pull request
 # events but only for the main branch
@@ -19,16 +19,11 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     strategy:
+      fail-fast: true
       matrix:
         # Test all supported Python versions under Ubuntu
         os: [ubuntu-latest]
-        python-version: ['3.10', '3.11', '3.12', '3.13']
-        # Additionally, test one Python version under MacOS and Windows, to detect OS-specific issues
-        include:
-          - os: macos-latest
-            python-version: '3.12'
-          - os: windows-latest
-            python-version: '3.12'
+        python-version: ['3.12']
 
     # The type of runner that the job will run on.
     runs-on: ${{ matrix.os }}
@@ -52,11 +47,11 @@ jobs:
       - name: Set ASTERIA environment
         run: |
           echo "ASTERIA=${{ github.workspace }}" >> "$GITHUB_ENV"
-        if: runner.os != 'Windows'
-      - name: Set ASTERIA environment for Windows
+      - name: Run tests with coverage
         run: |
-          echo "ASTERIA=${{ github.workspace }}" | Out-File -FilePath $env:GITHUB_ENV -Append
-        if: runner.os == 'Windows'
-      - name: Run unit tests with pytest
-        run: |
-          pytest
+          pytest --cov
+      - name: Coveralls
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_REPO_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: coveralls

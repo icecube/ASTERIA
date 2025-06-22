@@ -1,54 +1,53 @@
-# ASTERIA: A Supernova TEst Routine for IceCube Analysis 
+# ASTERIA: A Supernova TEst Routine for IceCube Analysis
+
+[![tests](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml/badge.svg)](https://github.com/icecube/ASTERIA/actions/workflows/tests.yml)
+[![Documentation Status](https://readthedocs.org/projects/asteria/badge/?version=latest)](https://asteria.readthedocs.io/en/latest/?badge=latest)
+[![Coverage Status](https://coveralls.io/repos/github/icecube/ASTERIA/badge.svg?branch=main&kill_cache=1)](https://coveralls.io/github/icecube/ASTERIA)
+
 ## Introduction
 
-This is a fast supernova neutrino simulation designed for the IceCube Neutrino
-Observatory. The original version was written in C++ by Thomas Kowarik and
-Gösta Kroll at Universität Mainz in 2011, and has been updated by Lutz Köpke.
-This project began as a Python port of the original program, the Unified 
-Supernova Simulation Routine (USSR).
+<img align="right" alt="ASTERIA" width="200px" src="docs/source/asteria.png">
 
-The code uses estimates of the supernova neutrino luminosity from large-scale
-simulations of core-collapse supernovae to calculate photons in the IceCube
-detector.
+This is a fast supernova neutrino simulation designed for the IceCube Neutrino Observatory. The original version, called the Unified Supernova Simulation Routine (USSR), was written in C++ by Thomas Kowarik and Gösta Kroll at Universität Mainz in 2011. This project began as a Python port of the original program.
+
+The code uses estimates of the supernova neutrino luminosity from large-scale simulations of core-collapse supernovae to calculate photons in the IceCube detector. The calculation includes parameterizations of the most important interactions contributing to signal in the ice from core-collapse neutrinos:
+* Inverse beta decay.
+* Electron scattering.
+* Charged-current interactions on <sup>16</sup>O.
+* Neutral-current interactions on <sup>16</sup>O.
+* Inelastic scattering on <sup>17/18</sup>O.
+
+Details are available in R. Abbasi et al., [*IceCube sensitivity for low-energy neutrinos from nearby supernovae*](https://arxiv.org/abs/1108.0171), A&A 535:A109, 2011.
+
+Access to supernova neutrino simulations is provided through the SNEWPY code, documented [here](https://snewpy.readthedocs.io/en/stable/) and [here](https://github.com/SNEWS2/snewpy).
 
 ## Access
 
-ASTERIA can be cloned from this GitHub repository in the usual way. It also
-pulls in a private submodule containing core-collapse supernova flux
-calculations. To pull the submodule after cloning the repository, run
-
+ASTERIA can be cloned from this GitHub repository in the usual way by running
 ```
-git submodule update --init --recursive
-```
-
-This only needs to be done the first time you clone ASTERIA. To update the
-submodule in your working copy, run the command
-
-```
-git submodule update --recursive --remote
+git clone https://github.com/icecube/ASTERIA.git
 ```
 
 ## Installation
 
 ASTERIA can be installed by cloning the repository and running
-
 ```
-python setup.py install
-```
-
-Alternatively, for rapid development the command
-
-```
-python setup.py develop
-export ASTERIA=/path/to/asteria_folder
+cd /path/to/asteria
+pip install . [--user]
 ```
 
-will install softlinks in your python path to the source in your git checkout.
+To run simulations, you'll need to set the environment variable `ASTERIA` to point to the source tree. For example, in `bash`, run
+```
+export ASTERIA=/path/to/asteria
+```
+and in `[t]csh`, run
+```
+setenv ASTERIA /path/to/asteria
+```
 
 ## Ignored Files
 
-ASTERIA is configured in such a way that the following directories will be
-automatically generated if they are missing, but their content will be ignored by git.
+ASTERIA is configured in such a way that the following directories will be automatically generated if they are missing, but their content will be ignored by git.
 
 ```
 /path/to/asteria_folder/scratch
@@ -60,6 +59,6 @@ automatically generated if they are missing, but their content will be ignored b
 
 ## License
 
-[BSD License](LICENSE.rst)
+[BSD 3-Clause License](LICENSE.rst)
 
 ASTERIA is free software licensed under a 3-clause BSD-style license.

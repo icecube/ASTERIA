@@ -1,20 +1,26 @@
-from asteria.stellardist import FixedDistance, StellarDensity
-
+import unittest
+from importlib.resources import files
 import astropy.units as u
-
 import numpy as np
 
-def test_fixed_distance():
-    fd = FixedDistance(10*u.kpc)
-    d = fd.distance()[0]
-    assert(d == 10*u.kpc)
+from asteria.stellardist import FixedDistance, StellarDensity
 
-    d = fd.distance(size=5)
-    assert(len(d) == 5)
+class TestStellarDistributions(unittest.TestCase):
 
-def test_stellar_density():
-    np.random.seed(1)
-    sd = StellarDensity('data/stellar/sn_radial_distrib_adams.fits')
+    def test_fixed_distance(self):
+        fd = FixedDistance(10*u.kpc)
+        d = fd.distance()[0]
+        self.assertTrue(d == 10*u.kpc)
 
-    d = sd.distance()
-    assert(np.abs(d.to('kpc').value - 8.853) < 1e-3)
+        d = fd.distance(size=5)
+        self.assertTrue(len(d) == 5)
+
+    def test_stellar_density(self):
+        np.random.seed(1)
+        stellar_file = files('asteria.data.stellar').joinpath('sn_radial_distrib_adams.fits')
+        self.assertTrue(stellar_file.exists())
+
+        sd = StellarDensity(stellar_file)
+
+        d = sd.distance()
+        self.assertTrue(np.abs(d.to('kpc').value - 8.853) < 1e-3)

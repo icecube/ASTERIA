@@ -13,7 +13,7 @@ import asteria.IO as io
 import numpy as np
 from astropy import units as u
 
-import os
+from importlib.resources import files
 from argparse import ArgumentParser
 
 
@@ -25,8 +25,7 @@ def parse(options=None):
 
     p = ArgumentParser(description='IceCube Fast CCSN Simulator')
     p.add_argument('-c', '--config', dest='config',
-                   default='{}/data/config/default.yaml'.format(
-                       os.environ['ASTERIA']),
+                   default=files('asteria.etc').joinpath('default.yaml'),
                    help='YAML configuration file.')
     # 
     # CCSN source fluxes and spectra.
