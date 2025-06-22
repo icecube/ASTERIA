@@ -21,7 +21,6 @@ Simulation Configuration
     nb/config_example.ipynb
     nb/AnalyticModel_DetectorResponse.ipynb
     nb/luminosity.ipynb
-    nb/simulation_handling.ipynb
 
 Detector Response
 -----------------
