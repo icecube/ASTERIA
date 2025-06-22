@@ -88,14 +88,14 @@ class Simulation:
             else:
                 self.flavors = flavors
 
-            if not hierarchy or hierarchy.upper() == 'DEFAULT':
+            if hierarchy is None or hierarchy.upper() == 'DEFAULT':
                 self.hierarchy = MassHierarchy.NORMAL
             else:
                 self.hierarchy = getattr(MassHierarchy, hierarchy.upper())
 
             self.mixing_scheme = mixing_scheme
             self.mixing_angle = mixing_angle
-            if mixing_scheme:
+            if mixing_scheme is not None:
                 if mixing_scheme == 'NoTransformation' or mixing_scheme == 'CompleteExchange':
                     self._mixing = getattr(ft, mixing_scheme)()
                 else:
@@ -119,26 +119,26 @@ class Simulation:
             self._photon_spectra = None
             self._create_paramdict(model, distance, flavors, hierarchy, interactions, mixing_scheme, mixing_angle, E, t)
 
-            if not detector_scope:
+            if detector_scope is None:
                 self._detector_scope = 'IC86'
             elif detector_scope == 'IC86' or detector_scope == 'Gen2':
                 self._detector_scope = detector_scope
             else:
                 raise ValueError("detector_scope only takes values `IC86`, `Gen2` or None")
 
-            if not add_wls:
+            if add_wls is None:
                 self._add_wls = False
             elif add_wls == True or add_wls == False:
                 self._add_wls = add_wls
             else:
                 raise ValueError("add_wls only takes values True, False or None")
 
-            if not geomfile:
+            if geomfile is None:
                 self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
             else:
                 self._geomfile = geomfile
 
-            if not effvolfile:
+            if effvolfile is None:
                 self._effvolfile = {
                     'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
                      'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
@@ -236,12 +236,12 @@ class Simulation:
                     self._detector_scope = 'IC86'
                     self._add_wls = False
 
-                if not geomfile:
+                if geomfile is None:
                     self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
                 else:
                     self._geomfile = geomfile
 
-                if not effvolfile:
+                if effvolfile is None:
                     self._effvolfile = {
                         'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
                         'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
@@ -435,7 +435,7 @@ class Simulation:
         avg_signal : numpy.ndarray
             Average signal observed in one DOM as a function of time
         """
-        if not dt:
+        if dt is None:
             dt = self._res_dt
         self.rebin_result(dt)
 
