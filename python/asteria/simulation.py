@@ -131,7 +131,7 @@ class Simulation:
 
             if not effvolfile:
                 self._effvolfile = {
-                    'IC86' : files('asteria.data').joinpath('detector/effectivevolume_benedikt_AHA_normalDoms.txt'),
+                    'IC86' : files('asteria.data').joinpath('detector/effvol_DOM.txt'),
                      'Gen2' : files('asteria.data').joinpath('detector/effvol_mDOM.txt')
                    }
             else:
