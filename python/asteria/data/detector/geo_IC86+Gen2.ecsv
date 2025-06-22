@@ -8,6 +8,7 @@
 # - {name: z, unit: m, datatype: float64}
 # - {name: det_type, datatype: string}
 # - {name: om_type, datatype: string}
+# meta: {name: IceCube-86 + IceCube-Gen2 Geometry}
 # schema: astropy-2.0
 str i x y z det_type om_type
 1 1 -256.14 -521.08 496.03 IC86 i3
