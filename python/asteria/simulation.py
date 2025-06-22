@@ -17,6 +17,7 @@ from math import ceil
 import numpy as np
 import configparser
 import warnings
+import abc
 import os
 
 from .interactions import Interactions
