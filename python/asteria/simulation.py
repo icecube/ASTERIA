@@ -125,7 +125,7 @@ class Simulation:
                 raise ValueError("add_wls only takes values True, False or None")
 
             if not geomfile:
-                self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
+                self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
             else:
                 self._geomfile = geomfile
 
@@ -228,7 +228,7 @@ class Simulation:
                     self._add_wls = False
 
                 if not geomfile:
-                    self._geomfile = files('asteria.data').joinpath('detector/Icecube_geometry.20110102.complete.txt')
+                    self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
                 else:
                     self._geomfile = geomfile
 

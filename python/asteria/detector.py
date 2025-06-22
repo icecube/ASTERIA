@@ -20,10 +20,7 @@ class Detector:
         self._detector_scope = detector_scope
 
         # Read in doms table from file
-        doms = np.genfromtxt(doms_table, delimiter = '\t', 
-                             names=['str', 'i', 'x', 'y', 'z', 'det_type', 'om_type'], 
-                             dtype='i4,i4,f8,f8,f8,U4,U2')
-
+        doms = Table.read(doms_table)
         doms = doms[doms['z'] <= max_height]
         
         # For Gen2
