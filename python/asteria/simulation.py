@@ -34,12 +34,19 @@ class Simulation:
     def __init__(self, config=None, *, model=None, distance=10 * u.kpc, res_dt=2 * u.ms, flavors=None, hierarchy=None,
                  interactions=Interactions(), mixing_scheme=None, mixing_angle=None, E=None, Emin=None, Emax=None,
                  dE=None, t=None, tmin=None, tmax=None, dt=None, detector_scope=None, add_wls=None, geomfile=None, effvolfile=None):
+
         self.metadata = {key: str(val) for key, val in locals().items() if
                          val is not None and
                          key not in ['self', 'E', 't']}
+
         self.metadata.update({ 'interactions': ', '.join([_int().__class__.__name__ if isinstance(_int, abc.ABCMeta) else _int.__class__.__name__ for _int in interactions]) })
+
         self.param = {}
-        if model and not config:
+        if model and config is None:
+
+            self.metadata.update({'model': {'name': model['name'],
+                                            'param': '; '.join([f"{key}, {val}" for key, val in model['param'].items()])}
+                                })
 
             if E is None and None in (Emin, Emax, dE):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `E` or "
@@ -51,6 +58,7 @@ class Simulation:
                 E = np.arange(_Emin, _Emax + _dE, _dE) * u.MeV
             elif E is None:
                 E = np.arange(0, 100, 1) * u.MeV
+                self.metadata.update({'Emin': 0 * u.MeV, 'Emax': 100 * u.MeV, 'dE': 1 * u.MeV})
 
             if t is None and None in (tmin, tmax, dt):
                 raise ValueError("Missing or incomplete energy range definition. Use argument `t` or "
@@ -66,6 +74,7 @@ class Simulation:
             else:
                 t = np.arange(-1, 1, 0.001) * u.s
                 _dt = 1 * u.ms
+                self.metadata.update({'tmin': -1 * u.s, 'tmax': 1 * u.s, 'dt': 1 * u.ms})
 
             self.source = Source(model['name'], model['param'])
             self.distance = distance
