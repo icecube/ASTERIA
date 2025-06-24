@@ -21,7 +21,6 @@ Simulation Configuration
     nb/config_example.ipynb
     nb/AnalyticModel_DetectorResponse.ipynb
     nb/luminosity.ipynb
-    nb/simulation_handling.ipynb
 
 Detector Response
 -----------------
@@ -30,7 +29,7 @@ Detector Response
     :maxdepth: 1
     :glob:
 
-    nb/detector*
+    nb/detector.ipynb
 
 Flavor Transformations
 ----------------------
@@ -40,7 +39,6 @@ Flavor Transformations
 
     nb/earth_models.ipynb
     nb/PiegsaEarthOscillations.ipynb
-    nb/simplemixing_class.ipynb
     nb/supernova_mixing.ipynb
 
 ROOT I/O
