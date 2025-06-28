@@ -30,7 +30,6 @@ Detector Response
     :glob:
 
     nb/detector.ipynb
-    nb/detector_hits.ipynb
     nb/detector_hits_IC86.ipynb
     nb/detector_hits_Gen2.ipynb
 
