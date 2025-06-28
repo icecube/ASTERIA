@@ -30,6 +30,7 @@ Detector Response
     :glob:
 
     nb/detector.ipynb
+    nb/detector_hits.ipynb
 
 Flavor Transformations
 ----------------------
