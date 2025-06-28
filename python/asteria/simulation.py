@@ -231,8 +231,8 @@ class Simulation:
                         raise ValueError("detector_scope only takes values `IC86`, `Gen2`")
                     
                     add_wls = detector['add_wls']
-                    if add_wls == True or add_wls == False:
-                        self._add_wls = add_wls
+                    if add_wls in ['True', 'False']:
+                        self._add_wls = add_wls == 'True'
                     else:
                         raise ValueError("add_wls only takes values True, False or None")
                 else:
