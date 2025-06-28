@@ -134,7 +134,10 @@ class Simulation:
                 raise ValueError("add_wls only takes values True, False or None")
 
             if geomfile is None:
-                self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
+                if detector_scope == 'Gen2':
+                    self._geomfile = files('asteria.data').joinpath('detector/geo_IC86+Gen2.ecsv')
+                else:
+                    self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
             else:
                 self._geomfile = geomfile
 
@@ -222,7 +225,7 @@ class Simulation:
 
                 if 'detector_scope' and 'add_wls' in configuration['DETECTOR'].keys():
                     detector_scope = str(detector['detector_scope'])
-                    if detector_scope == "IC86" or detector_scope == "Gen2":
+                    if detector_scope == 'IC86' or detector_scope == 'Gen2':
                         self._detector_scope = detector_scope
                     else:
                         raise ValueError("detector_scope only takes values `IC86`, `Gen2`")
@@ -237,7 +240,10 @@ class Simulation:
                     self._add_wls = False
 
                 if geomfile is None:
-                    self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
+                    if detector_scope == 'Gen2':
+                        self._geomfile = files('asteria.data').joinpath('detector/geo_IC86+Gen2.ecsv')
+                    else:
+                        self._geomfile = files('asteria.data').joinpath('detector/geo_IC86.ecsv')
                 else:
                     self._geomfile = geomfile
 
