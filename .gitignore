@@ -5,6 +5,7 @@ scratch/*
 !scratch/.gitignore
 data/processed/*
 !data/processed/.gitignore
+ana/other/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
