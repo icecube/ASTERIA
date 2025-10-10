@@ -6,6 +6,8 @@ scratch/*
 data/processed/*
 !data/processed/.gitignore
 ana/other/*
+ana/generic/files/*
+ana/sasi/files/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
