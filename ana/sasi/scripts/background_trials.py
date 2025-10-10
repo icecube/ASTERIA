@@ -56,12 +56,20 @@ class Background_Trials():
         Args:
             filename (str, optional): Name of simulation output file. Defaults to None.
         """
+        self.dir_path = os.path.join(self._file, f"../files/background/{self.model["name"]}/{self.bkg_dir_name}/")
+
+        if not os.path.exists(self.dir_path):
+            os.makedirs(self.dir_path)
 
         # filename for simulation output
-        filename = self._file + "/../files/background/{}/HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-            self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-            self.mixing_scheme, self.hierarchy,
-            self.bkg_trials, self.bkg_bins, self.distance.value)
+        filename = os.path.join(self.dir_path, "HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.model["name"], 
+            self.model["param"]["progenitor_mass"].value, 
+            self.mixing_scheme, 
+            self.hierarchy,
+            self.bkg_trials, 
+            self.bkg_bins, 
+            self.distance.value))
 
         # number of maximum trials, number of repetitions needed to fill bkg_trials
         self.max_trials = 10000 # size of batches
@@ -119,13 +127,21 @@ class Background_Trials():
                
         qdict = {"ic86": [], "gen2": [], "wls": []}
 
+        if not os.path.exists(self.dir_path):
+            raise FileNotFoundError("Directory does not exist. Run generate function first.")
+
         for dist in distance_range: # loop over all distances
             print("Distance: {}".format(dist))
             # filename of simulation output
-            filename_in = self._file + "/../files/background/{}/HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-                self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-                self.mixing_scheme, self.hierarchy,
-                self.bkg_trials, self.bkg_bins, dist.value)
+            filename_in = os.path.join(self.dir_path, "HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.model["name"], 
+            self.model["param"]["progenitor_mass"].value, 
+            self.mixing_scheme, 
+            self.hierarchy,
+            self.bkg_trials, 
+            self.bkg_bins, 
+            self.distance.value))
+            
             data = np.load(filename_in)
             
             for det in ["ic86", "gen2", "wls"]: # loop over detectors
@@ -138,10 +154,13 @@ class Background_Trials():
             qdict[det] = np.array(qdict[det])
         
         # save npz files
-        filename_out = self._file + "/../files/background/{}/QUAN_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
-            self.bkg_dir_name, self.model["name"], self.model["param"]["progenitor_mass"].value, 
-            self.mixing_scheme, self.hierarchy,
-            self.bkg_trials, self.bkg_bins)
+        filename_out = os.path.join(self.dir_path, "QUAN_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+            self.model["name"], 
+            self.model["param"]["progenitor_mass"].value, 
+            self.mixing_scheme, 
+            self.hierarchy,
+            self.bkg_trials, 
+            self.bkg_bins))
         
         np.savez(file = filename_out, 
                  dist = distance_range.value, 
