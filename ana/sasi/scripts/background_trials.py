@@ -1,8 +1,8 @@
 import os
 from tqdm import tqdm
 
-from .null_hypothesis import *
-from .helper import *
+from null_hypothesis import *
+from helper import *
 
 # Class generating and resorting data for background trials
 class Background_Trials():
@@ -34,6 +34,13 @@ class Background_Trials():
 
         self.get_dir_name()
         self._file = os.path.dirname(os.path.abspath(__file__))
+        self.dir_path = os.path.join(self._file, f"../files/background/{self.model['name']}/{self.bkg_dir_name}/")
+
+        # create directory if it does not already exist
+        if not os.path.exists(self.dir_path):
+            os.makedirs(self.dir_path)
+            print(f"Creating directory for bkg trials in {self.dir_path}...")
+
         np.random.seed(0)
 
     def get_dir_name(self):
@@ -42,13 +49,29 @@ class Background_Trials():
             self.bkg_dir_name = "default"
             
         elif self.mixing_scheme == "CompleteExchange":
-            self.bkg_dir_name = "syst_mix_comp_exch"
+            self.bkg_dir_name = "mix_comp_exch"
 
         elif self.mixing_scheme == "AdiabaticMSW":
             if self.hierarchy == "normal":
-                self.bkg_dir_name = "syst_mix_MSW_NH"
+                self.bkg_dir_name = "mix_MSW_NH"
             elif self.hierarchy == "inverted":
-                self.bkg_dir_name = "syst_mix_MSW_IH"
+                self.bkg_dir_name = "mix_MSW_IH"
+
+        # model
+        if self.model['param']['progenitor_mass'] != 20 * u.solMass:
+            progenitor_mass = self.model['param']['progenitor_mass'].value
+            direction = self.model['param']['direction']
+            self.bkg_dir_name = f"mod_{progenitor_mass}Msol_{direction}"
+
+        # analysis cut
+        if self.ft_para['freq_win'][1] == 85*u.Hz:
+            if self.ft_para['time_win'][0] == 150*u.ms:
+                self.bkg_dir_name = "ana_fcut_tcut"
+            else:
+                self.bkg_dir_name = "ana_fcut"
+        else:
+            if self.ft_para['time_win'][0] == 150*u.ms:
+                self.bkg_dir_name = "ana_tcut"
 
     def generate(self, filename = None):
         """Simulates TS distribution for N=self.bkg_trials trials in batches of 10000 and saves the data.
@@ -56,10 +79,6 @@ class Background_Trials():
         Args:
             filename (str, optional): Name of simulation output file. Defaults to None.
         """
-        self.dir_path = os.path.join(self._file, f"../files/background/{self.model["name"]}/{self.bkg_dir_name}/")
-
-        if not os.path.exists(self.dir_path):
-            os.makedirs(self.dir_path)
 
         # filename for simulation output
         filename = os.path.join(self.dir_path, "HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
@@ -140,8 +159,8 @@ class Background_Trials():
             self.hierarchy,
             self.bkg_trials, 
             self.bkg_bins, 
-            self.distance.value))
-            
+            dist.value))
+
             data = np.load(filename_in)
             
             for det in ["ic86", "gen2", "wls"]: # loop over detectors
@@ -154,7 +173,7 @@ class Background_Trials():
             qdict[det] = np.array(qdict[det])
         
         # save npz files
-        filename_out = os.path.join(self.dir_path, "QUAN_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+        filename_out = os.path.join(self.dir_path, "QUAN_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
             self.model["name"], 
             self.model["param"]["progenitor_mass"].value, 
             self.mixing_scheme, 
