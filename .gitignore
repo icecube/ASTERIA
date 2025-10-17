@@ -10,6 +10,7 @@ ana/generic/files/*
 ana/generic/run/*
 ana/sasi/files/*
 ana/sasi/run/*
+ana/sasi/test/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
