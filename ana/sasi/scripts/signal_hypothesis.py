@@ -2,11 +2,10 @@ import os
 import numpy as np
 import astropy.units as u
 from scipy.fft import fft, fftfreq
-from scipy.signal import stft
 from scipy.stats import norm
 
-from .helper import *
-from .plthelper import plot_summary_fft, plot_summary_stf
+from helper import *
+from plthelper import plot_summary_fft
 
 class Signal_Hypothesis():
 
@@ -14,14 +13,23 @@ class Signal_Hypothesis():
                  sim, 
                  res_dt,
                  distance, 
-                 temp_para):
+                 para):
 
         # define a few attributes
         self.sim = sim
         self.sim._res_dt = res_dt
         self.distance = distance
         self.tlength = len(self.sim.time)
-        self.temp_para = dict(temp_para) # deep copy of temp_para dict is saved to avoid implicit changes in attributes when looping over values
+
+        self.para = dict(para) # deep copy of para dict is saved to avoid implicit changes in attributes when looping over values
+        self.model = self.para["model"]
+        self.hierarchy = self.para["hierarchy"]
+        self.mixing_scheme = self.para["mixing_scheme"]
+        self.distance = self.para["distance"]
+        self.ft_para = self.para["ft_para"]
+        self.sig_trials = self.para["sig_trials"]
+        self.bkg_trials = self.para["bkg_trials"]
+        self.bkg_bins = self.para["bkg_bins"]
 
         self._file = os.path.dirname(os.path.abspath(__file__))
 
@@ -30,34 +38,36 @@ class Signal_Hypothesis():
         self.sim.scale_result(distance=distance)
 
     def get_dir_name(self):
-        
-        self.mixing_scheme = self.sim.mixing_scheme
-        if self.sim.hierarchy.name == "NORMAL":
-            self.hierarchy = "normal"
-        elif self.sim.hierarchy.name == "INVERTED":
-            self.hierarchy = "inverted"
 
-        # select correct directory for systemics
+# select correct directory for systemics
         if self.mixing_scheme == "NoTransformation":
             self.bkg_dir_name = "default"
-
-            if self.temp_para["time_start"] == 150 * u.ms and self.temp_para["time_end"] == 300 * u.ms:
-                self.scan_dir_name = "default"
-            else:
-                self.scan_dir_name = "syst_time_{:.0f}_{:.0f}ms".format(self.temp_para["time_start"].value, self.temp_para["time_end"].value)
-
+            
         elif self.mixing_scheme == "CompleteExchange":
-            self.bkg_dir_name = "syst_mix_comp_exch"
-            self.scan_dir_name = self.bkg_dir_name
+            self.bkg_dir_name = "mix_comp_exch"
 
         elif self.mixing_scheme == "AdiabaticMSW":
             if self.hierarchy == "normal":
-                self.bkg_dir_name = "syst_mix_MSW_NH"
-                self.scan_dir_name = self.bkg_dir_name
-
+                self.bkg_dir_name = "mix_MSW_NH"
             elif self.hierarchy == "inverted":
-                self.bkg_dir_name = "syst_mix_MSW_IH"
-                self.scan_dir_name = self.bkg_dir_name
+                self.bkg_dir_name = "mix_MSW_IH"
+
+        # model
+        if self.model['param']['progenitor_mass'] != 20 * u.solMass:
+            progenitor_mass = self.model['param']['progenitor_mass'].value
+            direction = self.model['param']['direction']
+            self.bkg_dir_name = f"mod_{progenitor_mass}Msol_{direction}"
+
+        # analysis cut
+        if self.ft_para['freq_win'][1] == 85*u.Hz:
+            if self.ft_para['time_win'][0] == 150*u.ms:
+                self.bkg_dir_name = "ana_fcut_tcut"
+            else:
+                self.bkg_dir_name = "ana_fcut"
+        else:
+            if self.ft_para['time_win'][0] == 150*u.ms:
+                self.bkg_dir_name = "ana_tcut"
+
         
     def set_sim(self, sim):
         """Set simulation
@@ -83,14 +93,6 @@ class Signal_Hypothesis():
             sig_trials (int): number of signal trials
         """
         self.sig_trials = sig_trials
-
-    def set_temp_para(self, temp_para):
-        """Set template parameter dictionary
-
-        Args:
-            temp_para (dict): template parameter dictionary
-        """
-        self.temp_para = temp_para
 
     def _background(self):
         """Calculates the background hits in res_dt time steps for all sensors and combines the hits into three detector scopes
@@ -140,64 +142,6 @@ class Signal_Hypothesis():
         self._avg_bkg["wls"] = avg_bkg_wls
 
         return
-
-    def _template(self, temp_para):
-        """Returns a generic modulation (template) of the same length and binning like the simulated light curve.
-
-        Args:
-            temp_para (dict): template parameter dictionary
-
-        Raises:
-            ValueError: Valid values for temp_para["position"] are "left", "center" and "right"
-
-        Returns:
-            template (numpy.ndarray): template to add to signal hits
-        """
-
-        # template parameters
-        frequency = temp_para["frequency"] # frequency
-        amplitude = temp_para["amplitude"] # amplitude
-        time_start = temp_para["time_start"] # start time
-        time_end = temp_para["time_end"] # end time
-        position = temp_para["position"] # positioning relative to start time
-
-        # transform all parameters in units of [s] and [1/s]
-        frequency, dt, time_start, time_end = frequency.to(1/u.s).value, self.sim._res_dt.to(u.s).value, time_start.to(u.s).value, time_end.to(u.s).value
-
-        # find how many full periods fit into the template_window
-        template_window = time_end-time_start
-        n_periods = int(template_window*frequency) #only full periods
-        template_duration = n_periods/frequency
-
-        # produce sinusodial signal for the template duration
-        x = np.arange(0,template_duration,dt)
-        y = np.sin(2 * np.pi * frequency * x) * amplitude # scale sinus by amplitude factor
-
-        # smooth SASI on-set by applying hanning window over the template duration
-        y *= np.hanning(len(y))
-
-        # find bins corresponding to start, end and "full period" end time
-        bin_start, bin_end, bin_end_new = int(time_start/dt), int(time_end/dt), int((time_start+template_duration)/dt) ##
-        
-        # prepare SASI template
-        bins_template = len(x) # number of bins in template
-        template = np.zeros_like(self.sim.time.value) # empty array of tlength signal window
-        template[:bins_template] = y # place template in the beginning
-        
-        # template can be placed next to time_start (left), time_end (right) and in the middle between time_start and time_end_new
-        if position == "center":
-            bin_roll = bin_start + int((bin_end-bin_end_new)/2)
-        elif position == "left":
-            bin_roll = bin_start
-        elif position == "right":
-            bin_roll = bin_end-bins_template
-        else:
-            raise ValueError('{} locator does not exist. Choose from "center", "left", "right".'.format(position))
-        
-        # shift template in position
-        template = np.roll(template, bin_roll)
-        
-        return template
     
     def _signal_model(self):
         """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
@@ -221,123 +165,6 @@ class Signal_Hypothesis():
         self._sig["gen2"] = sig_gen2
         self._sig["wls"] = sig_wls
 
-        return
-    
-    def _signal_generic(self, smoothing = False):
-        """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
-        counts from a generic oscillation template are added to the flat light curve.
-                
-        Args:
-            smoothing (bool, optional): Smooth lightcurve. Defaults to False.
-        """
-        self._sig = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
-        
-        # 1) get signal hits in res_dt binning for all sensor types
-        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
-        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
-        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
-        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
-
-        # combine signal hits into IC86, Gen2 and Gen2+WLS
-        sig_ic86 = sig_i3 + sig_dc
-        sig_gen2 = sig_i3 + sig_dc + sig_md
-        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
-
-        self._sig["ic86"] = sig_ic86
-        self._sig["gen2"] = sig_gen2
-        self._sig["wls"] = sig_wls
-
-        if smoothing:
-            # binning needed to smoothen a frequency f, low frequency cut of 100 Hz
-            frequency = 100*u.Hz
-            duration = self.sim.time[-1]-self.sim.time[0]
-            samples = (duration/self.sim._res_dt.to(u.s)).value
-            binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sas
-
-            for det in ["ic86", "gen2", "wls"]: # loop over detector
-                self._sig[det] = moving_average(self._sig[det], n = binning, const_padding = True)
-
-        # 2) The idea is we add the modulations from a template to the null hypothesis counts
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            temp_para_det = dict(self.temp_para) # copy of template dictionary
-
-            if self.temp_para["time_start"] < self.sim.time[0]:
-                raise ValueError("time_start = {} smaller than simulation time start of {}".format(self.temp_para["time_start"], self.sim.time[0]))
-            elif self.temp_para["time_end"] > self.sim.time[-1]:
-                raise ValueError("time_end = {} larger than simulation time end of {}".format(self.temp_para["time_end"], self.sim.time[-1]))
-
-            # scale amplitude relative to maximum of light curve
-            temp_para_det["amplitude"] = temp_para_det["amplitude"] * np.max(self._sig[det])
-      
-            # get template counts
-            template = self._template(temp_para_det)
-            
-            # combine flat light curve with template
-            sig = self._sig[det] + template
-        
-            # make sure that high amplitude fluctuations do not cause negative counts
-            sig = np.maximum(sig, 0)
-
-            # scale signal by 1 + signal variation.
-            self._sig[det] = sig
-
-        return
-    
-    def _signal_mix(self):
-        """Calculates the signal hits for a flat (null hypothesis) and non-flat (signal hypothesis) SN light curve. For the latter
-        counts from a generic oscillation template are added to the flat light curve.
-        """
-        self._sig = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
-        
-        # 1) The idea is that we first get the SASI wiggles and then smoothen them out with a moving average filter
-        t, sig_i3 = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='i3')
-        t, sig_dc = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='dc')
-        t, sig_md = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='md')
-        t, sig_ws = self.sim.detector_signal(dt=self.sim._res_dt, subdetector='ws')
-
-        # combine signal hits into IC86, Gen2 and Gen2+WLS
-        sig_ic86 = sig_i3 + sig_dc
-        sig_gen2 = sig_i3 + sig_dc + sig_md
-        sig_wls  = sig_i3 + sig_dc + sig_md + sig_ws
-
-        self._sig["ic86"] = sig_ic86
-        self._sig["gen2"] = sig_gen2
-        self._sig["wls"] = sig_wls
-
-        # binning needed to smoothen a frequency f, for Tamborra 2014, 20 M: f_sasi = 80 Hz
-        frequency = 80*u.Hz
-        duration = self.sim.time[-1]-self.sim.time[0]
-        samples = (duration/self.sim._res_dt.to(u.s)).value
-
-        binning  = int((1/frequency*samples/duration).value) #binning needed to filter out sinals with f>f_lb_sasi
-
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-
-            self._sig[det] = moving_average(self._sig[det], n = binning, const_padding = True)
-
-        # 2) The idea is we add the modulations from a template to the null hypothesis counts
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            temp_para_det = dict(self.temp_para) # copy of template dictionary
-
-            if self.temp_para["time_start"] < self.sim.time[0]:
-                raise ValueError("time_start = {} smaller than simulation time start of {}".format(self.temp_para["time_start"], self.sim.time[0]))
-            elif self.temp_para["time_end"] > self.sim.time[-1]:
-                raise ValueError("time_end = {} larger than simulation time end of {}".format(self.temp_para["time_end"], self.sim.time[-1]))
-
-            # scale amplitude relative to maximum of light curve
-            temp_para_det["amplitude"] = temp_para_det["amplitude"] * np.max(self._sig[det])
-      
-            # get template counts
-            template = self._template(temp_para_det)
-            
-            # combine flat light curve with template
-            sig = self._sig[det] + template
-        
-            # make sure that high amplitude fluctuations do not cause negative counts
-            sig = np.maximum(sig, 0)
-
-            # scale signal by 1 + signal variation.
-            self._sig[det] = sig
         return
 
     def _signal_sampled(self):
@@ -363,21 +190,8 @@ class Signal_Hypothesis():
         for det in ["ic86", "gen2", "wls"]: # loop over detector
             self._comb[det] = self._sig_sample[det] + self._bkg[det]
         
-        if residual:
-            self.apply_residual()
-
-        if hanning:
+        if self.ft_para["hanning"]:
             self.apply_hanning()
-
-        return
-    
-    def apply_residual(self):
-        """ Applies residual. The residual is defined as residual = ( sampled signal + background - averaged background ) / flat signal unsampled.
-        Make sure you apply this only once to avoid rescaling repeatedly. This method overwrites the content of _comb.
-        """
-
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-            self._comb[det] = ((self._comb[det] - self._avg_bkg[det])/self._sig[det])-1
 
         return
     
@@ -394,7 +208,7 @@ class Signal_Hypothesis():
         return
     
     def apply_tmask(self, time_win, det = None):
-        """ Applies time mask. Cuts signal window to values given in time_win for both FFT and STF method. 
+        """ Applies time mask. Cuts signal window to values given in time_win for the FFT. 
         This method overwrites the content of _comb. If keywords hypo and det are set to None, the cut is applied to all
         hypothesis and subdetectors. The new, cut time is _time_new with length tlength_new.
         Args:
@@ -405,29 +219,20 @@ class Signal_Hypothesis():
         tmask = np.logical_and(self._time>=time_low, self._time<=time_high) # time mask
 
         if det is None:
-            if self.mode == "FFT":
-                for det in ["ic86", "gen2", "wls"]: # loop over detector
-                    self._comb[det] = self._comb[det][:,tmask]
-                
-            elif self.mode == "STF":
-                for det in ["ic86", "gen2", "wls"]: # loop over detector
-                    self._stf[det] = self._stf[det][:,:,tmask]
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
+                self._comb[det] = self._comb[det][:,tmask]
 
         else:
-            if self.mode == "FFT":
-                self._comb[det] = self._comb[det][:,tmask]
-                
-            elif self.mode == "STF":
-                self._stf[det] = self._stf[det][:,:,tmask]
-            
+            self._comb[det] = self._comb[det][:,tmask]
+
         self._time_new = self._time[tmask]
         self.tlength_new = len(self._time_new) # new length of time array
 
         return
 
     def apply_fmask(self, freq_win, det = None):
-        """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win for both FFT and STF method. 
-        This method overwrites the content of _fft or _stf. If keywords hypo and det are set to None, the cut is applied to all
+        """ Applies frequency mask. Cuts frequency spectrum to values given in freq_win for the FFT method. 
+        This method overwrites the content of _fft. If keywords hypo and det are set to None, the cut is applied to all
         hypothesis and subdetectors. The new, cut frequency is _freq_new with length flength_new.
         Args:
             freq_win (list of astropy.units.quantity.Quantity): lower and higher frequency cut
@@ -437,32 +242,23 @@ class Signal_Hypothesis():
         fmask = np.logical_and(self._freq >=freq_low, self._freq<=freq_high) # frequency mask
 
         if det is None:
-            if self.mode == "FFT":
-                for det in ["ic86", "gen2", "wls"]: # loop over detector
-                    self._fft[det] = self._fft[det][:,fmask]
-                
-            elif self.mode == "STF":
-                for det in ["ic86", "gen2", "wls"]: # loop over detector
-                    self._stf[det] = self._stf[det][:,fmask,:]
-            
-        else:
-            if self.mode == "FFT":
+            for det in ["ic86", "gen2", "wls"]: # loop over detector
                 self._fft[det] = self._fft[det][:,fmask]
-                
-            elif self.mode == "STF":
-                self._stf[det] = self._stf[det][:,fmask,:]
+                            
+        else:
+            self._fft[det] = self._fft[det][:,fmask]
             
         self._freq_new = self._freq[fmask] # new frequency array
         self.flength_new = len(self._freq_new) # new length of frequency array
 
         return
 
-    def fft(self, fft_para):
+    def fft(self):
 
-        time_res = fft_para["time_res"]
-        time_win = fft_para["time_win"]
-        freq_res = fft_para["freq_res"]
-        freq_win = fft_para["freq_win"]
+        time_res = self.ft_para["time_res"]
+        time_win = self.ft_para["time_win"]
+        freq_res = self.ft_para["freq_res"]
+        freq_win = self.ft_para["freq_win"]
 
         if time_res != self.sim._res_dt:
             raise ValueError('fft_para["time_res"] = {} but ana.sim._res_dt = {}. Make sure to execute ana.run with the same resolution as you set in fft_para'.format(time_res, self.sim._res_dt))
@@ -488,70 +284,18 @@ class Signal_Hypothesis():
 
         return
 
-    def stf(self, stf_para):
-
-        hann_len = stf_para["hann_len"] # length of hann window
-        hann_res = stf_para["hann_res"] # desired frequency resolution in Hann window
-        hann_hop = stf_para["hann_hop"] # hann hop = number of time bins the window is moved
-        freq_sam = stf_para["freq_sam"] # sampling frequency of entire signal (1 kHz for 1 ms binning)
-        time_win = stf_para["time_win"]
-        freq_win = stf_para["freq_win"]
-
-
-        hann_len = int(hann_len.to_value(u.ms)) # define hann window
-        hann_res = hann_res.to_value(u.Hz)
-        hann_hop = int(hann_hop.to_value(u.ms)) #ShortTimeFFT does not accept numpt.int
-        freq_sam = freq_sam.to_value(u.Hz)
-        freq_mfft = int(freq_sam/hann_res)  #oversampling of hann window, relates to frequency resolution
-        hann_ovl = int(hann_len - hann_hop) # define hann overlap
-
-        # STFT is computationally expensive, batching will ensure that RAM is not completly used up
-        bat_step = 5000 # size of batches
-        trial_batch = np.arange(0, self.sig_trials, step=bat_step) #chunk data in batches of bat_step
-
-        self._stf = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
-        self._stf0 = {"ic86": None, "gen2": None, "wls": None}
-        self.ts = {"ic86": None, "gen2": None, "wls": None}
-
-        for det in ["ic86", "gen2", "wls"]: # loop over detector
-
-            # empty lists filled in batch loop
-            ts = []
-            
-            for bat in trial_batch: # loop over batches
-                
-                # avoid padding as this will introduce artefacts in the FT
-                self._freq, self._time, self._stf[det] = stft(self._comb[det][bat:bat+bat_step], 
-                                                                                    fs = freq_sam, window = "hann", 
-                                                                                    nperseg = hann_len, noverlap = hann_ovl, 
-                                                                                    boundary = None, padded = False, 
-                                                                                    return_onesided = True)
-                self._freq *= u.Hz
-                self._time = (self._time * u.s).to(u.ms) # time in units of ms
-                
-                self._stf0[det] = np.abs(self._stf[det][0]) ** 2 #save one non-manipulated copy for summary plot
-
-                self.apply_tmask(time_win, det = det)
-                self.apply_fmask(freq_win, det = det)
-
-                # take square of absolute for power
-                self._stf[det] = np.abs(self._stf[det]) ** 2
-
-                # maximum (hottest pixel) in array of 2D STF, returns array of length sig_trials
-                # value used for ts distribution
-                ts.append(np.nanmax(self._stf[det], axis = (1,2)))
-        
-            self.ts[det] = np.array(ts).flatten()
-
-        return
-
     def get_ts_stat(self):
 
         # Load the 50%, 16% and 84% quantiles for the background hypothesis
-        filename = self._file + "/files/background/{}/{}/QUAN_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
-            self.mode, self.bkg_dir_name, self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
-            self.mode, self.mixing_scheme, self.hierarchy,
-            self.bkg_trials, self.bkg_bins)
+        filename = self._file + "/../files/background/{}/{}/QUAN_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}.npz".format(
+            self.para["model"]["name"], 
+            self.bkg_dir_name, 
+            self.para["model"]["name"], 
+            self.para["model"]["param"]["progenitor_mass"].value, 
+            self.mixing_scheme, 
+            self.hierarchy,
+            self.bkg_trials, 
+            self.bkg_bins)
            
         bkg_quan = np.load(filename)
 
@@ -570,10 +314,18 @@ class Signal_Hypothesis():
         return
 
     def get_zscore(self):
-        filename = self._file + "/files/background/{}/{}/HIST_model_{}_{:.0f}_mode_{}_mix_{}_hier_{}_{:+.0f}%_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
-            self.mode, self.bkg_dir_name, self.temp_para["model"]["name"], self.temp_para["model"]["param"]["progenitor_mass"].value, 
-            self.mode, self.mixing_scheme, self.hierarchy,
-            self.bkg_trials, self.bkg_bins, self.distance.value)
+
+        # Load binned bkg ts distribution
+        filename = self._file + "/../files/background/{}/{}/HIST_model_{}_{:.0f}_mix_{}_hier_{}_bkg_trials_{:1.0e}_bins_{:1.0e}_distance_{:.1f}kpc.npz".format(
+            self.para["model"]["name"], 
+            self.bkg_dir_name, 
+            self.para["model"]["name"], 
+            self.para["model"]["param"]["progenitor_mass"].value, 
+            self.mixing_scheme, 
+            self.hierarchy,
+            self.bkg_trials, 
+            self.bkg_bins, 
+            self.distance.value)
         
         bkg_hist = np.load(filename)        
         self.pvalue = {"ic86": None, "gen2": None, "wls": None} # empty dictionary
@@ -598,74 +350,31 @@ class Signal_Hypothesis():
 
         return
   
-    def run(self, mode, ft_para, sig_trials, bkg_trials, bkg_bins = None, 
-            model = "generic", smoothing = False):
-        """Runs complete analysis chain including for time-integrated fast fourier transform (FFT)
-        and short-time fourier transform (STF). It computes background and signal hits, 
-        combines them, performs either FFT or STFT and calculates the TS distribution and significance.    
-
-        Args:
-            mode (str): analysis mode (FFT or STF)
-            ft_para (dict): parameters of the fourier transform (FFT or STF)
-            sig_trials (int): Number of signal trials.
-            bkg_trials (int): Number of background trials.
-            bkg_bins (int): Number of histogram bins of background distribution
-            model (str): composition of signal trial ("generic", "model", "mix")
-            smoothing (bool): Applies high-pass (moving average) filter.
-
-        Raises:
-            ValueError: model takes three valid values: "generic", "model" and "mix.
-            ValueError: mode takes two valid values: "FFT" and "STF".
+    def run(self):
+        """Runs complete analysis chain including for time-integrated fast fourier transform. It computes background and signal hits, 
+        combines them, performs the FFT and calculates the TS distribution and significance.    
         """
 
-        self.mode = mode
-        self.sig_trials = sig_trials
-        self.bkg_trials = bkg_trials
-        self.bkg_bins = bkg_bins
 
         self.get_dir_name() # build bkg file and scan directory name from input
-
-        if self.mode != "FFT" and self.mode != "STF":
-            raise ValueError('{} mode does not exist. Choose from "FFT" and "STF"'.format(self.mode))
 
         # load and combine data
         self._background()
         self._average_background()
-        if model == "generic":
-            self._signal_generic(smoothing = smoothing)
-        elif model == "model":
-            self._signal_model()
-        elif model == "mix":
-            self._signal_mix()
-        else:
-            raise ValueError('{} model type does not exist. Choose from "generic", "model", "mix".'.format(model))
+        self._signal_model()
         self._signal_sampled()
-
-        if self.mode == "FFT":
-            self._hypothesis(hanning = ft_para["hanning"])
-            self.fft(ft_para)
-            self.get_ts_stat()
-
-        elif self.mode == "STF":
-            self._hypothesis()
-            self.stf(ft_para)
-            self.get_ts_stat()
+        self._hypothesis()
+        self.fft()
+        self.get_ts_stat()
       
         self.get_zscore()
         
-    def dist_scan(self, distance_range, mode, ft_para, sig_trials, bkg_trials, bkg_bins, 
-                  model = "generic", smoothing = False, verbose = None):
+    def dist_scan(self, distance_range, verbose = None):
         """Calls run method for a range of distances and saves z-score and TS value for all detectors in an array.   
 
         Args:
             distance_range (np.ndarray): Distance range array
-            mode (str): analysis mode (FFT or STF)
-            ft_para (dict): parameters of the fourier transform (FFT or STF)
-            sig_trials: Number of signal trials.
-            bkg_trials (int): Number of background trials.
-            bkg_bins (int): Number of histogram bins of background distribution
-            model (str): composition of signal trial ("generic", "model", "mix")
-            smoothing (bool): Applies high-pass (moving average) filter.
+            verbose (bool): Verbosity
         """
         # prepare empty lists for distance loop
         pvalue = {"ic86": [], "gen2": [], "wls": []}
@@ -674,16 +383,15 @@ class Signal_Hypothesis():
 
         for dist in distance_range:
 
-            if verbose == "debug":
+            if verbose:
                 print("Distance: {:.1f}".format(dist))
 
             self.set_distance(distance=dist) # set simulation to distance
-            self.run(mode, ft_para, sig_trials, bkg_trials, bkg_bins, model, smoothing)
+            self.run()
 
             if verbose == "debug":
 
-                if self.mode == "FFT": plot_summary_fft(self, relative = True)
-                if self.mode == "STF": plot_summary_stf(self, relative = True)
+                plot_summary_fft(self, relative = True)
 
             for det in ["ic86", "gen2", "wls"]: # loop over detector
                 pvalue[det].append(self.pvalue[det])
