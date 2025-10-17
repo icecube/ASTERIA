@@ -178,6 +178,6 @@ def quantiles_histogram(hist, perc):
     return np.array(quant)
 
 # stellar distribution file, Adams 2013 model, returns CDF
-stellar_dist = StellarDensity(os.environ.get("ASTERIA") + '/python/asteria/data/stellar/sn_radial_distrib_adams.fits', add_LMC=False, add_SMC=False)
+stellar_dist = StellarDensity(os.environ.get("ASTERIA") + '/data/stellar/sn_radial_distrib_adams.fits', add_LMC=False, add_SMC=False)
 # interpolated CDF
 stellar_inter = PchipInterpolator(stellar_dist.dist.value, stellar_dist.cdf)

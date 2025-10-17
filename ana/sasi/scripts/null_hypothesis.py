@@ -2,7 +2,7 @@ import numpy as np
 import astropy.units as u
 from scipy.fft import fft, fftfreq
 
-from .helper import moving_average
+from helper import moving_average
 
 class Null_Hypothesis():
 

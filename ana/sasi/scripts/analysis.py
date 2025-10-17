@@ -4,7 +4,7 @@ from scipy.fft import fft, fftfreq
 from scipy.signal import stft
 from scipy.stats import norm, skewnorm, lognorm
 
-from .helper import *
+from helper import *
 
 class Analysis():
 

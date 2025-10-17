@@ -5,7 +5,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from scipy.stats import norm, lognorm, skewnorm  
 
 import copy
-from .helper import *
+from helper import *
 
 plt.rcParams["font.family"] = "Times New Roman"
 
