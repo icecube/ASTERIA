@@ -7,7 +7,9 @@ data/processed/*
 !data/processed/.gitignore
 ana/other/*
 ana/generic/files/*
+ana/generic/run/*
 ana/sasi/files/*
+ana/sasi/run/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
