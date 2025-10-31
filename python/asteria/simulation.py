@@ -812,7 +812,7 @@ class Simulation:
             return sample, offsets, seeds
         return sample
 
-    def trigger_significance(self, dt=0.5*u.s, binnings=[0.5, 1.5, 4, 10]*u.s, offset=0*u.s, *, seed=None):
+    def trigger_significance(self, dt=0.5 * u.s, binnings=[0.5, 1.5, 4, 10] * u.s, offset=0 * u.s, *, seed=None):
         """Simulates one SNDAQ trigger "significance" test statistic for requested binnings
 
         Parameters
@@ -853,140 +853,126 @@ class Simulation:
             7 - Repeat 2--5 for all binnings in `binnings`
 
         """
+        dur_sim = self.time[-1] - self.time[0]
+        if max(binnings) > dur_sim:
+            warnings.warn(f"Simulation time range ({dur_sim}) is too short "
+                          f"to generate xi using binning {max(binnings)}, unexpected behavior may occur.")
+
+        # Switches to improve readability
+        use_gen2 = self._detector_scope == 'Gen2'
+        use_gen2_wls = use_gen2 and self._add_wls
+
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
         _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
-        if self._detector_scope == 'Gen2':
+
+        # Preallocate and conditionally overwrite
+        hits_md = np.zeros(hits_i3.size)
+        hits_ws = np.zeros(hits_i3.size)
+        if use_gen2:
             _, hits_md = self.detector_hits(dt=dt, offset=offset, subdetector='md')
-            if self._add_wls:
-                _, hits_ws = self.detector_hits(dt=dt, offset=offset, subdetector='ws')
+        if use_gen2_wls:
+            _, hits_ws = self.detector_hits(dt=dt, offset=offset, subdetector='ws')
 
         xi = np.zeros(binnings.size)
+
+        # Create common background to use for comparisons
+        n_bin_bg = int((600 * u.s / dt).value)  # mimics SNDAQ, i.e. 10 min for bg estimation
+        bg_i3 = self.detector.i3_bg(dt=dt, size=n_bin_bg)
+        bg_dc = self.detector.dc_bg(dt=dt, size=n_bin_bg)
+        bg_md = self.detector.md_bg(dt=dt, size=n_bin_bg) if use_gen2 else np.zeros(hits_i3.size)
+        bg_ws = self.detector.ws_bg(dt=dt, size=n_bin_bg) if use_gen2_wls else np.zeros(hits_i3.size)
 
         for idx_bin, binsize in enumerate(binnings):
             if seed is not None:
                 np.random.seed(seed)
 
             rebin_factor = int(binsize.to(u.s).value / dt.to(u.s).value)
-            n_bins = ceil(hits_i3.size/rebin_factor)
 
-            bg_i3 = self.detector.i3_bg(dt=dt, size=hits_i3.size)
-            bg_dc = self.detector.dc_bg(dt=dt, size=hits_dc.size)
-            if self._detector_scope == 'Gen2':
-                bg_md = self.detector.md_bg(dt=dt, size=hits_md.size)
-                if self._add_wls:
-                    bg_ws = self.detector.ws_bg(dt=dt, size=hits_ws.size)
+            # Compute *DOM* background rate variance in search window binsize
+            bg_i3_var_dom = rebin_factor * self.detector.i3_dom_bg(dt=dt, size=n_bin_bg).var()
+            bg_dc_var_dom = rebin_factor * self.detector.dc_dom_bg(dt=dt, size=n_bin_bg).var()
+            bg_md_var_dom = rebin_factor * self.detector.md_dom_bg(dt=dt, size=n_bin_bg).var() if use_gen2 else None
+            bg_ws_var_dom = rebin_factor * self.detector.ws_dom_bg(dt=dt, size=n_bin_bg).var() if use_gen2_wls else None
 
-            # Create a realization of background rate scaled up from dt to binsize
+            # Compute *Subdetector* background rate mean in search window binsize
+
+            # If hits_i3.size % rebin_factor > 0, then rebinning will yeild a partial bin; exclude it
+            n_bins = ceil(hits_i3.size / rebin_factor)
+            if hits_i3.size % rebin_factor > 0:
+                n_bins -= 1
+
+            # Rebin background
             bg_i3_binned = np.zeros(n_bins)
             bg_dc_binned = np.zeros(n_bins)
+            bg_md_binned = np.zeros(n_bins)
+            bg_ws_binned = np.zeros(n_bins)
 
-            if self._detector_scope == 'Gen2':
-                bg_md_binned = np.zeros(n_bins)
-                if self._add_wls:
-                    bg_ws_binned = np.zeros(n_bins)
-                    for idx_time, (bg_i3_part, bg_dc_part, bg_md_part, bg_ws_part) in enumerate(_get_partitions(bg_i3, bg_dc, bg_md, bg_ws, part_size=rebin_factor)):
-                        bg_i3_binned[idx_time] = np.sum(bg_i3_part)
-                        bg_dc_binned[idx_time] = np.sum(bg_dc_part)
-                        bg_md_binned[idx_time] = np.sum(bg_md_part)
-                        bg_ws_binned[idx_time] = np.sum(bg_ws_part)
-                else:    
-                    for idx_time, (bg_i3_part, bg_dc_part, bg_md_part) in enumerate(_get_partitions(bg_i3, bg_dc, bg_md, part_size=rebin_factor)):
-                        bg_i3_binned[idx_time] = np.sum(bg_i3_part)
-                        bg_dc_binned[idx_time] = np.sum(bg_dc_part)
-                        bg_md_binned[idx_time] = np.sum(bg_md_part)
-            else:
-                for idx_time, (bg_i3_part, bg_dc_part) in enumerate(_get_partitions(bg_i3, bg_dc, part_size=rebin_factor)):
-                    bg_i3_binned[idx_time] = np.sum(bg_i3_part)
-                    bg_dc_binned[idx_time] = np.sum(bg_dc_part)
+            idx_parts = [p for p in _get_partitions(np.arange(hits_i3.size), part_size=rebin_factor)][:n_bins]
+            for idx_time, idx_part in enumerate(idx_parts):
+                bg_i3_binned[idx_time] = bg_i3[idx_part].sum()
+                bg_dc_binned[idx_time] = bg_dc[idx_part].sum()
+                bg_md_binned[idx_time] = bg_md[idx_part].sum()
+                bg_ws_binned[idx_time] = bg_ws[idx_part].sum()
 
-            # Compute *DOM* background rate variance
-            # Background variance is not well estimated after the rebin, so use lower binning and upscale
-            # This could be mitigated by extending background windows, at the cost of speed
-            bg_i3_var_dom = rebin_factor * self.detector.i3_dom_bg(dt=dt, size=1000).var()
-            bg_dc_var_dom = rebin_factor * self.detector.dc_dom_bg(dt=dt, size=1000).var()
-            if self._detector_scope == 'Gen2':
-                bg_md_var_dom = rebin_factor * self.detector.md_dom_bg(dt=dt, size=1000).var()
-                if self._add_wls:
-                    bg_ws_var_dom = rebin_factor * self.detector.ws_dom_bg(dt=dt, size=1000).var()
+            bg_i3_mean = bg_i3_binned.mean()
+            bg_dc_mean = bg_dc_binned.mean()
+            bg_md_mean = bg_md_binned.mean() if use_gen2 else 0
+            bg_ws_mean = bg_ws_binned.mean() if use_gen2_wls else 0
 
-            # If hits_i3.size / rebin_factor is not an integer, then the last bin in the rebinned rates will be partial
-            # In this case, exclude it from the calculation of the background mean
-            if bg_i3.size % rebin_factor != 0:
-                idx_bg = bg_i3_binned.size - 1
-            else:
-                idx_bg = bg_i3_binned.size
+            # Compute var_dmu, which depends on only background estimation (later used in xi calc)
+            # Compute as 1 / var_dmu, to streamline sums, then invert to obtain var_dmu
+            inv_var_dmu = ((self.detector.n_i3_doms / bg_i3_var_dom) +
+                           (self.detector.n_dc_doms * self.detector.dc_rel_eff ** 2 / bg_dc_var_dom))
+            inv_var_dmu += self.detector.n_md / bg_md_var_dom if use_gen2 else 0
+            inv_var_dmu += self.detector.n_ws * self.detector.ws_rel_eff ** 2 / bg_ws_var_dom if use_gen2_wls else 0
+            # TODO Jakob: Is rel. efficiency factor needed here or is it implicitly included?
+            var_dmu = 1 / inv_var_dmu
 
-            bg_i3_mean = bg_i3_binned[:idx_bg].mean()  # IC80 *subdetector* rate mean
-            bg_dc_mean = bg_dc_binned[:idx_bg].mean()  # DeepCore *subdetector* rate mean
-            if self._detector_scope == 'Gen2':
-                bg_md_mean = bg_md_binned[:idx_bg].mean()  # Gen2 mDOM *subdetector* rate mean
-                if self._add_wls:
-                    bg_ws_mean = bg_ws_binned[:idx_bg].mean()  # Gen2 WLS *subdetector* rate mean
-                    
-
-            ###
-            # Compute xi with increments of 0.5s offsets, mimicking the offset searches of SNDAQ
+            # Apply offsets to signal to mimic SNDAQ offset searches
             for idx_offset in range(rebin_factor):
                 hits_i3_offset = np.roll(hits_i3, idx_offset)
                 hits_i3_offset[:idx_offset] = 0
-                hits_i3_binned = np.zeros(n_bins)
 
                 hits_dc_offset = np.roll(hits_dc, idx_offset)
                 hits_dc_offset[:idx_offset] = 0
-                hits_dc_binned = np.zeros(n_bins)
 
-                if self._detector_scope == "Gen2":
+                # Define and conditionally overwrite
+                hits_md_offset = np.zeros(hits_i3.size)
+                hits_ws_offset = np.zeros(hits_i3.size)
+                if use_gen2:
                     hits_md_offset = np.roll(hits_md, idx_offset)
                     hits_md_offset[:idx_offset] = 0
-                    hits_md_binned = np.zeros(n_bins)
 
-                    if self._add_wls:
-                        hits_ws_offset = np.roll(hits_ws, idx_offset)
-                        hits_ws_offset[:idx_offset] = 0
-                        hits_ws_binned = np.zeros(n_bins)
-                
-                        for idx_time, (hits_i3_part, hits_dc_part, hits_md_part, hits_ws_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
-                                                                                                hits_md_offset, hits_ws_offset, part_size=rebin_factor)):
-                            hits_i3_binned[idx_time] = np.sum(hits_i3_part)
-                            hits_dc_binned[idx_time] = np.sum(hits_dc_part)
-                            hits_md_binned[idx_time] = np.sum(hits_md_part)
-                            hits_ws_binned[idx_time] = np.sum(hits_ws_part)
+                if use_gen2_wls:
+                    hits_ws_offset = np.roll(hits_ws, idx_offset)
+                    hits_ws_offset[:idx_offset] = 0
 
-                        var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
-                                    (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom) + 
-                                    (self.detector.n_md/bg_md_var_dom) + 
-                                    (self.detector.n_ws*self.detector.ws_rel_eff**2/bg_ws_var_dom)) # TODO Jakob: Is rel. efficiency factor needed here or is it implicitly included?
-                        dmu = var_dmu * (
-                                ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
-                                ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom) +
-                                ((hits_md_binned + bg_md_binned - bg_md_mean) / bg_md_var_dom) + 
-                                ((hits_ws_binned + bg_ws_binned - bg_ws_mean) / bg_ws_var_dom))
-                        _xi = dmu/np.sqrt(var_dmu)
+                # Rebin hits post-offset
+                hits_i3_binned = np.zeros(n_bins)
+                hits_dc_binned = np.zeros(n_bins)
+                hits_md_binned = np.zeros(n_bins)
+                hits_ws_binned = np.zeros(n_bins)
 
-                        xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
+                for idx_time, idx_part in enumerate(idx_parts):
+                    hits_i3_binned[idx_time] = np.sum(hits_i3_offset[idx_part])
+                    hits_dc_binned[idx_time] = np.sum(hits_dc_offset[idx_part])
+                    hits_md_binned[idx_time] = np.sum(hits_md_offset[idx_part])
+                    hits_ws_binned[idx_time] = np.sum(hits_ws_offset[idx_part])
 
-                        return xi
-                    
-                    else:
+                # Compute xi
+                dmu = var_dmu * (
+                        ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
+                        ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom))
+                dmu += var_dmu * ((hits_md_binned + bg_md_binned - bg_md_mean) / bg_md_var_dom) if use_gen2 else 0
+                dmu += var_dmu * ((hits_ws_binned + bg_ws_binned - bg_ws_mean) / bg_ws_var_dom) if use_gen2_wls else 0
 
-                        for idx_time, (hits_i3_part, hits_dc_part, hits_md_part) in enumerate(_get_partitions(hits_i3_offset, hits_dc_offset,
-                                                                                                hits_md_offset, part_size=rebin_factor)):
-                            hits_i3_binned[idx_time] = np.sum(hits_i3_part)
-                            hits_dc_binned[idx_time] = np.sum(hits_dc_part)
-                            hits_md_binned[idx_time] = np.sum(hits_md_part)
+                _xi = dmu / np.sqrt(var_dmu)
 
-                        var_dmu = 1/((self.detector.n_i3_doms/bg_i3_var_dom) +
-                                    (self.detector.n_dc_doms*self.detector.dc_rel_eff**2/bg_dc_var_dom) + 
-                                    (self.detector.n_md/bg_md_var_dom))
-                        dmu = var_dmu * (
-                                ((hits_i3_binned + bg_i3_binned - bg_i3_mean) / bg_i3_var_dom) +
-                                ((hits_dc_binned + bg_dc_binned - bg_dc_mean) / bg_dc_var_dom) +
-                                ((hits_md_binned + bg_md_binned - bg_md_mean) / bg_md_var_dom))
-                        _xi = dmu/np.sqrt(var_dmu)
+                # Update xi in current binning if offset window provides better xi
+                xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
 
-                        xi[idx_bin] = np.max([xi[idx_bin], _xi.max()])
+        return xi
 
-                        return xi
               
 def _get_partitions(*args, part_size=1000):
     if len(args) > 1:
