@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -11,7 +11,7 @@ license = "BSD-3-Clause"
 license-files = ["LICEN[CS]E*"]
 readme = {file = "README.md", content-type = "text/markdown"}
 
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 dependencies = [
     "numpy",
@@ -21,7 +21,7 @@ dependencies = [
     "matplotlib",
     "setuptools",
     "Tables >=3.5.1",
-    "snewpy>=1.6"
+    "snewpy @ git+https://github.com/SNEWS2/snewpy"
 ]
 
 [project.optional-dependencies]
