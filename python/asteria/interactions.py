@@ -181,7 +181,6 @@ class InvBetaPar(Interaction):
         # Convert all units to MeV
         Enu = e_nu.to('MeV').value
         
-
         # Calculate mean positron energy and momentum using the crappy estimate
         # from Strumia and Vissani eq. 25.
         Ee = Enu - (self.Mn - self.Mp)
