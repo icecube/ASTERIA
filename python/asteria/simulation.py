@@ -210,7 +210,7 @@ class Simulation:
             Flavor for which to report signal; if None, all-flavor is reported
         subdetector : None or str
             Subdetector volume; 'i3' for IC80, 'dc' for DeepCore, 'md' for mDOM 
-            (if self._detector_scope == 'Gen2'), None for full IC86/Gen2 (depending on self._detector_scope)
+            (if self.detector_scope == 'Gen2'), None for full IC86/Gen2 (depending on self.detector_scope)
         offset : astropy.quantity.Quantity
             Offset to apply to rebinned result in units s (or compatible)
 
@@ -227,7 +227,7 @@ class Simulation:
 
         E_per_V = self.total_E_per_V_binned.value if flavor is None else self.E_per_V_binned[flavor].value
 
-        if self._detector_scope == 'Gen2':
+        if self.detector_scope == 'Gen2':
             if subdetector == 'i3':
                 return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3)
             elif subdetector == 'dc':
@@ -251,11 +251,52 @@ class Simulation:
                                                         self.detector.md_total_effvol * self.eps_md)
         else:
             if subdetector == 'md' or subdetector == 'ws':
-                raise ValueError(f"Unknown omtype: {subdetector} for {self._detector_scope} detector scope")
+                raise ValueError(f"Unknown omtype: {subdetector} for {self.detector_scope} detector scope")
             else:
                 i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
                 dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
                 return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
+
+    def avg_dom_signal(self, dt=None, flavor=None):
+        """Returns estimated signal in one DOM, computed using avg DOM effective volume
+        This property will return None if this Simulation instance has not yet been run.
+
+        Parameters
+        ----------
+        dt : astropy.quantity.Quantity or None
+            Time binning used to report signal (e.g. 2 ms).
+            If None is provided, this will return the avg signal in the binning used for the simulation
+        flavor : snewpy.neutrino.Flavor or None
+            Neutrino flavor for which signal is calculated.
+            If None is provided, this will return the avg signal from all flavors.
+
+        Returns
+        ----------
+        avg_signal : numpy.ndarray
+            Average signal observed in one DOM as a function of time
+        """
+        if dt is None:
+            dt = self.res_dt
+        self.rebin_result(dt)
+
+        if flavor is None:
+            E_per_V = self._total_E_per_V_binned
+        else:
+            E_per_V = self._E_per_V_binned[flavor]
+
+        effvol_IC86 = 0.1654 * u.m ** 3 / u.MeV  # Simple estimation of IceCube DOM Eff. Vol.
+        effvol_Gen2 = 0.4288 * u.m ** 3 / u.MeV  # Simple estimation of Gen2 mDOM Eff. Vol. (np.avg(effvol_table))
+
+        if self.detector_scope == "Gen2":
+            if self._add_wls:
+                return effvol_IC86 * E_per_V * (self.eps_dc * self.detector.n_dc_doms + self.eps_i3 * self.detector.n_i3_doms) \
+                        /(self.detector.n_dc_doms + self.detector.n_i3_doms) + effvol_Gen2 * E_per_V * self.eps_md
+            #return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2 + effvol_Gen2 * E_per_V * self.eps_md
+
+        else:
+            return effvol_IC86 * E_per_V * (self.eps_dc * self.detector.n_dc_doms + self.eps_i3 * self.detector.n_i3_doms) \
+                    /(self.detector.n_dc_doms + self.detector.n_i3_doms)
+            #return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2
 
     def detector_hits(self, dt=0.5*u.ms, flavor=None, subdetector=None, offset=0*u.s, size=1):
         """Compute hit rates observed by detector
@@ -268,7 +309,7 @@ class Simulation:
             Flavor for which to report signal, if None is provided, all-flavor signal is reported
         subdetector : None or str
             IceCube subdetector volume to use for effective volume. 'i3' for IC80, 'dc' for DeepCore, 'md' for mDOM
-            (if self._detector_scope == 'Gen2'), None for full IC86/Gen2 (depending on self._detector_scope)
+            (if self.detector_scope == 'Gen2'), None for full IC86/Gen2 (depending on self.detector_scope)
         size : int
             Number of random realizations of the hit rate.
 
@@ -406,7 +447,7 @@ class Simulation:
                           f"to generate xi using binning {max(binnings)}, unexpected behavior may occur.")
 
         # Switches to improve readability
-        use_gen2 = self._detector_scope == 'Gen2'
+        use_gen2 = self.detector_scope == 'Gen2'
         use_gen2_wls = use_gen2 and self._add_wls
 
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
@@ -651,7 +692,7 @@ class Simulation:
                 self._E_per_V_binned[flavor] *= scaling_factor
             self._total_E_per_V *= scaling_factor
             self._total_E_per_V_binned *= scaling_factor
-            self.rebin_result(dt=self._res_dt, offset=self._res_offset, force_rebin=True)
+            self.rebin_result(dt=self.res_dt, offset=self.res_offset, force_rebin=True)
             self.distance = new_dist * u.kpc
 
     def _compute_deadtime_efficiency(self, omtype='i3', *, dom_effvol=None):
@@ -686,14 +727,14 @@ class Simulation:
                 dom_effvol = self.detector.dc_dom_effvol  # dc effective vol already includes relative efficiency
                 max_deadtime_eff = self._max_deadtime_eff_i3 # dc_ref_eff in detector.py should already include difference in deadtime
             elif omtype == 'md':
-                if self._detector_scope == 'Gen2':
+                if self.detector_scope == 'Gen2':
                     if self._add_wls:
                         dom_effvol = self.detector.md_dom_effvol + self.detector.ws_dom_effvol # WSL component contributes to mDOM signal
                     else:
                         dom_effvol = self.detector.md_dom_effvol
                     max_deadtime_eff = self._max_deadtime_eff_md
                 else:
-                    raise ValueError(f"Unknown omtype: {omtype} for {self._detector_scope} detector scope")
+                    raise ValueError(f"Unknown omtype: {omtype} for {self.detector_scope} detector scope")
             else:
                 raise ValueError(f"Unknown omtype: {omtype}, expected ('i3', 'dc', 'md')")
 
