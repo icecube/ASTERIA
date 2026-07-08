@@ -18,7 +18,6 @@ from importlib import import_module
 from importlib.resources import files
 
 from .interactions import Interactions
-from .source import Source
 from .detector import Detector
 
 class Simulation:
