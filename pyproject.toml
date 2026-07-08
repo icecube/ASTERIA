@@ -21,7 +21,7 @@ dependencies = [
     "matplotlib",
     "setuptools",
     "Tables >=3.5.1",
-    "snewpy@git+https://github.com/SNEWS2/snewpy#egg=sb-fix-mori2023"
+    "snewpy@git+https://github.com/SNEWS2/snewpy"
 ]
 
 [project.optional-dependencies]
