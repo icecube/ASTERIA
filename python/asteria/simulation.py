@@ -63,7 +63,7 @@ class Simulation:
             self._eps_ws = None
             self._max_deadtime_eff_i3 = 0.884
             self._max_deadtime_eff_md = 0.958
-            self._time_binned = None
+            self._t_binned = None
             self._E_per_V_binned = None
             self._total_E_per_V_binned = None
             self._result_ready = False
@@ -228,24 +228,24 @@ class Simulation:
 
         if self.detector_scope == 'Gen2':
             if subdetector == 'i3':
-                return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3)
+                return self.t_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3)
             elif subdetector == 'dc':
-                return self.time_binned, E_per_V * (self.detector.dc_total_effvol * self.eps_dc)
+                return self.t_binned, E_per_V * (self.detector.dc_total_effvol * self.eps_dc)
             elif subdetector == 'md':
-                return self.time_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md)
+                return self.t_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md)
             elif subdetector == 'ws':
                 if self._add_wls:
-                    return self.time_binned, E_per_V * (self.detector.ws_total_effvol * self.eps_ws)
+                    return self.t_binned, E_per_V * (self.detector.ws_total_effvol * self.eps_ws)
                 else:
                     raise ValueError(f"omtype = {subdetector} for add_wls = {self._add_wls} not allowed.")
             else:
                 if self._add_wls:
-                    return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 +
+                    return self.t_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 +
                                                         self.detector.dc_total_effvol * self.eps_dc +
                                                         self.detector.md_total_effvol * self.eps_md +
                                                         self.detector.ws_total_effvol * self.eps_ws)
                 else:
-                    return self.time_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 +
+                    return self.t_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 +
                                                         self.detector.dc_total_effvol * self.eps_dc +
                                                         self.detector.md_total_effvol * self.eps_md)
         else:
@@ -254,7 +254,7 @@ class Simulation:
             else:
                 i3_total_effvol = self.detector.i3_total_effvol if subdetector != 'dc' else 0
                 dc_total_effvol = self.detector.dc_total_effvol if subdetector != 'i3' else 0
-                return self.time_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
+                return self.t_binned, E_per_V * (i3_total_effvol * self.eps_i3 + dc_total_effvol * self.eps_dc)
 
     def avg_dom_signal(self, dt=None, flavor=None):
         """Returns estimated signal in one DOM, computed using avg DOM effective volume
@@ -317,13 +317,13 @@ class Simulation:
         hits : np.ndarray
             Hits observed by the IceCube detector (or subdetector) as a function of time
         """
-        time_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
-        # return time_binned, np.random.poisson(signal)
+        t_binned, signal = self.detector_signal(dt, flavor, subdetector, offset)
+        # return t_binned, np.random.poisson(signal)
         detector_hits = np.random.normal(signal, np.sqrt(signal),size=(size,len(signal)))
         if size==1:
-            return time_binned, detector_hits.reshape(-1)
+            return t_binned, detector_hits.reshape(-1)
         else:
-            return time_binned, detector_hits
+            return t_binned, detector_hits
 
     def sample_significance(self, sample_size=1, dt=0.5*u.s, distance=10*u.kpc, offset=None, binnings=None,
                             use_random_offset=True, *, only_highest=True, debug_info=False, seeds=None):
@@ -599,10 +599,10 @@ class Simulation:
             rebinfactor = int(np.rint(_dt / self.sim_dt.to_value('s')))
             offset_bins = int(_offset / self.sim_dt.to_value('us'))
 
-            self._time_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)]) * u.s
+            self._t_binned = np.array([part[0] for part in _get_partitions(_t, part_size=rebinfactor)]) * u.s
 
             self._E_per_V_binned = {}
-            self._total_E_per_V_binned = np.zeros_like(self._time_binned.value)
+            self._total_E_per_V_binned = np.zeros_like(self._t_binned.value)
 
             for flavor in self.flavors:
                 E_per_V = np.roll(self._E_per_V[flavor].value, offset_bins)
@@ -795,9 +795,9 @@ class Simulation:
         return self._E_per_V_binned
 
     @property
-    def time_binned(self):
+    def t_binned(self):
         """Leading bin edges of in result time binning"""
-        return self._time_binned
+        return self._t_binned
 
 
 def _get_partitions(*args, part_size=1000):
