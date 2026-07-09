@@ -32,7 +32,7 @@ class Simulation:
                  res_dt=2*u.ms,
                  res_offset=0*u.s,
                  distance=10*u.kpc,
-                 detector_scope=None,
+                 detector_scope='IC86',
                  add_wls=None):
         """Initialize simulation and metadata.
         """
