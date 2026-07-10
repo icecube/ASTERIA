@@ -26,7 +26,7 @@ class Simulation:
                  model=None,
                  interactions=Interactions(),
                  flavors=Flavor,
-                 flavor_xform=None,
+                 flavor_xform=ft.NoTransformation(),
                  E=None,
                  t=None,
                  res_dt=2*u.ms,
