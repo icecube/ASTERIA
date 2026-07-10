@@ -39,5 +39,5 @@ Other Notebooks
     :maxdepth: 1
     
     nb/asymmetric_errors.ipynb
-    nb/load_simulation.ipynb
+    nb/signal_per_dom.ipynb
     nb/stellar_distributions.ipynb
