@@ -6,27 +6,52 @@ from __future__ import print_function, division
 from astropy import units as u
 from astropy.table import Table
 
+from importlib.resources import files
+
 import numpy as np
-import numpy.lib.recfunctions as rfn
 from scipy.interpolate import PchipInterpolator, InterpolatedUnivariateSpline
+
+detector_configs = {
+    'IC86' : {
+        'geom' : files('asteria.data').joinpath('detector/geo_IC86.ecsv'),
+        'Veff' : files('asteria.data').joinpath('detector/effvol_DOM.ecsv')
+    },
+    'Gen2' : {
+        'geom' : files('asteria.data').joinpath('detector/geo_IC86+Gen2.ecsv'),
+        'Veff' : files('asteria.data').joinpath('detector/effvol_mDOM.ecsv')
+    }
+}
 
 class Detector:
 
     """ Class for IceCube detector """
 
-    def __init__(self, doms_table, effvol_table, detector_scope, max_height=1900, 
-                 dc_rel_eff=1.35, ws_rel_eff=0.405):
+    def __init__(self, detector_scope, max_height=1900, dc_rel_eff=1.35, ws_rel_eff=0.405):
+        """Initialize a Detector object.
+
+        Parameters
+        ----------
+        detector_scope: str
+            Detector scope: IC86 or Gen2
+        max_height: float
+            Maximum detector height in meters
+        dc_rel_eff: float
+            Relative efficiency of DeepCore DOMs (IC DOMS == 1)
+        ws_rel_eff: float
+            Wavelength shifter relative efficiency (IC DOMS == 1)
+        """
 
         self._detector_scope = detector_scope
 
-        # Read in doms table from file
-        doms = Table.read(doms_table)
+        # Read in DOMs table from file
+        doms = Table.read(detector_configs[detector_scope]['geom'])
         doms = doms[doms['z'] <= max_height]
-        
+
         # For Gen2
         if self._detector_scope == 'Gen2':
             self._effvol_table = {}
-            for det, filename in effvol_table.items():
+            for det in detector_configs.keys():
+                filename = detector_configs[det]['Veff']
                 evt = Table.read(filename)
                 evt.sort('z')
                 self._effvol_table[det] = evt
@@ -35,13 +60,13 @@ class Detector:
             doms = doms[doms['det_type'] == 'IC86']
 
             #- read in effective volume table
-            filename = effvol_table['IC86']
+            filename = detector_configs['IC86']['Veff']
             evt = Table.read(filename)
             evt.sort('z')
             self._effvol_table = evt
 
-        # Doms effective volume DeepCore and normal doms
-        doms_effvol = self.effvol(doms)
+        # DOMs effective volume: DeepCore and normal DOMs
+        doms_effvol = self.get_effvol(doms)
         doms_effvol[doms['om_type'] == 'dc'] = doms_effvol[doms['om_type'] == 'dc']*dc_rel_eff
 
         # Create DOMs table.
@@ -225,7 +250,7 @@ class Detector:
     def ws_dom_effvol(self):
         return self.ws_total_effvol / self.n_ws
     
-    def effvol(self, doms):
+    def get_effvol(self, doms):
         """Interpolate table to to get effective volume.
 
         Parameters
@@ -289,60 +314,59 @@ class Detector:
             else:
                 raise ValueError('det_type must be either "IC86" or "Gen2"')           
 
-
-def initialize(config):
-    """Initialize a Detector model from configuration parameters.
-
-    Parameters
-    ----------
-
-    config : :class:`asteria.config.Configuration`
-        Configuration parameters used to create a Detector.
-
-    Returns
-    -------
-    Detector
-        An initialized detector model.
-    """
-    detector_scope = config.detector.detector_scope
-    
-    geomfile = '/'.join([config.abs_base_path,
-                         config.detector.geometry.table.path])
-    effvfile = '/'.join([config.abs_base_path,
-                         config.detector.effvol.table.path])
-
-    return Detector(geomfile, effvfile, detector_scope)
-
-"""
-def main():
-    Test main
-    doms_table_fname = "../Icecube_geometry.20110102.complete.txt"
-    effvol_table_fname = "../effvol/effectivevolume_benedikt_AHA_normalDoms.txt"
-    icecube = Detector(doms_table_fname, effvol_table_fname)
-    effvol = icecube.effvol_table()
-    i3_doms = icecube.doms_table('i3')
-    dc_doms = icecube.doms_table('dc')
-
-    import matplotlib.pyplot as plt
-
-    fig, ax = plt.subplots(1, figsize=(8, 5))
-
-    # ax.scatter(i3_doms['x'], i3_doms['y'], color='k', marker='o', label='i3_string')
-    # ax.scatter(dc_doms['x'], dc_doms['y'], color='r', marker='o', label='dc_string')
-    # ax.set(xlabel='X-axis [m]', ylabel='Y-axis [m]')
-
-    depth = np.arange(-500., 500., 5.)
-    ax.plot(effvol['z'], effvol['effvol'], 'ko', label='Effective Vol')
-    ax.plot(depth, icecube.effvol(depth), 'b--', label='Interpolated Effective Vol')
-    ax.set(xlabel='Depth [m]', ylabel='Effective Vol')
-
-    ax.legend()
-    fig.tight_layout()
-
-    plt.savefig('effvol.png', bbox_inches='tight')
-
-    plt.show()
-
-
-if __name__ == "__main__":
-    main()"""
+#def initialize(config):
+#    """Initialize a Detector model from configuration parameters.
+#
+#    Parameters
+#    ----------
+#
+#    config : :class:`asteria.config.Configuration`
+#        Configuration parameters used to create a Detector.
+#
+#    Returns
+#    -------
+#    Detector
+#        An initialized detector model.
+#    """
+#    detector_scope = config.detector.detector_scope
+#    
+#    geomfile = '/'.join([config.abs_base_path,
+#                         config.detector.geometry.table.path])
+#    effvfile = '/'.join([config.abs_base_path,
+#                         config.detector.effvol.table.path])
+#
+#    return Detector(geomfile, effvfile, detector_scope)
+#
+#"""
+#def main():
+#    Test main
+#    doms_table_fname = "../Icecube_geometry.20110102.complete.txt"
+#    effvol_table_fname = "../effvol/effectivevolume_benedikt_AHA_normalDoms.txt"
+#    icecube = Detector(doms_table_fname, effvol_table_fname)
+#    effvol = icecube.effvol_table()
+#    i3_doms = icecube.doms_table('i3')
+#    dc_doms = icecube.doms_table('dc')
+#
+#    import matplotlib.pyplot as plt
+#
+#    fig, ax = plt.subplots(1, figsize=(8, 5))
+#
+#    # ax.scatter(i3_doms['x'], i3_doms['y'], color='k', marker='o', label='i3_string')
+#    # ax.scatter(dc_doms['x'], dc_doms['y'], color='r', marker='o', label='dc_string')
+#    # ax.set(xlabel='X-axis [m]', ylabel='Y-axis [m]')
+#
+#    depth = np.arange(-500., 500., 5.)
+#    ax.plot(effvol['z'], effvol['effvol'], 'ko', label='Effective Vol')
+#    ax.plot(depth, icecube.effvol(depth), 'b--', label='Interpolated Effective Vol')
+#    ax.set(xlabel='Depth [m]', ylabel='Effective Vol')
+#
+#    ax.legend()
+#    fig.tight_layout()
+#
+#    plt.savefig('effvol.png', bbox_inches='tight')
+#
+#    plt.show()
+#
+#
+#if __name__ == "__main__":
+#    main()"""
