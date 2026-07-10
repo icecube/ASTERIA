@@ -32,14 +32,6 @@ Detector Response
     nb/detector_hits_IC86.ipynb
     nb/detector_hits_Gen2.ipynb
 
-ROOT I/O
---------
-
-.. toctree::
-    :maxdepth: 1
-
-    nb/sim_2_root.ipynb
-
 Other Notebooks
 ---------------
 
