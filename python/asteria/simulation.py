@@ -176,8 +176,12 @@ class Simulation:
         self._E_per_V = {}
         self._total_E_per_V = np.zeros(self.t.size)
 
-        #- Compute the flux for all flavors 
+        #- Compute the flux for all flavors. Do not extrapolate outside the
+        #  model's defined time.
         d3f_dEdtdA = self.model.get_flux(self.t, self.E, self.distance, self.xform)
+        select = (self.t >= self.model.time[0]) & (self.t <= self.model.time[-1])
+        d3f_dEdtdA.array[:, ~select, :] = 0 * d3f_dEdtdA.unit
+
         d2f_dtdA = d3f_dEdtdA.integrate('energy')
 
         #- Compute total energy per volume per unit time for each flavor
