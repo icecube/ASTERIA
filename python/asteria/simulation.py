@@ -238,12 +238,12 @@ class Simulation:
             elif subdetector == 'md':
                 return self.t_binned, E_per_V * (self.detector.md_total_effvol * self.eps_md)
             elif subdetector == 'ws':
-                if self._add_wls:
+                if self.add_wls:
                     return self.t_binned, E_per_V * (self.detector.ws_total_effvol * self.eps_ws)
                 else:
-                    raise ValueError(f"omtype = {subdetector} for add_wls = {self._add_wls} not allowed.")
+                    raise ValueError(f"omtype = {subdetector} for add_wls = {self.add_wls} not allowed.")
             else:
-                if self._add_wls:
+                if self.add_wls:
                     return self.t_binned, E_per_V * (self.detector.i3_total_effvol * self.eps_i3 +
                                                         self.detector.dc_total_effvol * self.eps_dc +
                                                         self.detector.md_total_effvol * self.eps_md +
@@ -291,7 +291,7 @@ class Simulation:
         effvol_Gen2 = 0.4288 * u.m ** 3 / u.MeV  # Simple estimation of Gen2 mDOM Eff. Vol. (np.avg(effvol_table))
 
         if self.detector_scope == "Gen2":
-            if self._add_wls:
+            if self.add_wls:
                 return effvol_IC86 * E_per_V * (self.eps_dc * self.detector.n_dc_doms + self.eps_i3 * self.detector.n_i3_doms) \
                         /(self.detector.n_dc_doms + self.detector.n_i3_doms) + effvol_Gen2 * E_per_V * self.eps_md
             #return effvol_IC86 * E_per_V * (self.eps_dc + self.eps_i3)/2 + effvol_Gen2 * E_per_V * self.eps_md
@@ -451,7 +451,7 @@ class Simulation:
 
         # Switches to improve readability
         use_gen2 = self.detector_scope == 'Gen2'
-        use_gen2_wls = use_gen2 and self._add_wls
+        use_gen2_wls = use_gen2 and self.add_wls
 
         _, hits_i3 = self.detector_hits(dt=dt, offset=offset, subdetector='i3')
         _, hits_dc = self.detector_hits(dt=dt, offset=offset, subdetector='dc')
@@ -625,7 +625,7 @@ class Simulation:
             self._eps_dc = self._compute_deadtime_efficiency(omtype='dc')
             if self.detector_scope == 'Gen2':
                 self._eps_md = self._compute_deadtime_efficiency(omtype='md')
-                if self._add_wls:
+                if self.add_wls:
                     self._eps_ws = self._eps_md # Assume the same dead time efficiency for WLS and mDOM as the readout happens in mDOM.
 
     def save_config(self, filename, overwrite=False):
@@ -731,7 +731,7 @@ class Simulation:
                 max_deadtime_eff = self._max_deadtime_eff_i3 # dc_ref_eff in detector.py should already include difference in deadtime
             elif omtype == 'md':
                 if self.detector_scope == 'Gen2':
-                    if self._add_wls:
+                    if self.add_wls:
                         dom_effvol = self.detector.md_dom_effvol + self.detector.ws_dom_effvol # WSL component contributes to mDOM signal
                     else:
                         dom_effvol = self.detector.md_dom_effvol
