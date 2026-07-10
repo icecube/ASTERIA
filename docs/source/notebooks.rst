@@ -20,7 +20,6 @@ Simulation Configuration
 
     nb/config_example.ipynb
     nb/AnalyticModel_DetectorResponse.ipynb
-    nb/luminosity.ipynb
 
 Detector Response
 -----------------
@@ -32,16 +31,6 @@ Detector Response
     nb/detector.ipynb
     nb/detector_hits_IC86.ipynb
     nb/detector_hits_Gen2.ipynb
-
-Flavor Transformations
-----------------------
-
-.. toctree::
-    :maxdepth: 1
-
-    nb/earth_models.ipynb
-    nb/PiegsaEarthOscillations.ipynb
-    nb/supernova_mixing.ipynb
 
 ROOT I/O
 --------
