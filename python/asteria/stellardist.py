@@ -23,7 +23,7 @@ class Distance(ABC):
         super().__init__()
 
     @abstractmethod
-    def distance(self, size=1):
+    def generate_distance(self, size=1):
         """Generate distance to a progenitor.
 
         Parameters
@@ -61,7 +61,7 @@ class FixedDistance(Distance):
         self.dist = d
         self.sigma = sigma
 
-    def distance(self, size=1):
+    def generate_distance(self, size=1):
         """Generate distance to a progenitor.
 
         Parameters
@@ -98,7 +98,7 @@ class FixedDistance(Distance):
 class StellarDensity(Distance):
     """Generate distances according to a Sun-centric radial mass density."""
 
-    def __init__(self, distcdf_file, add_LMC=False, add_SMC=False):
+    def __init__(self, distcdf_file, add_LMC=False, add_SMC=False, m_MW=2.012e10*u.Msun, m_LMC=2.7e9*u.Msun, m_SMC=3.1e8*u.Msun):
         """Progenitor distance with some uncertainty.
         
         Parameters
@@ -109,61 +109,61 @@ class StellarDensity(Distance):
             If true, add a Gaussian model of the LMC stellar distribution.
         add_SMC : bool
             If true, add a Gaussian model of the SMC stellar distribution.
+        m_MW : Quantity
+            Stellar mass of the Milky Way, excluding remnants. Default value is from Lian+ ApJL 37:990, 2025.
+        m_LMC : Quantity
+            Stellar mass of the LMC. Default value from van der Marel+ Proc.  IAU Symp 256 4:81, 2009 (arXiv:0809.4268).
+        m_SMC : Quantity
+            Stellar mass of the SMC. Default value from van der Marel+ Proc.  IAU Symp 256 4:81, 2009 (arXiv:0809.4268).
         """
         super().__init__()
 
         hdu = fits.open(distcdf_file)
         distunit = u.Unit(hdu['DIST'].header['BUNIT'])
-        self.dist = hdu['DIST'].data
-        self.cdf = hdu['CDF'].data
-        self.name = hdu['CDF'].header['NAME']
-        self.publication = hdu['CDF'].header['PUB']
-        self.use_LMC = add_LMC
-        self.use_SMC = add_SMC
-
-        # Virial mass of the MW is ~1.5e12 Msun; see L. Watkins et al., 
-        # ApJ 873:118 (2019), arXiv:1804.11348 [astro-ph.GA].
-        # Assume 5% of this is stored in stellar mass (educated guess).
-        m_MW = 0.05 * 1.5e12
+        self._dist = hdu['DIST'].data
+        self._cdf = hdu['CDF'].data
+        self._name = hdu['CDF'].header['NAME']
+        self._publication = hdu['CDF'].header['PUB']
+        self._use_LMC = add_LMC
+        self._use_SMC = add_SMC
 
         if add_LMC:
-            # Combined visible mass of LMC disk and neutral gas; see 
-            # Kinematical Structure of the Magellanic System,
-            # R. P. van der Marel, N. Kallivayalil, G. Besla, Proc. IAU Symp.
-            # 256, 2009, 81-92, arXiv:0809.4268 [astro-ph].
-            m_LMC = 3.2e9
+            #- Treat the LMC as a Gaussian blob centered 50 kpc from Earth
             r_LMC = (50*u.kpc).to(distunit).value
             sigma_LMC = (2.5*u.kpc).to(distunit).value
 
-            mratio = m_LMC/m_MW
+            mratio = float(m_LMC/m_MW)
             dist_LMC = np.linspace(r_LMC-5*sigma_LMC, r_LMC+5*sigma_LMC, 51)
             cdf_LMC = mratio * norm.cdf(dist_LMC, r_LMC, sigma_LMC)
 
-            self.dist = np.append(self.dist, dist_LMC)
-            self.cdf = np.append(self.cdf, 1. + cdf_LMC)
-            self.cdf /= np.max(self.cdf)
+            self._dist = np.append(self._dist, dist_LMC)
+            self._cdf = np.append(self._cdf, 1. + cdf_LMC)
+
+            #- Cut repeat entries and ensure monotonicity in the CDF
+            self._dist, idx = np.unique(self._dist[self._dist.argsort(kind='stable')], return_index=True)
+            self._cdf = self._cdf[idx] / np.max(self._cdf[idx])
         if add_SMC:
-            # Total stellar mass of the SMC is estimated to be 3.1x10^8 Msun;
-            # R. P. van der Marel, N. Kallivayalil, G. Besla, Proc. IAU Symp.
-            # 256, 2009, 81-92, arXiv:0809.4268 [astro-ph].
-            m_SMC = 3.1e8
+            #- Treat the LMC as a Gaussian blob centered 60 kpc from Earth
             r_SMC = (60*u.kpc).to(distunit).value
             sigma_SMC = (1.25*u.kpc).to(distunit).value
 
-            mratio = m_SMC/m_MW
+            mratio = float(m_SMC/m_MW)
             dist_SMC = np.linspace(r_SMC-5*sigma_SMC, r_SMC+5*sigma_SMC, 51)
             cdf_SMC = mratio * norm.cdf(dist_SMC, r_SMC, sigma_SMC)
 
-            self.dist = np.append(self.dist, dist_SMC)
-            self.cdf = np.append(self.cdf, 1. + cdf_SMC)
-            self.cdf /= np.max(self.cdf)
+            self._dist = np.append(self._dist, dist_SMC)
+            self._cdf = np.append(self._cdf, 1. + cdf_SMC)
 
-        self._inv_cdf = PchipInterpolator(self.cdf, self.dist)
+            #- Cut repeat entries and ensure monotonicity in the CDF
+            self._dist, idx = np.unique(self._dist[self._dist.argsort(kind='stable')], return_index=True)
+            self._cdf = self._cdf[idx] / np.max(self._cdf[idx])
 
-        # Set distance in distance units.
-        self.dist *= distunit
+        self._inv_cdf = PchipInterpolator(self._cdf, self._dist)
 
-    def distance(self, size=1):
+        #- Set distance in distance units
+        self._dist *= distunit
+
+    def generate_distance(self, size=1):
         """Generate distance to a progenitor.
 
         Parameters
@@ -177,7 +177,7 @@ class StellarDensity(Distance):
             Distance(s) to CCSN progenitor.
         """
         u = np.random.uniform(0.,1., size)
-        return self._inv_cdf(u) * self.dist.unit
+        return self._inv_cdf(u) * self._dist.unit
 
     def __str__(self):
         """Express as a string.
@@ -188,9 +188,32 @@ class StellarDensity(Distance):
             String representation of StellarDensity.
         """
         s = 'Stellar density:\n'
-        s += '- model   = {}\n'.format(self.name)
-        s += '- paper   = {}\n'.format(self.publication)
-        s += '- use LMC = {}\n'.format(self.use_LMC)
-        s += '- use SMC = {}'.format(self.use_SMC)
+        s += '- model   = {}\n'.format(self._name)
+        s += '- paper   = {}\n'.format(self._publication)
+        s += '- use LMC = {}\n'.format(self._use_LMC)
+        s += '- use SMC = {}'.format(self._use_SMC)
         return s
 
+    @property
+    def distance(self):
+        return self._dist
+
+    @property
+    def cdf(self):
+        return self._cdf
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def publiation(self):
+        return self._publication
+
+    @property
+    def use_LMC(self):
+        return self._use_LMC
+
+    @property
+    def use_SMC(self):
+        return self._use_SMC
