@@ -9,10 +9,10 @@ class TestStellarDistributions(unittest.TestCase):
 
     def test_fixed_distance(self):
         fd = FixedDistance(10*u.kpc)
-        d = fd.distance()[0]
+        d = fd.generate_distance()[0]
         self.assertTrue(d == 10*u.kpc)
 
-        d = fd.distance(size=5)
+        d = fd.generate_distance(size=5)
         self.assertTrue(len(d) == 5)
 
     def test_stellar_density(self):
@@ -22,5 +22,5 @@ class TestStellarDistributions(unittest.TestCase):
 
         sd = StellarDensity(stellar_file)
 
-        d = sd.distance()
+        d = sd.generate_distance()
         self.assertTrue(np.abs(d.to('kpc').value - 8.853) < 1e-3)
